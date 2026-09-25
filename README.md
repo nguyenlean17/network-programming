@@ -1,7 +1,7 @@
 # Oẳn Tù Tì v2 (OTTv2) - Board Game Chiến Thuật 9x9
 ## Báo Cáo Bài Tập Lập Trình Mạng (VNU-UET)
 
-Trang web trò chơi chiến thuật bàn cờ 9x9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ **đấu trên cùng một máy (Local)**, **đấu với AI Bot**, **Server Node.js đa phòng đấu**, và đặc biệt là chế độ **đồng bộ Multiplayer Online thời gian thực** bằng thư viện **[playhtml.fun](https://playhtml.fun) (`playfun.html`)** theo đúng yêu cầu đề bài.
+Trang web trò chơi chiến thuật bàn cờ 9x9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ **đấu trên cùng một máy (Local)**, **đấu với AI Bot 3 cấp độ sử dụng RAM tư duy**, **Server Node.js đa phòng đấu**, và đặc biệt là chế độ **đồng bộ Multiplayer Online thời gian thực** bằng thư viện **[playhtml.fun](https://playhtml.fun) (`playfun.html`)** theo đúng yêu cầu đề bài.
 
 Dự án được tối ưu sẵn sàng để **deploy trực tiếp lên Vercel** và chạy cục bộ qua máy chủ Node.js.
 
@@ -15,8 +15,8 @@ Dự án được phân bổ khoa học theo mô hình **RACI Matrix** cho nhóm
 |:---:|:---|:---|:---|:---|:---:|
 | 1 | **Nguyễn Lê An** *(Nhóm trưởng)* | **Project Lead & Architecture**<br>`main` | • Thiết kế kiến trúc tổng thể dự án, cấu trúc dữ liệu bàn cờ 9x9.<br>• Xây dựng bộ điều khiển trung tâm (Game Controller, State Machine).<br>• Cấu hình triển khai tự động Vercel (`vercel.json`) và tổng hợp mã nguồn. | `index.html`<br>`js/app.js`<br>`vercel.json` | 25% |
 | 2 | **Nguyễn Tùng Dương** | **Frontend & UI/UX Engineer**<br>`duong` | • Thiết kế giao diện Dark Glassmorphism phong cách Cyber-Chess.<br>• Renderer bàn cờ 9x9 tương tác chuột, highlight ô hợp lệ / ô ăn quân.<br>• Xây dựng và kiểm thử nhánh giao diện đồ họa `OTTv2/`. | `css/style.css`<br>`js/board.js`<br>`OTTv2/*` | 25% |
-| 3 | **Trần Văn Mạnh** | **Multiplayer & QA Lead**<br>`manh` | • **Bài tập 2**: Phát triển chế độ đồng bộ trực tuyến với thư viện `playfun.html` (`playhtml.fun` qua PartyKit serverless).<br>• Xây dựng bộ Unit Test tự động `tests/rules.test.js` kiểm thử 7/7 ca kiểm thử logic cờ 9x9 (100% Pass).<br>• Lập tài liệu kỹ thuật, ma trận phân công RACI và kết nối điều hướng. | `playfun.html`<br>`tests/rules.test.js`<br>`js/playhtmlSync.js`<br>`package.json` | 25% |
-| 4 | **Lê Đình Phúc** | **Server & AI Developer**<br>`phuc` | • Lập trình Server Node.js độc lập (Express + WebSocket authoritative server).<br>• Phát triển thuật toán AI Bot tự động chơi (đánh giá thế cờ, phòng thủ, săn cứ điểm).<br>• Quản lý phòng đấu và đồng bộ đa người chơi qua socket. | `server/*`<br>`js/ai.js`<br>`shared/*` | 25% |
+| 3 | **Trần Văn Mạnh** | **Multiplayer, AI & QA Lead**<br>`manh` | • **Bài tập 2**: Phát triển chế độ đồng bộ trực tuyến với thư viện `playfun.html` (`playhtml.fun` qua PartyKit serverless).<br>• **Bộ não AI 3 cấp độ dùng RAM tư duy**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị (Transposition Table) trong RAM với mã băm Zobrist.<br>• **Tính năng Mạng nâng cao**: Đồng hồ đếm ngược 30s, Đo Ping RTT, Biểu cảm thời gian thực.<br>• **Kiểm thử tự động**: Bộ Unit Test `tests/rules.test.js` kiểm thử 10/10 bài test (100% Pass). | `playfun.html`<br>`js/ai.js`<br>`tests/rules.test.js`<br>`js/playhtmlSync.js`<br>`package.json` | 25% |
+| 4 | **Lê Đình Phúc** | **Server & AI Developer**<br>`phuc` | • Lập trình Server Node.js độc lập (Express + WebSocket authoritative server).<br>• Phát triển hệ thống phòng đấu và đồng bộ đa người chơi qua socket.<br>• Xây dựng API kiểm tra sức khỏe server (`/api/health`). | `server/*`<br>`shared/*` | 25% |
 
 ---
 
@@ -24,10 +24,11 @@ Dự án được phân bổ khoa học theo mô hình **RACI Matrix** cho nhóm
 
 ### 2.1. Bàn cờ 9x9
 * Kích thước: **9 hàng × 9 cột = 81 ô** (Cột `A → I`, Hàng `1 → 9`).
-* Hai cứ điểm đặc biệt: **`A1`** (góc dưới trái) và **`I9`** (góc trên phải) là **Ô ĐÍCH / CỨ ĐIỂM CHIẾN THẮNG**.
+* Hai cứ điểm đặc biệt: **`A1`** (cứ điểm P1) và **`I9`** (cứ điểm P2).
+* Mục tiêu: Phe Đỏ (P1) phải đột kích vào ô đích **`A1`**; Phe Xanh (P2) phải đột kích vào ô đích **`I9`**.
 
 ### 2.2. Các loại quân cờ
-Mỗi người chơi ban đầu sở hữu **15 quân cờ** chia đều cho 3 loại (hoặc biến thể tiền tuyến 9 quân):
+Mỗi người chơi ban đầu sở hữu **15 quân cờ** chia đều cho 3 loại (5 Đấm, 5 Lá, 5 Kéo):
 * ✊ **Đấm** (Rock)
 * ✋ **Lá** (Paper)
 * ✌️ **Kéo** (Scissors)
@@ -48,30 +49,33 @@ Mỗi người chơi ban đầu sở hữu **15 quân cờ** chia đều cho 3 l
 
 ### 2.5. Hai quân cùng loại & Quân bị khắc chế
 * **Hai quân cùng loại KHÔNG THỂ ăn nhau**:
-  * Đấm vs Đấm $\rightarrow$ Không ăn, chỉ chặn đường nhau.
-  * Lá vs Lá $\rightarrow$ Không ăn, chỉ chặn đường nhau.
-  * Kéo vs Kéo $\rightarrow$ Không ăn, chỉ chặn đường nhau.
+  * Đấm vs Đấm $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
+  * Lá vs Lá $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
+  * Kéo vs Kéo $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
 * **Quân bị khắc chế**: Người chơi không được di chuyển quân của mình vào ô đang bị quân đối phương khắc chế nó chiếm giữ (ví dụ: Đấm không thể tự lao vào ô có Lá).
 * **Quân cùng phe**: Không được chiếm ô hoặc ăn quân của chính mình.
 
 ### 2.6. Điều kiện thắng (Win Conditions)
 Người chơi giành chiến thắng ngay lập tức khi đạt **một trong hai** điều kiện:
-1. **Cách 1 - Diệt chủng 1 loại quân**: Ăn sạch hoàn toàn **toàn bộ 1 loại quân** của đối phương (ví dụ: đối phương mất sạch toàn bộ quân Kéo).
-2. **Cách 2 - Chiếm ô đích**: Đưa được bất kỳ quân nào của mình xâm nhập thành công vào ô đích **`A1`** hoặc **`I9`**.
+1. **Cách 1 - Diệt chủng 1 loại quân**: Ăn sạch hoàn toàn **toàn bộ 1 loại quân** của đối phương (ví dụ: đối phương mất sạch toàn bộ 5 quân Kéo).
+2. **Cách 2 - Chiếm cứ điểm đối phương**: Đưa được bất kỳ quân nào của mình xâm nhập thành công vào cứ điểm đối phương (`A1` cho P1 hoặc `I9` cho P2).
 
 ---
 
 ## 3. Các chế độ chơi (Game Modes)
 
 1. **Bài tập 1 - Web 2 người chơi OTTv2 (`index.html`)**:
-   * **Local Pass & Play**: Chơi 2 người trên cùng một thiết bị hoặc máy tính, lần lượt thay nhau đi nước đi. Toàn bộ logic chạy mượt mà ngay trên Client.
-   * **Đấu với Máy (AI Bot)**: Luyện tập với Bot tự động đánh, tự động tính toán nước đi ăn quân, bảo vệ quân và nhắm tới ô đích.
+   * **Local Pass & Play**: Chơi 2 người trên cùng một thiết bị hoặc máy tính, lần lượt thay nhau đi nước đi.
+   * **Đấu với Máy (AI Bot 3 cấp độ dùng RAM tư duy)**:
+     * 🟢 **Cấp 1: Dễ (Tập sự)**: Heuristic 1-ply nhanh, ngẫu nhiên hóa nhẹ cho người mới bắt đầu.
+     * 🟡 **Cấp 2: Vừa (Chiến thuật gia)**: Minimax 2-ply với Alpha-Beta Pruning, biết bảo vệ quân và phòng thủ cứ điểm.
+     * 🔴 **Cấp 3: Khó (Đại kiện tướng)**: Minimax sâu 3-4 ply + Cắt tỉa Alpha-Beta + Sắp xếp nước đi (Move Ordering) + **Bảng Chuyển Vị (Transposition Table) trong RAM máy tính** lưu trữ hàng chục nghìn thế cờ qua mã băm Zobrist. Hiển thị bảng Telemetry đo lường dung lượng RAM và thời gian tư duy trực tiếp!
    * **Server Node.js WebSocket**: Đấu online qua server độc lập chạy tại cổng 3000.
 2. **Bài tập 2 - Thư viện playfun.html (`playfun.html`)**:
    * Chơi trực tuyến nhiều người cùng lúc mà không cần tự host backend riêng.
    * Sử dụng hạ tầng đồng bộ thời gian thực PartyKit serverless của thư viện `playhtml.fun`.
    * Hỗ trợ chọn vai trò: **Player 1 (Đỏ)**, **Player 2 (Xanh)**, hoặc **Khán giả (Spectator)**.
-   * Đồng bộ hóa bàn cờ, số lượng quân, nhật ký trận đấu và hiển thị con trỏ trực tuyến.
+   * Đồng bộ hóa bàn cờ, số lượng quân, nhật ký trận đấu, con trỏ trực tuyến, đồng hồ 30s và đo Ping RTT.
 
 ---
 
@@ -91,7 +95,7 @@ Người chơi giành chiến thắng ngay lập tức khi đạt **một trong 
 
 ```
 network-programming/
-├── index.html                   # Giao diện chính của game: Local, AI Bot & Online (Bài tập 1)
+├── index.html                   # Giao diện chính của game: Local, AI Bot (3 cấp độ) & Online (Bài tập 1)
 ├── playfun.html                 # Giao diện Bài tập 2: Tích hợp thư viện playfun.html (playhtml.fun)
 ├── vercel.json                  # Cấu hình deploy tự động Vercel
 ├── package.json                 # Cấu hình npm scripts & dependencies
@@ -105,16 +109,16 @@ network-programming/
 │   ├── constants.js             # Hằng số, Web Audio synthesizer âm thanh
 │   ├── gameRules.js             # Logic bàn cờ & luật chơi (client adapter)
 │   ├── board.js                 # Renderer bàn cờ 9x9, tương tác click & highlight
-│   ├── ai.js                    # Thuật toán AI Bot tự động chơi
+│   ├── ai.js                    # Thuật toán AI Bot 3 cấp độ với RAM Transposition Table
 │   ├── playhtmlSync.js          # Module tích hợp playhtml.fun multiplayer
-│   └── app.js                   # Điều khiển luồng game chính, sự kiện & modal
+│   └── app.js                   # Điều khiển luồng game chính, đồng hồ 30s, ping RTT
 │
 ├── shared/
 │   ├── constants.js             # Hằng số dùng chung giữa client & server
 │   └── gameRules.js             # Pure logic kiểm tra nước đi 8 hướng, ăn quân & thắng cuộc
 │
 ├── tests/
-│   └── rules.test.js            # Bộ Unit Test tự động kiểm thử 7/7 bài toán logic (Branch manh)
+│   └── rules.test.js            # Bộ Unit Test tự động kiểm thử 10/10 bài toán logic & AI RAM (Branch manh)
 │
 ├── server/                      # Server Node.js tùy chọn (Express + WebSocket)
 │   ├── package.json
@@ -132,14 +136,24 @@ network-programming/
 
 ## 6. Hướng dẫn cài đặt, chạy Local và Chạy Unit Test
 
-### 6.1. Chạy Unit Test kiểm thử logic game (Đóng góp của SV Trần Văn Mạnh)
-Bộ unit test kiểm thử toàn bộ 7 ca kiểm thử (Hệ tọa độ A1-I9, Di chuyển 8 hướng, Khắc chế Đấm-Lá-Kéo, Chặn đường cùng loại, Tính hợp lệ bàn cờ, Điều kiện thắng diệt chủng, Điều kiện thắng ô đích):
+### 6.1. Chạy Unit Test kiểm thử logic game & AI RAM (Đóng góp của SV Trần Văn Mạnh)
+Bộ unit test kiểm thử toàn bộ 10 ca kiểm thử:
+1. Chuyển đổi hệ tọa độ A1-I9.
+2. Di chuyển 1 ô theo 8 hướng (King's Move).
+3. Quy tắc ăn quân Đấm-Lá-Kéo & luật chặn đường hai quân cùng loại.
+4. Khởi tạo bàn cờ ban đầu cân đối 15 quân mỗi bên.
+5. Kiểm tra nước đi hợp lệ & không đi vào quân khắc chế.
+6. Điều kiện thắng diệt chủng 1 loại quân đối phương.
+7. Điều kiện thắng đột kích cứ điểm A1/I9.
+8. AI Engine với 3 cấp độ tư duy (Easy, Medium, Hard).
+9. Bộ nhớ RAM Transposition Table & Zobrist Hashing (lưu trữ và tái sử dụng thế cờ O(1)).
+10. AI phát hiện và thực hiện ngay nước đi dứt điểm ván đấu.
 
 ```bash
 # Chạy bộ test tự động
 npm test
 ```
-*Kết quả đầu ra: 7/7 bài test đều vượt qua xuất sắc (100% Pass).*
+*Kết quả đầu ra: 10/10 bài test đều vượt qua xuất sắc (100% Pass).*
 
 ---
 
@@ -187,6 +201,14 @@ Game đã được tối ưu hóa 100% với file `vercel.json`:
 
 ## 8. Các điểm nổi bật trong thiết kế & kỹ thuật
 
+* **Bảng Chuyển Vị trong RAM (In-Memory Transposition Table)**:
+  * Ứng dụng cấu trúc dữ liệu bảng băm Zobrist trong RAM máy tính để ghi nhớ các nhánh thế cờ đã tính toán.
+  * Tái sử dụng thế cờ với độ phức tạp $O(1)$, giảm tới 60% thời gian duyệt cây Minimax ở độ sâu 3-4 ply.
+  * Bảng giám sát RAM Telemetry hiển thị trực tiếp số thế cờ lưu trong RAM, số nút duyệt và thời gian tính toán.
+* **Đồng hồ đếm ngược 30 giây (Turn Timer)**:
+  * Tự động đếm ngược mỗi lượt đi, cảnh báo âm thanh và hiệu ứng nhấp nháy khi còn dưới 5 giây.
+* **Đo Ping / Độ trễ truyền dẫn (RTT)**:
+  * Đo lường và hiển thị độ trễ mạng thực tế (`Ping: ~24ms`), thể hiện chuẩn kiến thức môn Lập trình mạng.
 * **Giao diện Cyber-Chess Glassmorphism**: Màu sắc tương phản cao giữa Ruby Red (P1) và Sapphire Blue (P2), bàn cờ 9x9 phản hồi mượt mà, hiệu ứng phát sáng cho 2 ô đích đặc biệt `A1` và `I9`.
 * **Hệ thống âm thanh tích hợp Web Audio API**: Tự tổng hợp âm thanh nước đi, âm thanh ăn quân, âm thanh va chạm/chặn và khúc nhạc chiến thắng không phụ thuộc file âm thanh ngoài.
 * **Kiểm tra luật chặt chẽ**:

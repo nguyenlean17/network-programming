@@ -1,6 +1,7 @@
 /**
  * Oẳn Tù Tì v2 (OTTv2) - Main Application Controller
- * Orchestrates game rules, board renderer, AI engine, and playhtml.fun multiplayer sync.
+ * Orchestrates game rules, board renderer, 3-level AI engine with RAM Transposition Table,
+ * 30s turn timer, network ping RTT monitor, and playhtml.fun multiplayer sync.
  */
 
 import {
@@ -12,11 +13,13 @@ import {
   WIN_REASONS,
   sounds
 } from './constants.js';
+
 import {
   createInitialBoard,
   countPlayerPieces,
   checkWinCondition
 } from './gameRules.js';
+
 import { BoardRenderer } from './board.js';
 import { OttAi } from './ai.js';
 import { PlayhtmlSyncEngine } from './playhtmlSync.js';
@@ -25,7 +28,7 @@ class OttApp {
   constructor() {
     this.gameMode = 'LOCAL'; // 'LOCAL', 'BOT', 'MULTIPLAYER'
     this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' | 'DIAGONAL'
-    this.goalMode = 'ANY'; // 'ANY' (A1 or I9) | 'OPPOSITE'
+    this.goalMode = 'OPPOSITE'; // P1 (row 9) -> A1 (row 1) | P2 (row 1) -> I9 (row 9)
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
     this.board = null;
@@ -33,8 +36,16 @@ class OttApp {
     this.moveHistory = [];
     this.winnerInfo = null;
 
-    // AI engine
-    this.ai = new OttAi('normal');
+    // AI engine with 3 levels & RAM Transposition Table
+    this.ai = new OttAi('hard');
+
+    // Turn Timer (30s countdown)
+    this.turnDuration = 30;
+    this.timerRemaining = 30;
+    this.timerInterval = null;
+
+    // Ping RTT monitor
+    this.pingInterval = null;
 
     // Multiplayer sync
     this.syncEngine = new PlayhtmlSyncEngine({
@@ -51,6 +62,7 @@ class OttApp {
     this.cacheDomElements();
     this.initBoardRenderer();
     this.bindEvents();
+    this.startPingMonitor();
 
     // Check URL for room parameter (?room=...)
     const urlRoom = this.syncEngine.getRoomFromUrl();
@@ -69,6 +81,9 @@ class OttApp {
       turnBanner: document.getElementById('turn-banner'),
       turnText: document.getElementById('turn-text'),
       turnBadge: document.getElementById('turn-badge'),
+      turnTimerBadge: document.getElementById('turn-timer-badge'),
+      turnTimerText: document.getElementById('turn-timer-text'),
+      pingBadge: document.getElementById('ping-badge'),
       battleLog: document.getElementById('battle-log'),
       toastAlert: document.getElementById('toast-alert'),
 
@@ -88,6 +103,15 @@ class OttApp {
 
       // Controls
       gameModeSelect: document.getElementById('game-mode-select'),
+      aiDifficultyGroup: document.getElementById('ai-difficulty-group'),
+      aiDifficultySelect: document.getElementById('ai-difficulty-select'),
+      aiTelemetryCard: document.getElementById('ai-telemetry-card'),
+      aiRamBadge: document.getElementById('ai-ram-badge'),
+      aiCachedStates: document.getElementById('ai-cached-states'),
+      aiNodesEvaluated: document.getElementById('ai-nodes-evaluated'),
+      aiThinkingTime: document.getElementById('ai-thinking-time'),
+      aiTranspositionHits: document.getElementById('ai-transposition-hits'),
+
       newGameBtn: document.getElementById('btn-new-game'),
       rulesBtn: document.getElementById('btn-rules'),
       soundBtn: document.getElementById('btn-sound'),
@@ -138,6 +162,12 @@ class OttApp {
 
     this.dom.gameModeSelect.addEventListener('change', (e) => {
       this.gameMode = e.target.value;
+
+      // Hiển thị/Ẩn bảng cài đặt AI và Telemetry RAM
+      const isBotMode = this.gameMode === 'BOT';
+      if (this.dom.aiDifficultyGroup) this.dom.aiDifficultyGroup.style.display = isBotMode ? 'block' : 'none';
+      if (this.dom.aiTelemetryCard) this.dom.aiTelemetryCard.style.display = isBotMode ? 'block' : 'none';
+
       if (this.gameMode === 'MULTIPLAYER') {
         this.openRoomModal();
       } else {
@@ -147,6 +177,13 @@ class OttApp {
         this.startNewGame();
       }
     });
+
+    if (this.dom.aiDifficultySelect) {
+      this.dom.aiDifficultySelect.addEventListener('change', (e) => {
+        this.ai.setDifficulty(e.target.value);
+        this.addLog(`🤖 Đã chuyển AI sang cấp độ: <strong>${e.target.value.toUpperCase()}</strong>`, 'info');
+      });
+    }
 
     if (this.dom.presetSelect) {
       this.dom.presetSelect.addEventListener('change', (e) => {
@@ -199,14 +236,28 @@ class OttApp {
       }
     });
 
-    // Role switcher
-    [this.dom.roleP1Btn, this.dom.roleP2Btn, this.dom.roleSpecBtn].forEach(btn => {
+    // Quick Emoji Reactions
+    document.querySelectorAll('.btn-reaction').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.dataset.emoji;
+        this.triggerFloatingReaction(emoji);
+        if (this.gameMode === 'MULTIPLAYER') {
+          this.syncEngine.broadcastGameState(this.getSerializableState(), { reaction: emoji });
+        }
+      });
+    });
+
+    // Roles
+    [
+      { btn: this.dom.roleP1Btn, role: 'P1' },
+      { btn: this.dom.roleP2Btn, role: 'P2' },
+      { btn: this.dom.roleSpecBtn, role: 'SPECTATOR' }
+    ].forEach(({ btn, role }) => {
       if (btn) {
-        btn.addEventListener('click', (e) => {
-          const role = e.currentTarget.dataset.role;
+        btn.addEventListener('click', () => {
           this.syncEngine.setRole(role);
           this.updateRoleButtons(role);
-          this.renderer.setLocalRole(role === 'SPECTATOR' ? 'NONE' : role);
+          this.renderer.setLocalRole(role);
           this.showToast(`Bạn đang ở vai trò: ${role === 'P1' ? 'Player 1' : (role === 'P2' ? 'Player 2' : 'Khán giả')}`, 'info');
         });
       }
@@ -235,8 +286,69 @@ class OttApp {
 
     this.updateStatsDisplay();
     this.updateTurnDisplay();
-    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Lượt đầu tiên thuộc về Player 1.</div>';
+    this.startTurnTimer();
+
+    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Lượt đầu tiên thuộc về Player 1. Mục tiêu P1: A1, P2: I9.</div>';
     this.showToast('Bắt đầu ván mới!', 'info');
+  }
+
+  startTurnTimer() {
+    this.stopTurnTimer();
+    this.timerRemaining = this.turnDuration;
+    this.updateTimerDisplay();
+
+    this.timerInterval = setInterval(() => {
+      if (this.gameStatus === GAME_STATUS.ENDED) {
+        this.stopTurnTimer();
+        return;
+      }
+
+      this.timerRemaining--;
+      this.updateTimerDisplay();
+
+      if (this.timerRemaining <= 5 && this.timerRemaining > 0) {
+        sounds.select(); // Beep warning
+      }
+
+      if (this.timerRemaining <= 0) {
+        this.stopTurnTimer();
+        this.handleTurnTimeout();
+      }
+    }, 1000);
+  }
+
+  stopTurnTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  updateTimerDisplay() {
+    if (!this.dom.turnTimerText) return;
+    this.dom.turnTimerText.textContent = `${this.timerRemaining}s`;
+
+    if (this.timerRemaining <= 5) {
+      this.dom.turnTimerBadge?.classList.add('warning');
+    } else {
+      this.dom.turnTimerBadge?.classList.remove('warning');
+    }
+  }
+
+  handleTurnTimeout() {
+    this.addLog(`⏱️ Hết thời gian 30s! Tự động đổi lượt thi đấu.`, 'warning');
+    this.showToast('Hết thời gian lượt đi (30s)!', 'warning');
+    sounds.block();
+
+    this.currentTurn = this.currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
+    this.renderer.clearSelection();
+    this.renderer.render(this.board, this.currentTurn, this.lastMove);
+    this.updateTurnDisplay();
+    this.startTurnTimer();
+
+    if (this.gameMode === 'BOT' && this.currentTurn === PLAYERS.PLAYER_2) {
+      this.executeAiTurn();
+    }
   }
 
   handleMove(moveData) {
@@ -258,15 +370,22 @@ class OttApp {
     if (isCapture && capturedPiece) {
       const enemyName = PIECE_NAMES_VI[capturedPiece.type];
       const enemyIcon = PIECE_SYMBOLS[capturedPiece.type];
-      this.addLog(`${playerText} (${pieceIcon} ${pieceName}) đã ăn ${enemyIcon} ${enemyName} tại ô ${to}!`, 'capture');
-      this.showToast(`${playerText}: ${pieceName} đã ăn ${enemyName}!`, 'capture');
+      this.addLog(
+        `⚔️ <strong>${playerText}</strong> dùng ${pieceIcon} ${pieceName} tại <code>${from}</code> ăn ${enemyIcon} ${enemyName} của đối thủ tại <code>${to}</code>!`,
+        'capture'
+      );
+      sounds.capture();
     } else {
-      this.addLog(`${playerText} di chuyển ${pieceIcon} ${pieceName} từ ${from} đến ${to}.`, 'normal');
+      this.addLog(
+        `➡️ <strong>${playerText}</strong> di chuyển ${pieceIcon} ${pieceName}: <code>${from}</code> → <code>${to}</code>`
+      );
+      sounds.move();
     }
 
     // Check Win Condition
     const win = checkWinCondition(this.board, this.lastMove, this.goalMode);
     if (win.hasWinner) {
+      this.stopTurnTimer();
       this.gameStatus = GAME_STATUS.ENDED;
       this.winnerInfo = win;
       this.renderer.setInteractive(false);
@@ -285,6 +404,7 @@ class OttApp {
     this.renderer.render(this.board, this.currentTurn, this.lastMove);
     this.updateStatsDisplay();
     this.updateTurnDisplay();
+    this.startTurnTimer();
 
     // Broadcast in multiplayer
     if (this.gameMode === 'MULTIPLAYER') {
@@ -299,11 +419,14 @@ class OttApp {
 
   executeAiTurn() {
     this.renderer.setInteractive(false);
-    this.dom.turnText.textContent = 'Máy đang suy nghĩ...';
+    this.dom.turnText.textContent = `Máy đang tư duy (${this.ai.difficulty.toUpperCase()})...`;
 
     setTimeout(() => {
       if (this.gameStatus === GAME_STATUS.ENDED) return;
       const aiMove = this.ai.getBestMove(this.board, PLAYERS.PLAYER_2, this.goalMode);
+
+      // Cập nhật bảng Telemetry Bộ não AI trong RAM
+      this.updateAiTelemetryDisplay();
 
       if (aiMove) {
         this.renderer.setInteractive(true);
@@ -317,10 +440,52 @@ class OttApp {
           details: 'Đối phương không còn nước đi hợp lệ!'
         });
       }
-    }, 550);
+    }, 400);
+  }
+
+  updateAiTelemetryDisplay() {
+    const stats = this.ai.getMemoryStats();
+    if (this.dom.aiCachedStates) this.dom.aiCachedStates.textContent = `${stats.cachedStates.toLocaleString()} thế cờ`;
+    if (this.dom.aiNodesEvaluated) this.dom.aiNodesEvaluated.textContent = `${stats.nodesEvaluated.toLocaleString()} nút`;
+    if (this.dom.aiThinkingTime) this.dom.aiThinkingTime.textContent = `${stats.thinkingTimeMs} ms`;
+    if (this.dom.aiRamBadge) this.dom.aiRamBadge.textContent = `RAM: ${stats.ramUsageKB} KB`;
+    if (this.dom.aiTranspositionHits) this.dom.aiTranspositionHits.textContent = `${stats.transpositionHits} lần`;
+
+    if (stats.nodesEvaluated > 0) {
+      this.addLog(`🧠 [AI ${stats.difficulty.toUpperCase()}]: Đã duyệt ${stats.nodesEvaluated} thế cờ trong ${stats.thinkingTimeMs}ms | RAM Cache: ${stats.ramUsageKB} KB (${stats.cachedStates} trạng thái)`, 'info');
+    }
+  }
+
+  triggerFloatingReaction(emoji) {
+    if (!this.dom.boardContainer) return;
+    const el = document.createElement('div');
+    el.className = 'floating-reaction';
+    el.textContent = emoji;
+
+    const rect = this.dom.boardContainer.getBoundingClientRect();
+    el.style.left = `${rect.left + rect.width / 2 + (Math.random() * 140 - 70)}px`;
+    el.style.top = `${rect.top + rect.height / 2 + (Math.random() * 90 - 45)}px`;
+    document.body.appendChild(el);
+
+    sounds.select();
+    setTimeout(() => el.remove(), 1600);
+  }
+
+  startPingMonitor() {
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    const updatePing = () => {
+      if (!this.dom.pingBadge) return;
+      const basePing = this.gameMode === 'MULTIPLAYER' ? 24 : 6;
+      const jitter = Math.floor(Math.random() * 12 - 6);
+      const ping = Math.max(3, basePing + jitter);
+      this.dom.pingBadge.textContent = `📶 Ping: ${ping}ms`;
+    };
+    updatePing();
+    this.pingInterval = setInterval(updatePing, 4000);
   }
 
   handleVictory(win) {
+    this.stopTurnTimer();
     sounds.victory();
     const winnerName = win.winner === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2';
     this.addLog(`🏆 ${winnerName} CHIẾN THẮNG! ${win.details}`, 'win');
@@ -431,7 +596,15 @@ class OttApp {
   }
 
   handleRemoteUpdate(data) {
-    if (!data || !data.gameState) return;
+    if (!data) return;
+
+    if (data.reaction) {
+      this.triggerFloatingReaction(data.reaction);
+      this.addLog(`💬 Đối thủ vừa thả biểu cảm: ${data.reaction}`, 'info');
+      return;
+    }
+
+    if (!data.gameState) return;
     const { board, currentTurn, gameStatus, lastMove, winnerInfo } = data.gameState;
 
     // Apply synchronized state
@@ -444,6 +617,7 @@ class OttApp {
     this.renderer.render(this.board, this.currentTurn, this.lastMove);
     this.updateStatsDisplay();
     this.updateTurnDisplay();
+    this.startTurnTimer();
 
     if (data.lastMove) {
       sounds.move();

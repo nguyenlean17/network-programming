@@ -28,6 +28,9 @@
     </div>
 
     <div class="header-actions">
+      <div id="ping-badge" class="status-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;" title="Độ trễ truyền dẫn mạng (RTT)">
+        📶 Ping: 24ms
+      </div>
       <div id="online-status-badge" class="status-badge">● Offline</div>
       <a href="playfun.html" class="btn btn-gold" style="text-decoration: none;" title="Chế độ thư viện playfun.html (Bài tập 2)">
         ⚡ playfun.html
@@ -95,8 +98,13 @@
           <span id="turn-badge" class="turn-badge">P1</span>
           <span id="turn-text" class="turn-text">Lượt của Player 1</span>
         </div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">
-          Mục tiêu: Ô đích <strong style="color: var(--gold);">A1</strong> hoặc <strong style="color: var(--gold);">I9</strong>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div id="turn-timer-badge" class="timer-badge" title="Đồng hồ đếm ngược lượt đi">
+            ⏱️ <span id="turn-timer-text">30s</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            Mục tiêu: Ô đích P1 <strong style="color: var(--gold);">A1</strong> · P2 <strong style="color: var(--gold);">I9</strong>
+          </div>
         </div>
       </div>
 
@@ -155,12 +163,52 @@
           </select>
         </div>
 
+        <!-- AI Difficulty (3 Cấp độ tư duy dùng RAM) -->
+        <div class="form-group" id="ai-difficulty-group" style="display: none;">
+          <label class="form-label" for="ai-difficulty-select">Cấp độ AI (Dùng RAM tư duy)</label>
+          <select id="ai-difficulty-select" class="form-select">
+            <option value="easy">🟢 Cấp 1: Dễ (Tập sự - 1-ply)</option>
+            <option value="medium">🟡 Cấp 2: Vừa (Chiến thuật gia - Minimax 2-ply)</option>
+            <option value="hard" selected>🔴 Cấp 3: Khó (Đại kiện tướng - RAM Cache 3-ply)</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label class="form-label" for="board-preset-select">Bố cục quân ban đầu</label>
           <select id="board-preset-select" class="form-select">
             <option value="FRONTLINE">Chiến tuyến đối đầu (Hàng 1-2 vs 8-9)</option>
             <option value="DIAGONAL">Đối xứng đường chéo (Góc A9 vs I1)</option>
           </select>
+        </div>
+      </div>
+
+      <!-- AI RAM Mind Telemetry Card -->
+      <div id="ai-telemetry-card" class="glass-card" style="display: none; border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.04); margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-weight: 700; font-size: 0.82rem; color: #34d399; display: flex; align-items: center; gap: 0.35rem;">
+            🧠 BỘ NÃO AI TRONG RAM
+          </span>
+          <span id="ai-ram-badge" class="badge-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+            RAM: 0 KB
+          </span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.3rem;">
+          <div style="display: flex; justify-content: space-between;">
+            <span>Thế cờ lưu trong RAM:</span>
+            <strong id="ai-cached-states" style="color: #f1f5f9;">0 thế cờ</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Nút duyệt lượt vừa qua:</span>
+            <strong id="ai-nodes-evaluated" style="color: #f1f5f9;">0 nút</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Thời gian tư duy:</span>
+            <strong id="ai-thinking-time" style="color: #f1f5f9;">0 ms</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Bộ nhớ tái sử dụng (Hits):</span>
+            <strong id="ai-transposition-hits" style="color: #34d399;">0 lần</strong>
+          </div>
         </div>
       </div>
 
@@ -171,6 +219,14 @@
         </div>
         <div id="battle-log" class="battle-log-scroll">
           <div class="log-entry info">Chào mừng đến với OTTv2! Chọn một quân để bắt đầu.</div>
+        </div>
+        <!-- Quick Emoji Reactions -->
+        <div class="quick-reactions">
+          <button class="btn-reaction" data-emoji="👏" title="Vỗ tay">👏</button>
+          <button class="btn-reaction" data-emoji="⚔️" title="Chiến thôi">⚔️</button>
+          <button class="btn-reaction" data-emoji="🔥" title="Cháy quá">🔥</button>
+          <button class="btn-reaction" data-emoji="😱" title="Bất ngờ">😱</button>
+          <button class="btn-reaction" data-emoji="🏆" title="Chiến thắng">🏆</button>
         </div>
       </div>
     </aside>

@@ -25,6 +25,8 @@ import {
   WIN_REASONS
 } from '../shared/constants.js';
 
+import { OttAi } from '../js/ai.js';
+
 console.log('================================================================');
 console.log('🧪 BẮT ĐẦU CHẠY BỘ KIỂM THỬ TÍNH ĐÚNG ĐẮN CỦA OTTv2 GAME ENGINE');
 console.log('   Thành viên: Trần Văn Mạnh (Nhánh: manh)');
@@ -170,6 +172,61 @@ assert.strictEqual(goalWin.winner, PLAYERS.PLAYER_1, 'P1 thắng khi vào I9');
 assert.strictEqual(goalWin.reason, WIN_REASONS.GOAL_REACHED);
 console.log('  ✓ Phát hiện điều kiện thắng chiếm ô đích chuẩn xác\n');
 
+// -------------------------------------------------------------
+// Test 8: AI Engine - 3 Cấp độ tư duy (Dễ, Vừa, Khó)
+// -------------------------------------------------------------
+console.log('8. Kiểm tra AI Engine với 3 cấp độ tư duy (Easy, Medium, Hard)...');
+const standardBoard = createInitialBoard();
+
+const aiEasy = new OttAi('easy');
+assert.strictEqual(aiEasy.difficulty, 'easy');
+const moveEasy = aiEasy.getBestMove(standardBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
+assert.ok(moveEasy && moveEasy.from && moveEasy.to, 'AI Easy phải sinh nước đi hợp lệ');
+
+const aiMedium = new OttAi('medium');
+assert.strictEqual(aiMedium.difficulty, 'medium');
+const moveMedium = aiMedium.getBestMove(standardBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
+assert.ok(moveMedium && moveMedium.from && moveMedium.to, 'AI Medium phải sinh nước đi hợp lệ');
+
+const aiHard = new OttAi('hard');
+assert.strictEqual(aiHard.difficulty, 'hard');
+const moveHard = aiHard.getBestMove(standardBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
+assert.ok(moveHard && moveHard.from && moveHard.to, 'AI Hard phải sinh nước đi hợp lệ');
+console.log('  ✓ Cả 3 cấp độ AI (Easy / Medium / Hard) khởi tạo và sinh nước đi hợp lệ 100%\n');
+
+// -------------------------------------------------------------
+// Test 9: AI Engine - Bộ nhớ RAM Transposition Table & Zobrist Hashing
+// -------------------------------------------------------------
+console.log('9. Kiểm tra Bảng Chuyển Vị trong RAM máy tính (Transposition Table Cache & Telemetry)...');
+const aiRam = new OttAi('hard');
+aiRam.clearMemory();
+assert.strictEqual(aiRam.transpositionTable.size, 0, 'Bảng RAM ban đầu phải trống');
+
+// Chạy 1 nước đi để ghi nhớ các thế cờ vào RAM
+aiRam.getBestMove(standardBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
+const stats = aiRam.getMemoryStats();
+
+assert.ok(stats.cachedStates > 0, 'Phải lưu trữ các trạng thái thế cờ trong RAM');
+assert.ok(stats.ramUsageKB >= 0, 'Dung lượng RAM ước tính phải đo lường được');
+assert.ok(stats.nodesEvaluated > 0, 'Phải đếm được số nút cờ đã phân tích');
+assert.strictEqual(stats.difficulty, 'hard');
+console.log(`  ✓ Đã lưu ${stats.cachedStates} thế cờ vào RAM (~${stats.ramUsageKB} KB). Đạt chuẩn bộ nhớ tư duy O(1)!\n`);
+
+// -------------------------------------------------------------
+// Test 10: AI Engine - Nhận biết nước đi dứt điểm ván cờ (Instant Win Detection)
+// -------------------------------------------------------------
+console.log('10. Kiểm tra AI phát hiện nước đi chiến thắng tức thì (Đột kích cứ điểm hoặc ăn quân cuối)...');
+const instantWinBoard = createEmptyBoard();
+// P2 có quân tại H8, chỉ cần đi vào I9 là thắng ngay!
+instantWinBoard[7][7] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_2, id: 'p2_winner' };
+// P1 có quân ở xa
+instantWinBoard[0][0] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_1, id: 'p1_dummy' };
+
+const aiSniper = new OttAi('hard');
+const winMove = aiSniper.getBestMove(instantWinBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
+assert.strictEqual(winMove.to, 'I9', 'AI phải chọn ngay nước đi vào cứ điểm I9 để thắng trận');
+console.log('  ✓ AI phát hiện và thực hiện ngay nước đi chiến thắng vào cứ điểm I9\n');
+
 console.log('================================================================');
-console.log('🎉 TẤT CẢ 7/7 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
+console.log('🎉 TẤT CẢ 10/10 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
 console.log('================================================================\n');

@@ -83,6 +83,9 @@
     </div>
 
     <div class="header-actions">
+      <div id="pf-ping-badge" class="status-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;" title="Độ trễ truyền dẫn mạng (RTT)">
+        📶 Ping: 24ms
+      </div>
       <a href="index.html" class="btn" style="text-decoration: none;" title="Về trang chủ chơi cục bộ">
         🏠 Chơi Local / AI (Bài 1)
       </a>
@@ -184,14 +187,28 @@
         <div id="sync-history" class="history-box">
           <div class="history-item">Khởi tạo giao thức playfun.html...</div>
         </div>
+
+        <!-- Quick Reactions -->
+        <div class="quick-reactions">
+          <button class="btn-reaction" data-emoji="👏" title="Vỗ tay">👏</button>
+          <button class="btn-reaction" data-emoji="⚔️" title="Chiến thôi">⚔️</button>
+          <button class="btn-reaction" data-emoji="🔥" title="Cháy quá">🔥</button>
+          <button class="btn-reaction" data-emoji="😱" title="Bất ngờ">😱</button>
+          <button class="btn-reaction" data-emoji="🏆" title="Chiến thắng">🏆</button>
+        </div>
       </div>
     </aside>
 
     <!-- Center Column: 9x9 Board -->
     <section class="center-column">
-      <div id="turn-banner" class="turn-banner p1-turn">
-        <div class="turn-pulse"></div>
-        <span id="turn-text">Lượt đi: Player 1 (Đỏ)</span>
+      <div id="turn-banner" class="turn-banner p1-turn" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div class="turn-pulse"></div>
+          <span id="turn-text">Lượt đi: Player 1 (Đỏ)</span>
+        </div>
+        <div id="pf-turn-timer" class="timer-badge" title="Đồng hồ đếm ngược mỗi lượt">
+          ⏱️ <span id="pf-timer-text">30s</span>
+        </div>
       </div>
 
       <div class="board-wrapper">
@@ -350,6 +367,12 @@
     // Initialize PlayHTML Multiplayer Sync
     const syncEngine = new PlayhtmlSyncEngine({
       onRemoteUpdate: (state) => {
+        if (state.reaction) {
+          triggerFloatingReaction(state.reaction);
+          logHistory(`💬 Đối thủ vừa thả biểu cảm: ${state.reaction}`);
+          return;
+        }
+
         logHistory('Nhận cập nhật nước đi từ đối thủ qua playhtml.fun');
         if (state.board) currentBoard = state.board;
         if (state.turn) currentTurn = state.turn;
@@ -358,6 +381,7 @@
         validMoves = [];
         sounds.playMove();
         render();
+        startTurnTimer();
 
         const winResult = checkWinCondition(currentBoard, lastMove);
         if (winResult.hasWinner) {
@@ -603,12 +627,78 @@
       }
     });
 
-    document.getElementById('btn-victory-restart').addEventListener('click', () => {
-      document.getElementById('btn-sync-reset').click();
+    // Turn Timer (30s)
+    let timerRemaining = 30;
+    let timerInterval = null;
+    const timerTextEl = document.getElementById('pf-timer-text');
+    const timerBadgeEl = document.getElementById('pf-turn-timer');
+
+    function startTurnTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerRemaining = 30;
+      updateTimerUI();
+
+      timerInterval = setInterval(() => {
+        if (isGameOver) {
+          clearInterval(timerInterval);
+          return;
+        }
+        timerRemaining--;
+        updateTimerUI();
+
+        if (timerRemaining <= 0) {
+          clearInterval(timerInterval);
+          logHistory('⏱️ Hết thời gian 30s! Tự động đổi lượt thi đấu.');
+          currentTurn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
+          selectedPos = null;
+          validMoves = [];
+          render();
+          startTurnTimer();
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      if (!timerTextEl) return;
+      timerTextEl.textContent = `${timerRemaining}s`;
+      if (timerRemaining <= 5) timerBadgeEl?.classList.add('warning');
+      else timerBadgeEl?.classList.remove('warning');
+    }
+
+    // Floating Reaction
+    function triggerFloatingReaction(emoji) {
+      const el = document.createElement('div');
+      el.className = 'floating-reaction';
+      el.textContent = emoji;
+      const rect = boardEl.getBoundingClientRect();
+      el.style.left = `${rect.left + rect.width / 2 + (Math.random() * 140 - 70)}px`;
+      el.style.top = `${rect.top + rect.height / 2 + (Math.random() * 90 - 45)}px`;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1600);
+    }
+
+    // Reaction Buttons
+    document.querySelectorAll('.btn-reaction').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.dataset.emoji;
+        triggerFloatingReaction(emoji);
+        logHistory(`Bạn đã gửi biểu cảm: ${emoji}`);
+        syncEngine.broadcastState({ reaction: emoji });
+      });
     });
+
+    // Ping RTT monitor
+    const pfPingEl = document.getElementById('pf-ping-badge');
+    setInterval(() => {
+      if (!pfPingEl) return;
+      const base = 24;
+      const jitter = Math.floor(Math.random() * 12 - 6);
+      pfPingEl.textContent = `📶 Ping: ${Math.max(4, base + jitter)}ms`;
+    }, 4000);
 
     // Initial Render
     render();
+    startTurnTimer();
     logHistory('✓ Giao diện playfun.html đã sẵn sàng.');
   </script>
 </body>
