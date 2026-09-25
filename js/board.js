@@ -37,7 +37,7 @@ export class BoardRenderer {
     this.interactive = true;
     this.localPlayerRole = null; // null = can move both, 'P1' or 'P2' = locked role
     this.isFlipped = false;
-    this.theme = 'theme-emerald'; // 'theme-emerald' | 'theme-wood' | 'theme-cyber'
+    this.theme = 'theme-playchess'; // 'theme-playchess' | 'theme-emerald' | 'theme-wood' | 'theme-cyber'
   }
 
   setInteractive(flag) {
@@ -51,7 +51,7 @@ export class BoardRenderer {
   setTheme(theme) {
     this.theme = theme;
     const parent = this.container.parentElement || this.container;
-    parent.classList.remove('theme-emerald', 'theme-wood', 'theme-cyber');
+    parent.classList.remove('theme-playchess', 'theme-emerald', 'theme-wood', 'theme-cyber');
     parent.classList.add(theme);
     try {
       localStorage.setItem('ott_chess_theme', theme);
@@ -95,7 +95,7 @@ export class BoardRenderer {
 
     // Apply theme to wrapper
     const parent = this.container.parentElement || this.container;
-    parent.classList.remove('theme-emerald', 'theme-wood', 'theme-cyber');
+    parent.classList.remove('theme-playchess', 'theme-emerald', 'theme-wood', 'theme-cyber');
     parent.classList.add(this.theme);
 
     const rowIndices = this.isFlipped

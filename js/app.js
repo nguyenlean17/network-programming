@@ -1,8 +1,8 @@
 /**
- * Oẳn Tù Tì v2 (OTTv2) - Main Application Controller
- * Orchestrates game rules, board renderer, 3-level AI engine with RAM Transposition Table,
- * 30s turn timer, network ping RTT monitor, playhtml.fun multiplayer sync,
- * and Pre-game Custom Draft & Placement Mode (tối đa 9 quân tự chọn dàn trận).
+ * Playchess Arena · Oẳn Tù Tì v2 (OTTv2) - Main Application Controller
+ * Orchestrates game rules, board renderer, 15-piece original frontline strategy,
+ * 30s turn timer, dual digital LCD chess clocks, network ping RTT monitor,
+ * Playchess dock sidebar, and Supabase / playhtml multiplayer sync.
  */
 
 import {
@@ -18,8 +18,6 @@ import {
 import {
   createInitialBoard,
   createEmptyBoard,
-  createCustomBoard,
-  generateAiDraftPlacement,
   countPlayerPieces,
   checkWinCondition,
   validateMove,
@@ -28,14 +26,13 @@ import {
 } from './gameRules.js';
 
 import { BoardRenderer } from './board.js';
-import { OttAi } from './ai.js';
 import { SupabaseSyncEngine } from './supabaseSync.js';
 import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 
 class OttApp {
   constructor() {
-    this.gameMode = 'LOCAL'; // 'LOCAL', 'BOT', 'MULTIPLAYER'
-    this.boardPreset = 'CHESS_9'; // 'CHESS_9' (Chuẩn cờ vua 9 quân) | 'FRONTLINE' | 'DIAGONAL' | 'CUSTOM_DRAFT'
+    this.gameMode = 'LOCAL'; // 'LOCAL', 'MULTIPLAYER'
+    this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' (15 quân nguyên bản) | 'DIAGONAL' | 'CHESS_9'
     this.goalMode = 'OPPOSITE'; // P1 (row 9) -> A1 (row 1) | P2 (row 1) -> I9 (row 9)
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
@@ -43,9 +40,6 @@ class OttApp {
     this.lastMove = null;
     this.moveHistory = [];
     this.winnerInfo = null;
-
-    // AI engine with 3 levels & RAM Transposition Table
-    this.ai = new OttAi('hard');
 
     // Dual Chess Clocks (300s = 5 phút mỗi bên)
     this.clockP1Seconds = 300;
@@ -66,11 +60,6 @@ class OttApp {
 
     // Ping RTT monitor
     this.pingInterval = null;
-
-    // Custom Draft Mode State (Tự chọn & Dàn trận 9 quân)
-    this.isDraftPhase = false;
-    this.draftSelectedType = PIECE_TYPES.ROCK;
-    this.draftPlacedP1 = []; // [{ x, y, type }]
 
     // Supabase Realtime Serverless Multiplayer sync
     this.syncEngine = new SupabaseSyncEngine({
@@ -142,15 +131,6 @@ class OttApp {
 
       // Controls
       gameModeSelect: document.getElementById('game-mode-select'),
-      aiDifficultyGroup: document.getElementById('ai-difficulty-group'),
-      aiDifficultySelect: document.getElementById('ai-difficulty-select'),
-      aiTelemetryCard: document.getElementById('ai-telemetry-card'),
-      aiRamBadge: document.getElementById('ai-ram-badge'),
-      aiCachedStates: document.getElementById('ai-cached-states'),
-      aiNodesEvaluated: document.getElementById('ai-nodes-evaluated'),
-      aiThinkingTime: document.getElementById('ai-thinking-time'),
-      aiTranspositionHits: document.getElementById('ai-transposition-hits'),
-
       newGameBtn: document.getElementById('btn-new-game'),
       rulesBtn: document.getElementById('btn-rules'),
       btnQuickGuide: document.getElementById('btn-quick-guide'),
@@ -158,19 +138,24 @@ class OttApp {
       onlineBtn: document.getElementById('btn-online-room'),
       presetSelect: document.getElementById('board-preset-select'),
 
-      // Custom Draft Toolbar Elements
-      draftToolbar: document.getElementById('draft-toolbar'),
-      draftBtnRock: document.getElementById('draft-btn-rock'),
-      draftBtnPaper: document.getElementById('draft-btn-paper'),
-      draftBtnScissors: document.getElementById('draft-btn-scissors'),
-      draftCountRock: document.getElementById('draft-count-rock'),
-      draftCountPaper: document.getElementById('draft-count-paper'),
-      draftCountScissors: document.getElementById('draft-count-scissors'),
-      draftTotalPlaced: document.getElementById('draft-total-placed'),
-      draftProgressBar: document.getElementById('draft-progress-bar'),
-      btnDraftAuto: document.getElementById('btn-draft-auto'),
-      btnDraftClear: document.getElementById('btn-draft-clear'),
-      btnDraftConfirm: document.getElementById('btn-draft-confirm'),
+      // Playchess Dock Sidebar Tabs & Panes
+      tabBtnNotation: document.getElementById('tab-btn-notation'),
+      tabBtnLobby: document.getElementById('tab-btn-lobby'),
+      tabBtnChat: document.getElementById('tab-btn-chat'),
+      paneNotation: document.getElementById('pane-notation'),
+      paneLobby: document.getElementById('pane-lobby'),
+      paneChat: document.getElementById('pane-chat'),
+
+      // Playchess Dock Lobby Quick Actions
+      btnDockCreateRoom: document.getElementById('btn-dock-create-room'),
+      dockRoomCodeInput: document.getElementById('dock-room-code-input'),
+      btnDockJoinRoom: document.getElementById('btn-dock-join-room'),
+
+      // Playchess Move Notation Navigation Buttons
+      btnNotationStart: document.getElementById('btn-notation-start'),
+      btnNotationPrev: document.getElementById('btn-notation-prev'),
+      btnNotationNext: document.getElementById('btn-notation-next'),
+      btnNotationEnd: document.getElementById('btn-notation-end'),
 
       // Room Modal & Supabase Cloud
       roomModal: document.getElementById('room-modal'),
@@ -267,11 +252,6 @@ class OttApp {
     this.dom.gameModeSelect.addEventListener('change', (e) => {
       this.gameMode = e.target.value;
 
-      // Hiển thị/Ẩn bảng cài đặt AI và Telemetry RAM
-      const isBotMode = this.gameMode === 'BOT';
-      if (this.dom.aiDifficultyGroup) this.dom.aiDifficultyGroup.style.display = isBotMode ? 'block' : 'none';
-      if (this.dom.aiTelemetryCard) this.dom.aiTelemetryCard.style.display = isBotMode ? 'block' : 'none';
-
       if (this.gameMode === 'MULTIPLAYER') {
         this.openRoomModal();
       } else {
@@ -282,50 +262,78 @@ class OttApp {
       }
     });
 
-    if (this.dom.aiDifficultySelect) {
-      this.dom.aiDifficultySelect.addEventListener('change', (e) => {
-        this.ai.setDifficulty(e.target.value);
-        this.addLog(`🤖 Đã chuyển AI sang cấp độ: <strong>${e.target.value.toUpperCase()}</strong>`, 'info');
-      });
-    }
-
     if (this.dom.presetSelect) {
       this.dom.presetSelect.addEventListener('change', (e) => {
         this.boardPreset = e.target.value;
-        if (this.boardPreset === 'CUSTOM_DRAFT') {
-          this.startDraftPhase();
-        } else {
-          this.endDraftPhase();
-          this.startNewGame();
-        }
+        this.startNewGame();
       });
     }
 
-    // Custom Draft Piece Buttons
-    [
-      { btn: this.dom.draftBtnRock, type: PIECE_TYPES.ROCK },
-      { btn: this.dom.draftBtnPaper, type: PIECE_TYPES.PAPER },
-      { btn: this.dom.draftBtnScissors, type: PIECE_TYPES.SCISSORS }
-    ].forEach(({ btn, type }) => {
+    // Playchess Dock Tab Switching
+    const dockTabs = [
+      { btn: this.dom.tabBtnNotation, pane: this.dom.paneNotation },
+      { btn: this.dom.tabBtnLobby, pane: this.dom.paneLobby },
+      { btn: this.dom.tabBtnChat, pane: this.dom.paneChat }
+    ];
+    dockTabs.forEach(({ btn, pane }) => {
       if (btn) {
         btn.addEventListener('click', () => {
-          [this.dom.draftBtnRock, this.dom.draftBtnPaper, this.dom.draftBtnScissors].forEach(b => b?.classList.remove('active'));
+          dockTabs.forEach(t => {
+            t.btn?.classList.remove('active');
+            t.pane?.classList.remove('active');
+          });
           btn.classList.add('active');
-          this.draftSelectedType = type;
+          pane?.classList.add('active');
         });
       }
     });
 
-    if (this.dom.btnDraftAuto) {
-      this.dom.btnDraftAuto.addEventListener('click', () => this.autoDraftPlacement());
+    // Playchess Dock Lobby Quick Online Handlers
+    if (this.dom.btnDockCreateRoom) {
+      this.dom.btnDockCreateRoom.addEventListener('click', () => {
+        this.gameMode = 'MULTIPLAYER';
+        if (this.dom.gameModeSelect) this.dom.gameModeSelect.value = 'MULTIPLAYER';
+        const newRoom = this.syncEngine.generateRoomId();
+        this.syncEngine.joinRoom(newRoom, 'P1', this.getSerializableState());
+        this.openRoomModal();
+      });
     }
 
-    if (this.dom.btnDraftClear) {
-      this.dom.btnDraftClear.addEventListener('click', () => this.clearDraftPlacement());
+    if (this.dom.btnDockJoinRoom) {
+      this.dom.btnDockJoinRoom.addEventListener('click', () => {
+        const code = this.dom.dockRoomCodeInput?.value.trim().toUpperCase();
+        if (!code) {
+          this.showToast('Vui lòng nhập mã phòng!', 'warning');
+          return;
+        }
+        this.gameMode = 'MULTIPLAYER';
+        if (this.dom.gameModeSelect) this.dom.gameModeSelect.value = 'MULTIPLAYER';
+        const fullRoom = code.startsWith('OTT-') ? code : `OTT-${code}`;
+        this.syncEngine.joinRoom(fullRoom, 'P2', this.getSerializableState());
+        this.openRoomModal();
+      });
     }
 
-    if (this.dom.btnDraftConfirm) {
-      this.dom.btnDraftConfirm.addEventListener('click', () => this.confirmDraftPlacement());
+    // Playchess Notation Navigation Controls
+    if (this.dom.btnNotationStart) {
+      this.dom.btnNotationStart.addEventListener('click', () => {
+        if (this.dom.chessNotationList) this.dom.chessNotationList.scrollTop = 0;
+      });
+    }
+    if (this.dom.btnNotationEnd) {
+      this.dom.btnNotationEnd.addEventListener('click', () => {
+        if (this.dom.chessNotationList) this.dom.chessNotationList.scrollTop = this.dom.chessNotationList.scrollHeight;
+      });
+    }
+    if (this.dom.btnNotationPrev) {
+      this.dom.btnNotationPrev.addEventListener('click', () => {
+        if (this.dom.chessNotationList) this.dom.chessNotationList.scrollTop -= 35;
+      });
+    }
+    if (this.dom.btnNotationNext) {
+      this.dom.btnNotationNext.addEventListener('click', () => {
+        if (this.dom.chessNotationList) this.dom.chessNotationList.scrollTop += 35;
+      });
     }
 
     this.dom.soundBtn.addEventListener('click', () => {
@@ -469,7 +477,7 @@ class OttApp {
     // Chess Resign
     if (this.dom.btnResign) {
       this.dom.btnResign.addEventListener('click', () => {
-        if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
+        if (this.gameStatus === GAME_STATUS.ENDED) return;
         const winner = this.currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
         const winnerName = winner === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)';
         if (confirm(`Bạn có chắc chắn muốn ĐẦU HÀNG ván cờ này? ${winnerName} sẽ giành chiến thắng!`)) {
@@ -489,31 +497,16 @@ class OttApp {
     // Chess Offer Draw
     if (this.dom.btnDraw) {
       this.dom.btnDraw.addEventListener('click', () => {
-        if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
-        if (this.gameMode === 'BOT') {
-          const p1Count = this.countPieces(PLAYERS.PLAYER_1);
-          const p2Count = this.countPieces(PLAYERS.PLAYER_2);
-          if (Math.abs(p1Count - p2Count) <= 1) {
-            this.stopTurnTimer();
-            this.gameStatus = GAME_STATUS.ENDED;
-            this.winnerInfo = { winner: 'DRAW', reason: 'AGREEMENT' };
-            this.renderer.setInteractive(false);
-            this.addLog(`🤝 <strong>AI Bot chấp thuận hòa cờ!</strong> Hai bên chia điểm cân bằng.`, 'info');
-            this.handleVictory(this.winnerInfo);
-          } else {
-            this.showToast('🤖 AI Bot từ chối hòa vì đang có ưu thế trên bàn cờ!', 'warning');
-          }
-        } else {
-          if (confirm('Đối thủ có đồng ý HÒA CỜ không?')) {
-            this.stopTurnTimer();
-            this.gameStatus = GAME_STATUS.ENDED;
-            this.winnerInfo = { winner: 'DRAW', reason: 'AGREEMENT' };
-            this.renderer.setInteractive(false);
-            this.addLog(`🤝 <strong>Hai đấu thủ đã đồng ý hòa cờ!</strong> Trận đấu kết thúc bất phân thắng bại.`, 'info');
-            this.handleVictory(this.winnerInfo);
-            if (this.gameMode === 'MULTIPLAYER') {
-              this.syncEngine.broadcastGameState(this.getSerializableState(), null);
-            }
+        if (this.gameStatus === GAME_STATUS.ENDED) return;
+        if (confirm('Đối thủ có đồng ý HÒA CỜ không?')) {
+          this.stopTurnTimer();
+          this.gameStatus = GAME_STATUS.ENDED;
+          this.winnerInfo = { winner: 'DRAW', reason: 'AGREEMENT' };
+          this.renderer.setInteractive(false);
+          this.addLog(`🤝 <strong>Hai đấu thủ đã đồng ý hòa cờ!</strong> Trận đấu kết thúc bất phân thắng bại.`, 'info');
+          this.handleVictory(this.winnerInfo);
+          if (this.gameMode === 'MULTIPLAYER') {
+            this.syncEngine.broadcastGameState(this.getSerializableState(), null);
           }
         }
       });
@@ -549,199 +542,9 @@ class OttApp {
   }
 
   // -------------------------------------------------------------
-  // Custom Draft & Placement Mode (Tự chọn & Dàn trận 9 quân)
-  // -------------------------------------------------------------
-  startDraftPhase() {
-    this.isDraftPhase = true;
-    this.stopTurnTimer();
-    this.board = createEmptyBoard();
-    this.draftPlacedP1 = [];
-
-    if (this.dom.draftToolbar) this.dom.draftToolbar.style.display = 'block';
-
-    this.renderer.clearSelection();
-    this.renderer.setInteractive(true);
-    this.renderer.setPlacementMode(true, (x, y, coord, piece) => {
-      this.handleDraftCellClick(x, y, coord, piece);
-    }, 5, 8); // P1 rows 6-9 (indices y = 5..8)
-
-    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
-    this.renderer.highlightPlacementZone(5, 8);
-
-    this.updateDraftCounters();
-    this.addLog('🛡️ <strong>Giai đoạn Dàn Trận</strong>: Chọn Đấm/Lá/Kéo rồi click vào nửa sân của bạn (Hàng 6 - 9) để đặt tối đa 9 quân!', 'info');
-    this.showToast('Giai đoạn dàn trận: Hãy đặt tối đa 9 quân cờ vào hàng 6-9!', 'info');
-  }
-
-  endDraftPhase() {
-    this.isDraftPhase = false;
-    if (this.dom.draftToolbar) this.dom.draftToolbar.style.display = 'none';
-    this.renderer.setPlacementMode(false);
-  }
-
-  handleDraftCellClick(x, y, coord, piece) {
-    if (!this.isDraftPhase) return;
-
-    // Click vào quân đã đặt của P1 -> Gỡ bỏ quân
-    if (piece && piece.player === PLAYERS.PLAYER_1) {
-      this.board[y][x] = null;
-      this.draftPlacedP1 = this.draftPlacedP1.filter(p => !(p.x === x && p.y === y));
-      sounds.select();
-      this.updateDraftCounters();
-      this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
-      this.renderer.highlightPlacementZone(5, 8);
-      return;
-    }
-
-    // Kiểm tra nửa sân hợp lệ của P1 (hàng 6-9, y: 5..8)
-    if (y < 5 || y > 8) {
-      this.showToast('Chỉ được đặt quân trên nửa sân của bạn (Hàng 6 - 9)!', 'warning');
-      sounds.block();
-      this.renderer.shakeCell(coord);
-      return;
-    }
-
-    // Giới hạn tối đa 9 quân
-    if (this.draftPlacedP1.length >= 9) {
-      this.showToast('Bạn chỉ được chọn tối đa 9 quân cờ!', 'warning');
-      sounds.block();
-      return;
-    }
-
-    // Đặt quân đang chọn
-    this.board[y][x] = { player: PLAYERS.PLAYER_1, type: this.draftSelectedType };
-    this.draftPlacedP1.push({ x, y, type: this.draftSelectedType });
-    sounds.select();
-
-    this.updateDraftCounters();
-    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
-    this.renderer.highlightPlacementZone(5, 8);
-  }
-
-  updateDraftCounters() {
-    let rocks = 0, papers = 0, scissors = 0;
-    for (const p of this.draftPlacedP1) {
-      if (p.type === PIECE_TYPES.ROCK) rocks++;
-      else if (p.type === PIECE_TYPES.PAPER) papers++;
-      else if (p.type === PIECE_TYPES.SCISSORS) scissors++;
-    }
-
-    if (this.dom.draftCountRock) this.dom.draftCountRock.textContent = rocks;
-    if (this.dom.draftCountPaper) this.dom.draftCountPaper.textContent = papers;
-    if (this.dom.draftCountScissors) this.dom.draftCountScissors.textContent = scissors;
-    const total = this.draftPlacedP1.length;
-    if (this.dom.draftTotalPlaced) this.dom.draftTotalPlaced.textContent = total;
-
-    if (this.dom.draftProgressBar) {
-      const pct = Math.round((total / 9) * 100);
-      this.dom.draftProgressBar.style.width = `${pct}%`;
-    }
-
-    // Bật nút Vào trận nếu đã đặt ít nhất 1 quân
-    if (this.dom.btnDraftConfirm) {
-      this.dom.btnDraftConfirm.disabled = (total === 0);
-    }
-  }
-
-  autoDraftPlacement() {
-    this.clearDraftPlacement();
-
-    // Tự động bố trí 3 Đấm, 3 Lá, 3 Kéo cân bằng trên hàng 7 và 8
-    const slots = [
-      { x: 1, y: 7, type: PIECE_TYPES.ROCK },
-      { x: 3, y: 7, type: PIECE_TYPES.PAPER },
-      { x: 5, y: 7, type: PIECE_TYPES.SCISSORS },
-      { x: 7, y: 7, type: PIECE_TYPES.ROCK },
-      { x: 2, y: 8, type: PIECE_TYPES.PAPER },
-      { x: 4, y: 8, type: PIECE_TYPES.SCISSORS },
-      { x: 6, y: 8, type: PIECE_TYPES.ROCK },
-      { x: 3, y: 6, type: PIECE_TYPES.PAPER },
-      { x: 5, y: 6, type: PIECE_TYPES.SCISSORS }
-    ];
-
-    for (const s of slots) {
-      this.board[s.y][s.x] = { player: PLAYERS.PLAYER_1, type: s.type };
-      this.draftPlacedP1.push({ x: s.x, y: s.y, type: s.type });
-    }
-
-    sounds.select();
-    this.updateDraftCounters();
-    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
-    this.renderer.highlightPlacementZone(5, 8);
-    this.showToast('Đã xếp nhanh đội hình 9 quân cân bằng!', 'success');
-  }
-
-  clearDraftPlacement() {
-    for (const p of this.draftPlacedP1) {
-      this.board[p.y][p.x] = null;
-    }
-    this.draftPlacedP1 = [];
-    this.updateDraftCounters();
-    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
-    this.renderer.highlightPlacementZone(5, 8);
-  }
-
-  confirmDraftPlacement() {
-    if (this.draftPlacedP1.length === 0) {
-      this.showToast('Vui lòng đặt ít nhất 1 quân cờ!', 'warning');
-      return;
-    }
-
-    // Bố trí quân cho Player 2
-    if (this.gameMode === 'BOT') {
-      // AI tự động sinh đội hình 9 quân cân bằng trên nửa sân của Bot (hàng 1-3)
-      const aiPieces = generateAiDraftPlacement(Math.min(9, Math.max(this.draftPlacedP1.length, 6)));
-      for (const p of aiPieces) {
-        this.board[p.y][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
-      }
-      this.addLog(`🤖 AI Bot đã tự động dàn trận đội hình 9 quân đối đầu!`, 'info');
-    } else {
-      // Local 2-Player: Tự động bố trí đội hình 9 quân đối xứng cho P2
-      const p2Pieces = [
-        { x: 1, y: 1, type: PIECE_TYPES.SCISSORS },
-        { x: 3, y: 1, type: PIECE_TYPES.ROCK },
-        { x: 5, y: 1, type: PIECE_TYPES.PAPER },
-        { x: 7, y: 1, type: PIECE_TYPES.SCISSORS },
-        { x: 2, y: 0, type: PIECE_TYPES.ROCK },
-        { x: 4, y: 0, type: PIECE_TYPES.PAPER },
-        { x: 6, y: 0, type: PIECE_TYPES.SCISSORS },
-        { x: 3, y: 2, type: PIECE_TYPES.ROCK },
-        { x: 5, y: 2, type: PIECE_TYPES.PAPER }
-      ];
-      for (const p of p2Pieces) {
-        this.board[p.y][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
-      }
-    }
-
-    // Kết thúc giai đoạn dàn trận và bắt đầu ván cờ!
-    this.endDraftPhase();
-    this.currentTurn = PLAYERS.PLAYER_1;
-    this.gameStatus = GAME_STATUS.PLAYING;
-    this.lastMove = null;
-    this.moveHistory = [];
-    this.winnerInfo = null;
-
-    this.renderer.setInteractive(true);
-    this.renderer.render(this.board, this.currentTurn, null);
-    this.updateStatsDisplay();
-    this.updateTurnDisplay();
-    this.startTurnTimer();
-
-    this.addLog(`⚔️ <strong>ĐÃ DÀN TRẬN XONG!</strong> Trận đấu chính thức bắt đầu! Lượt đầu tiên: Player 1.`, 'win');
-    this.showToast('Dàn trận thành công! Bắt đầu ván đấu!', 'success');
-    sounds.victory();
-  }
-
-  // -------------------------------------------------------------
   // Standard Gameplay Controls
   // -------------------------------------------------------------
   startNewGame() {
-    if (this.boardPreset === 'CUSTOM_DRAFT') {
-      this.startDraftPhase();
-      return;
-    }
-
-    this.endDraftPhase();
     this.board = createInitialBoard(this.boardPreset);
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
@@ -786,7 +589,7 @@ class OttApp {
     this.updateClockDisplays();
 
     this.timerInterval = setInterval(() => {
-      if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) {
+      if (this.gameStatus === GAME_STATUS.ENDED) {
         this.stopTurnTimer();
         return;
       }
@@ -879,14 +682,10 @@ class OttApp {
     this.updateTurnDisplay();
     this.updateClockDisplays();
     this.startTurnTimer();
-
-    if (this.gameMode === 'BOT' && this.currentTurn === PLAYERS.PLAYER_2) {
-      this.executeAiTurn();
-    }
   }
 
   handleMove(moveData) {
-    if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
+    if (this.gameStatus === GAME_STATUS.ENDED) return;
 
     // Apply move to board
     const { fromPos, toPos, piece, isCapture, capturedPiece, from, to } = moveData;
@@ -957,50 +756,6 @@ class OttApp {
     if (this.gameMode === 'MULTIPLAYER') {
       this.syncEngine.broadcastGameState(this.getSerializableState(), this.lastMove);
     }
-
-    // If Playing against AI Bot
-    if (this.gameMode === 'BOT' && this.currentTurn === PLAYERS.PLAYER_2 && this.gameStatus === GAME_STATUS.PLAYING) {
-      this.executeAiTurn();
-    }
-  }
-
-  executeAiTurn() {
-    this.renderer.setInteractive(false);
-    this.dom.turnText.textContent = `Máy đang tư duy (${this.ai.difficulty.toUpperCase()})...`;
-
-    setTimeout(() => {
-      if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
-      const aiMove = this.ai.getBestMove(this.board, PLAYERS.PLAYER_2, this.goalMode);
-
-      // Cập nhật bảng Telemetry Bộ não AI trong RAM
-      this.updateAiTelemetryDisplay();
-
-      if (aiMove) {
-        this.renderer.setInteractive(true);
-        this.handleMove(aiMove);
-      } else {
-        // AI has no valid moves left
-        this.renderer.setInteractive(true);
-        this.handleVictory({
-          hasWinner: true,
-          winner: PLAYERS.PLAYER_1,
-          details: 'Đối phương không còn nước đi hợp lệ!'
-        });
-      }
-    }, 400);
-  }
-
-  updateAiTelemetryDisplay() {
-    const stats = this.ai.getMemoryStats();
-    if (this.dom.aiCachedStates) this.dom.aiCachedStates.textContent = `${stats.cachedStates.toLocaleString()} thế cờ`;
-    if (this.dom.aiNodesEvaluated) this.dom.aiNodesEvaluated.textContent = `${stats.nodesEvaluated.toLocaleString()} nút`;
-    if (this.dom.aiThinkingTime) this.dom.aiThinkingTime.textContent = `${stats.thinkingTimeMs} ms`;
-    if (this.dom.aiRamBadge) this.dom.aiRamBadge.textContent = `RAM: ${stats.ramUsageKB} KB`;
-    if (this.dom.aiTranspositionHits) this.dom.aiTranspositionHits.textContent = `${stats.transpositionHits} lần`;
-
-    if (stats.nodesEvaluated > 0) {
-      this.addLog(`🧠 [AI ${stats.difficulty.toUpperCase()}]: Đã duyệt ${stats.nodesEvaluated} thế cờ trong ${stats.thinkingTimeMs}ms | RAM Cache: ${stats.ramUsageKB} KB (${stats.cachedStates} trạng thái)`, 'info');
-    }
   }
 
   triggerFloatingReaction(emoji) {
@@ -1068,7 +823,7 @@ class OttApp {
     this.dom.p1ScissorsCount.textContent = p1[PIECE_TYPES.SCISSORS];
     this.dom.p1TotalCount.textContent = p1.total;
 
-    const p1Max = (this.boardPreset === 'CHESS_9' || this.boardPreset === 'CUSTOM_DRAFT') ? 9 : 15;
+    const p1Max = (this.boardPreset === 'CHESS_9') ? 9 : 15;
     const p1Pct = Math.min(100, Math.round((p1.total / p1Max) * 100));
     if (this.dom.p1ArmyBar) this.dom.p1ArmyBar.style.width = `${p1Pct}%`;
     if (this.dom.p1MeterLabel) this.dom.p1MeterLabel.innerHTML = `<strong>${p1.total}</strong> / ${p1Max} quân (${p1Pct}%)`;
@@ -1096,7 +851,7 @@ class OttApp {
     this.dom.p2ScissorsCount.textContent = p2[PIECE_TYPES.SCISSORS];
     this.dom.p2TotalCount.textContent = p2.total;
 
-    const p2Max = (this.boardPreset === 'CHESS_9' || this.boardPreset === 'CUSTOM_DRAFT') ? 9 : 15;
+    const p2Max = (this.boardPreset === 'CHESS_9') ? 9 : 15;
     const p2Pct = Math.min(100, Math.round((p2.total / p2Max) * 100));
     if (this.dom.p2ArmyBar) this.dom.p2ArmyBar.style.width = `${p2Pct}%`;
     if (this.dom.p2MeterLabel) this.dom.p2MeterLabel.innerHTML = `<strong>${p2.total}</strong> / ${p2Max} quân (${p2Pct}%)`;
@@ -1133,20 +888,15 @@ class OttApp {
     if (this.dom.turnBadge) this.dom.turnBadge.textContent = isP1 ? 'P1' : 'P2';
     if (this.dom.turnAvatar) this.dom.turnAvatar.textContent = isP1 ? 'P1' : 'P2';
 
-    if (this.gameMode === 'BOT' && !isP1) {
-      this.dom.turnText.textContent = `Lượt của Máy (AI ${this.ai.difficulty.toUpperCase()})`;
-      if (this.dom.turnSubtext) this.dom.turnSubtext.textContent = 'Bộ não AI đang tính toán nước đi trong RAM...';
-    } else {
-      this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
-      if (this.dom.turnSubtext) {
-        this.dom.turnSubtext.textContent = isP1
-          ? 'Ruby Legion · Chọn 1 quân cờ để di chuyển'
-          : 'Sapphire Order · Chọn 1 quân cờ để di chuyển';
-      }
+    this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
+    if (this.dom.turnSubtext) {
+      this.dom.turnSubtext.textContent = isP1
+        ? 'Ruby Legion · Chọn 1 quân cờ để di chuyển'
+        : 'Sapphire Order · Chọn 1 quân cờ để di chuyển';
     }
 
-    this.dom.p1Card.classList.toggle('active-turn', isP1);
-    this.dom.p2Card.classList.toggle('active-turn', !isP1);
+    this.dom.p1Card?.classList.toggle('active-turn', isP1);
+    this.dom.p2Card?.classList.toggle('active-turn', !isP1);
 
     if (this.dom.moveHintText) {
       this.dom.moveHintText.innerHTML = `💡 Đến lượt <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Chọn 1 quân của bạn để xem 8 hướng di chuyển.`;
@@ -1162,21 +912,6 @@ class OttApp {
 
   handleCellHover(x, y, coord, selectedPos, board, currentTurn) {
     if (!this.dom.moveHintText) return;
-
-    if (this.isDraftPhase) {
-      const typeName = PIECE_NAMES_VI[this.draftSelectedType] || this.draftSelectedType;
-      if (y >= 5 && y <= 8) {
-        const existing = board && board[y] ? board[y][x] : null;
-        if (existing) {
-          this.dom.moveHintText.innerHTML = `🛡️ Ô [<strong>${coord}</strong>] đang có quân <strong>${PIECE_NAMES_VI[existing.type]}</strong>. Click để đổi loại hoặc gỡ quân.`;
-        } else {
-          this.dom.moveHintText.innerHTML = `➕ Click vào ô [<strong>${coord}</strong>] để đặt quân <strong>${typeName}</strong>.`;
-        }
-      } else {
-        this.dom.moveHintText.innerHTML = `⚠️ Ô [<strong>${coord}</strong>] nằm ngoài nửa sân dàn trận! Chỉ được đặt ở Hàng 6 - 9.`;
-      }
-      return;
-    }
 
     if (!selectedPos) {
       const piece = board && board[y] ? board[y][x] : null;
@@ -1236,10 +971,6 @@ class OttApp {
 
   handleCellLeave(selectedPos) {
     if (!this.dom.moveHintText) return;
-    if (this.isDraftPhase) {
-      this.dom.moveHintText.innerHTML = `🛡️ Giai đoạn dàn trận: Chọn loại quân rồi click ô Hàng 6 - 9 để bố trí tối đa 9 quân.`;
-      return;
-    }
     if (selectedPos && this.board) {
       const { x, y } = selectedPos;
       const piece = this.board[y][x];

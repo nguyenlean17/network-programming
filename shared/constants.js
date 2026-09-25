@@ -67,8 +67,7 @@ export const WIN_REASONS = {
 };
 
 export const BOARD_PRESETS = {
-  CHESS_9: 'CHESS_9',            // Chuẩn Cờ Vua: 9 quân chia đều (3 Đấm, 3 Lá, 3 Kéo)
-  FRONTLINE: 'FRONTLINE',        // Tiền tuyến đối đầu (15 quân)
+  FRONTLINE: 'FRONTLINE',        // Tiền tuyến đối đầu (15 quân chuẩn gốc)
   DIAGONAL: 'DIAGONAL',          // Doanh trại đường chéo (15 quân)
-  CUSTOM_DRAFT: 'CUSTOM_DRAFT'   // Tự chọn & Dàn trận (Tối đa 9 quân)
+  CHESS_9: 'CHESS_9'             // 9 quân chia đều (3 Đấm, 3 Lá, 3 Kéo)
 };
