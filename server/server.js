@@ -122,9 +122,23 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🎮 OTTv2 Server running on http://localhost:${PORT}`);
-  console.log(`🌐 WebSockets listening for multiplayer rooms`);
-  console.log(`===============================================`);
+function startServer(port) {
+  server.listen(port, () => {
+    console.log(`===============================================`);
+    console.log(`🎮 OTTv2 Server running on http://localhost:${port}`);
+    console.log(`🌐 WebSockets listening for multiplayer rooms`);
+    console.log(`===============================================`);
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const nextPort = Number(PORT) + 1;
+    console.warn(`⚠️ Cổng ${PORT} đang bận. Đang tự động chuyển sang cổng ${nextPort}...`);
+    startServer(nextPort);
+  } else {
+    console.error('Lỗi khởi động server:', err);
+  }
 });
+
+startServer(PORT);
