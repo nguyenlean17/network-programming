@@ -1,233 +1,220 @@
-# Oẳn Tù Tì v2 (OTTv2) - Board Game Chiến Thuật 9x9
-## Báo Cáo Bài Tập Lập Trình Mạng (VNU-UET)
+# Oẳn Tù Tì v2 (OTTv2) - Board Game Chiến Thuật 9×9
+## Dự Án Web Game Oẳn Tù Tì v2: Chơi Cục Bộ (Local 2 Players) & Đa Người Chơi (Multiplayer Server / playfull.html)
 
-Trang web trò chơi chiến thuật bàn cờ 9x9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ **đấu trên cùng một máy (Local)**, **đấu với AI Bot 3 cấp độ sử dụng RAM tư duy**, **Server Node.js đa phòng đấu**, và đặc biệt là chế độ **đồng bộ Multiplayer Online thời gian thực** bằng thư viện **[playhtml.fun](https://playhtml.fun) (`playfun.html`)** theo đúng yêu cầu đề bài.
-
-Dự án được tối ưu sẵn sàng để **deploy trực tiếp lên Vercel** và chạy cục bộ qua máy chủ Node.js.
-
----
-
-## 1. Thành viên & Bảng phân chia công việc nhóm (4 Sinh viên)
-
-Dự án được phân bổ khoa học theo mô hình **RACI Matrix** cho nhóm tối đa 4 sinh viên theo đúng yêu cầu đề bài:
-
-| STT | Họ và Tên | Vai Trò & Nhánh Git | Nhiệm Vụ Chuyên Trách Cụ Thể | Module / Tệp Phụ Trách | Đóng Góp |
-|:---:|:---|:---|:---|:---|:---:|
-| 1 | **Nguyễn Lê An** *(Nhóm trưởng)* | **Project Lead & Architecture**<br>`main` | • Thiết kế kiến trúc tổng thể dự án, cấu trúc dữ liệu bàn cờ 9x9.<br>• Xây dựng bộ điều khiển trung tâm (Game Controller, State Machine).<br>• Cấu hình triển khai tự động Vercel (`vercel.json`) và tổng hợp mã nguồn. | `index.html`<br>`js/app.js`<br>`vercel.json` | 25% |
-| 2 | **Nguyễn Tùng Dương** | **Frontend & UI/UX Engineer**<br>`duong` | • Thiết kế giao diện Dark Glassmorphism phong cách Cyber-Chess.<br>• Renderer bàn cờ 9x9 tương tác chuột, highlight ô hợp lệ / ô ăn quân.<br>• Xây dựng và kiểm thử nhánh giao diện đồ họa `OTTv2/`. | `css/style.css`<br>`js/board.js`<br>`OTTv2/*` | 25% |
-| 3 | **Trần Văn Mạnh** | **Multiplayer, AI & QA Lead**<br>`manh` | • **Bài tập 2**: Phát triển chế độ đồng bộ trực tuyến với thư viện `playfun.html` (`playhtml.fun` qua PartyKit serverless).<br>• **Bộ não AI 3 cấp độ dùng RAM tư duy**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị (Transposition Table) trong RAM với mã băm Zobrist.<br>• **Chế độ Tự Chọn & Dàn Trận 9 quân (Custom Draft)**: Tự do chọn và dàn trận tối đa 9 quân tùy ý (Đấm/Lá/Kéo) trên nửa sân trước khi vào trận.<br>• **Tính năng Mạng nâng cao & Sảnh xem**: Sảnh xem trực tiếp `rooms.html`, đồng hồ đếm ngược 30s, Đo Ping RTT, Biểu cảm thời gian thực.<br>• **Kiểm thử tự động**: Bộ Unit Test `tests/rules.test.js` kiểm thử 12/12 bài test (100% Pass). | `playfun.html`<br>`rooms.html`<br>`js/ai.js`<br>`tests/rules.test.js`<br>`js/playhtmlSync.js`<br>`package.json` | 25% |
-| 4 | **Nguyễn Minh Đức** | **Server & AI Developer**<br>`phuc` | • Lập trình Server Node.js độc lập (Express + WebSocket authoritative server).<br>• Phát triển hệ thống phòng đấu và đồng bộ đa người chơi qua socket.<br>• Xây dựng API kiểm tra sức khỏe server (`/api/health`). | `server/*`<br>`shared/*` | 25% |
+Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ:
+1. **Chế độ 2 người chơi trên cùng một thiết bị (Local 2 Players - Phase 1)**: Lần lượt thay phiên thực hiện nước đi hoàn toàn ở client, không cần server.
+2. **Chế độ Phòng Đấu Trực Tuyến & Danh sách phòng (Authoritative Multiplayer Server - Phase 2)**:
+   * Máy chủ Node.js (Express + WebSocket) quản lý trạng thái trò chơi tập trung (Authoritative source of truth).
+   * **Sảnh phòng trực tuyến (Live Room Lobby)**: Khi tạo một phòng mới, phòng đó **lập tức xuất hiện trong danh sách phòng**. Người chơi khác có thể **chọn phòng đó từ danh sách để vào chơi ngay mà không bắt buộc phải copy link** (vẫn có nút copy link nếu muốn chia sẻ).
+   * Hỗ trợ nhiều phòng cùng lúc (Room 001, Room 002, Room 003...).
+3. **Chế độ Đồng bộ Thư viện `playfull.html` / `playfun.html` (`playhtml.fun`)**: Đồng bộ thời gian thực qua thư viện playhtml và máy chủ serverless.
+4. **Chế độ Đấu với Máy (AI Engine 3 cấp độ)**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị RAM.
+5. **Thiết kế giao diện mới (Redesign)**: Phong cách **Minimalistic (Tối giản), hoàn toàn KHÔNG SỬ DỤNG GRADIENTS**; màu sắc đơn sắc (solid colors), đường nét sắc nét (crisp 1px borders), độ tương phản cao và độ rõ ràng tối đa trên mọi kích thước màn hình.
 
 ---
 
-## 2. Tổng quan & Luật chơi chi tiết
+## 1. Luật Chơi Chi Tiết Oẳn Tù Tì v2 (OTTv2)
 
-### 2.1. Bàn cờ 9x9
+### 1.1. Bàn cờ 9×9
 * Kích thước: **9 hàng × 9 cột = 81 ô** (Cột `A → I`, Hàng `1 → 9`).
-* Hai cứ điểm đặc biệt: **`A1`** (cứ điểm P1) và **`I9`** (cứ điểm P2).
-* Mục tiêu: Phe Đỏ (P1) phải đột kích vào ô đích **`A1`**; Phe Xanh (P2) phải đột kích vào ô đích **`I9`**.
+* Hệ tọa độ:
+  ```
+  A1 B1 C1 D1 E1 F1 G1 H1 I1
+  A2 B2 C2 D2 E2 F2 G2 H2 I2
+  ...
+  A9 B9 C9 D9 E9 F9 G9 H9 I9
+  ```
+* **Hai ô đích đặc biệt**: **`A1`** và **`I9`**.
+* Nếu người chơi đưa được bất kỳ quân nào của mình vào một trong hai ô này (`A1` hoặc `I9`) thì **người đó thắng ngay lập tức**.
 
-### 2.2. Các loại quân cờ
-Mỗi người chơi ban đầu sở hữu **15 quân cờ** chia đều cho 3 loại (5 Đấm, 5 Lá, 5 Kéo):
+### 1.2. Các loại quân cờ
+Mỗi người chơi có các quân cờ thuộc 3 loại:
 * ✊ **Đấm** (Rock)
 * ✋ **Lá** (Paper)
 * ✌️ **Kéo** (Scissors)
 
-### 2.3. Quy tắc di chuyển (King's Move)
-* Di chuyển tương tự **quân Vua trong cờ vua**: Mỗi lượt quân chỉ được đi tối đa **1 ô** theo bất kỳ hướng nào trong **8 hướng** (ngang, dọc, chéo):
-  ```
-  ↖  ↑  ↗
-  ←  ●  →
-  ↙  ↓  ↘
-  ```
-* Không được đi ra ngoài biên bàn cờ. Không được đi quá 1 ô trong một lượt đi.
+Người chơi 1 (Player 1 - Phe Đỏ) và Người chơi 2 (Player 2 - Phe Xanh) được phân biệt rõ rệt bằng màu sắc và huy hiệu trên bàn cờ.
 
-### 2.4. Quy tắc ăn quân & Khắc chế (Oẳn Tù Tì)
+### 1.3. Di chuyển quân (King's Move)
+* Mỗi quân cờ di chuyển tương tự **quân Vua trong cờ vua**:
+  Mỗi lượt, quân có thể di chuyển tối đa **1 ô** theo bất kỳ một trong **8 hướng**:
+  ```
+  ↖  ↑  ↗   (Chéo trên trái, Lên, Chéo trên phải)
+  ←  ●  →   (Trái, Quân cờ, Phải)
+  ↙  ↓  ↘   (Chéo dưới trái, Xuống, Chéo dưới phải)
+  ```
+* **Ràng buộc di chuyển**:
+  * Không được di chuyển quá 1 ô trong một lượt đi.
+  * Không được đi ra ngoài bàn cờ.
+  * Không thể đi vào ô đang bị chiếm bởi quân cùng phe.
+
+### 1.4. Quy tắc ăn quân (Oẳn Tù Tì)
 * ✊ **Đấm** ăn ✌️ **Kéo**
 * ✌️ **Kéo** ăn ✋ **Lá**
 * ✋ **Lá** ăn ✊ **Đấm**
 
-### 2.5. Hai quân cùng loại & Quân bị khắc chế
+Ví dụ: Quân Đấm của Player 1 di chuyển vào ô đang có quân Kéo của Player 2:
+$\rightarrow$ Kéo bị ăn, quân Đấm chiếm ô đó.
+
+### 1.5. Hai quân cùng loại (Chặn đường)
 * **Hai quân cùng loại KHÔNG THỂ ăn nhau**:
-  * Đấm vs Đấm $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
-  * Lá vs Lá $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
-  * Kéo vs Kéo $\rightarrow$ Không ăn, chỉ đứng chặn đường nhau.
-* **Quân bị khắc chế**: Người chơi không được di chuyển quân của mình vào ô đang bị quân đối phương khắc chế nó chiếm giữ (ví dụ: Đấm không thể tự lao vào ô có Lá).
-* **Quân cùng phe**: Không được chiếm ô hoặc ăn quân của chính mình.
+  * Đấm vs Đấm $\rightarrow$ Không ăn, đứng chặn đường nhau.
+  * Lá vs Lá $\rightarrow$ Không ăn, đứng chặn đường nhau.
+  * Kéo vs Kéo $\rightarrow$ Không ăn, đứng chặn đường nhau.
+* Hai quân chỉ đứng chặn đường nhau và không được chiếm cùng 1 ô.
 
-### 2.6. Điều kiện thắng (Win Conditions)
-Người chơi giành chiến thắng ngay lập tức khi đạt **một trong hai** điều kiện:
-1. **Cách 1 - Diệt chủng 1 loại quân**: Ăn sạch hoàn toàn **toàn bộ 1 loại quân** của đối phương (ví dụ: đối phương mất sạch toàn bộ 5 quân Kéo).
-2. **Cách 2 - Chiếm cứ điểm đối phương**: Đưa được bất kỳ quân nào của mình xâm nhập thành công vào cứ điểm đối phương (`A1` cho P1 hoặc `I9` cho P2).
+### 1.6. Quân bị khắc chế
+* Khi quân tấn công bị quân đối phương khắc chế:
+  * Đấm tấn công Lá $\rightarrow$ Bị Lá khắc, không được thực hiện nước đi (nước đi không hợp lệ / bị chặn).
+  * Kéo tấn công Đấm $\rightarrow$ Bị Đấm khắc, không được đi vào.
+  * Lá tấn công Kéo $\rightarrow$ Bị Kéo khắc, không được đi vào.
 
----
-
-## 3. Các chế độ chơi (Game Modes)
-
-1. **Bài tập 1 - Web 2 người chơi OTTv2 (`index.html`)**:
-   * **Local Pass & Play**: Chơi 2 người trên cùng một thiết bị hoặc máy tính, lần lượt thay nhau đi nước đi.
-   * **Đấu với Máy (AI Bot 3 cấp độ dùng RAM tư duy)**:
-     * 🟢 **Cấp 1: Dễ (Tập sự)**: Heuristic 1-ply nhanh, ngẫu nhiên hóa nhẹ cho người mới bắt đầu.
-     * 🟡 **Cấp 2: Vừa (Chiến thuật gia)**: Minimax 2-ply với Alpha-Beta Pruning, biết bảo vệ quân và phòng thủ cứ điểm.
-     * 🔴 **Cấp 3: Khó (Đại kiện tướng)**: Minimax sâu 3-4 ply + Cắt tỉa Alpha-Beta + Sắp xếp nước đi (Move Ordering) + **Bảng Chuyển Vị (Transposition Table) trong RAM máy tính** lưu trữ hàng chục nghìn thế cờ qua mã băm Zobrist. Hiển thị bảng Telemetry đo lường dung lượng RAM và thời gian tư duy trực tiếp!
-   * **Chế độ Tự Chọn & Dàn Trận Tùy Ý (Custom Draft & Pre-game Placement Mode)**:
-     * Tự chọn số lượng Kéo, Búa (Đấm), Bao (Lá) tùy ý **tối đa 9 quân**.
-     * Tự do sắp xếp trên nửa bàn cờ (Hàng 6-9 cho P1 Đỏ, Hàng 1-3 cho AI Bot Xanh).
-     * Hỗ trợ thanh công cụ dàn trận: chọn loại quân ✊/✋/✌️, bộ đếm $0/9$, Xếp nhanh ngẫu nhiên (Auto Deploy), Xóa hết (Clear), Vào Trận Ngay (Confirm).
-     * AI Bot tự động phân bổ cân bằng 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân đối diện.
-   * **Server Node.js WebSocket**: Đấu online qua server độc lập chạy tại cổng 3000.
-   * **Sảnh Xem Trực Tiếp (`rooms.html`)**: Theo dõi và làm khán giả (Spectator) cho tất cả các phòng multiplayer.
-2. **Bài tập 2 - Thư viện playfun.html (`playfun.html`)**:
-   * Chơi trực tuyến nhiều người cùng lúc mà không cần tự host backend riêng.
-   * Sử dụng hạ tầng đồng bộ thời gian thực PartyKit serverless của thư viện `playhtml.fun`.
-   * Hỗ trợ chọn vai trò: **Player 1 (Đỏ)**, **Player 2 (Xanh)**, hoặc **Khán giả (Spectator)**.
-   * Đồng bộ hóa bàn cờ, số lượng quân, nhật ký trận đấu, con trỏ trực tuyến, đồng hồ 30s và đo Ping RTT.
+### 1.7. Điều kiện thắng (Win Conditions)
+Có **2 cách** để giành chiến thắng:
+1. **Cách 1: Ăn hết một loại quân của đối phương**
+   * Nếu một người chơi ăn sạch hoàn toàn một loại quân bất kỳ của đối phương (ví dụ đối phương ban đầu có 5 Kéo và mất toàn bộ 5 Kéo, số Kéo về 0) $\rightarrow$ Người chơi đó thắng ngay lập tức.
+   * Không cần phải ăn hết toàn bộ quân đối phương.
+2. **Cách 2: Đưa quân vào ô đích (`A1` hoặc `I9`)**
+   * Nếu người chơi đưa bất kỳ quân nào của mình vào ô đích **`A1`** hoặc **`I9`** $\rightarrow$ Thắng ngay lập tức.
 
 ---
 
-## 4. Các repository mã nguồn mở tương tự đã khảo sát & tham khảo
+## 2. Kiến Trúc & Cấu Trúc Thư Mục
 
-1. **[`spencerc99/playhtml`](https://github.com/spencerc99/playhtml)**:
-   * Thư viện mã nguồn mở tạo các thành phần HTML tương tác, đồng bộ nhiều người chơi thời gian thực từ nền tảng `https://playhtml.fun`.
-   * Được áp dụng trực tiếp trong `playfun.html` cho Bài tập 2.
-2. **[`nati-Workneh/RPS`](https://github.com/nati-Workneh/RPS)**:
-   * Dự án game chiến thuật bàn cờ Đấm-Lá-Kéo theo lượt (Squad RPS), cung cấp ý tưởng về bố trí quân và giao diện hiển thị.
-3. **[`boardgameio/boardgame.io`](https://github.com/boardgameio/boardgame.io)**:
-   * Framework quản lý trạng thái trò chơi theo lượt phổ biến trên GitHub, tham khảo để xây dựng tầng logic độc lập (`shared/gameRules.js`).
-
----
-
-## 5. Cấu trúc thư mục dự án
+Dự án được phân tách rõ ràng giữa **Client UI**, **Server Authoritative Logic**, và **Shared Rules**:
 
 ```
 network-programming/
-├── index.html                   # Giao diện chính của game: Local, AI Bot (3 cấp độ) & Online (Bài tập 1)
-├── playfun.html                 # Giao diện Bài tập 2: Tích hợp thư viện playfun.html (playhtml.fun)
-├── rooms.html                   # Sảnh xem trực tiếp: Theo dõi tất cả các phòng đấu multiplayer (Spectator Hub)
-├── vercel.json                  # Cấu hình deploy tự động Vercel
-├── package.json                 # Cấu hình npm scripts & dependencies
-├── .gitignore                   # Loại trừ node_modules, temp files
-├── README.md                    # Báo cáo phân chia nhóm và tài liệu hướng dẫn kỹ thuật
+├── index.html                   # Giao diện chính: Local 2 Players, Sảnh phòng Online & AI
+├── playfun.html                 # Giao diện Bài tập 2: Thư viện playfun.html (playhtml.fun)
+├── rooms.html                   # Sảnh xem trực tiếp phụ trợ (Live Spectator Hub)
+├── package.json                 # Cấu hình dự án & scripts chạy
+├── .gitignore                   # Loại trừ node_modules và tệp tạm
+├── README.md                    # Hướng dẫn chi tiết dự án & luật chơi
 │
 ├── css/
-│   └── style.css                # Giao diện Dark Glassmorphism, hiệu ứng cờ 9x9 Cyber-Chess
+│   └── style.css                # Hệ thống thiết kế Minimalistic (Hoàn toàn KHÔNG gradients)
 │
 ├── js/
-│   ├── constants.js             # Hằng số, Web Audio synthesizer âm thanh
-│   ├── gameRules.js             # Logic bàn cờ & luật chơi (client adapter)
-│   ├── board.js                 # Renderer bàn cờ 9x9, tương tác click & highlight
-│   ├── ai.js                    # Thuật toán AI Bot 3 cấp độ với RAM Transposition Table
-│   ├── playhtmlSync.js          # Module tích hợp playhtml.fun multiplayer
-│   └── app.js                   # Điều khiển luồng game chính, đồng hồ 30s, ping RTT
+│   ├── app.js                   # Bộ điều khiển trung tâm (App Controller, Tabs, UI updates)
+│   ├── board.js                 # Renderer bàn cờ 9×9, tương tác chuột & highlight nước đi
+│   ├── constants.js             # Hằng số bàn cờ, âm thanh synthesizer, tọa độ
+│   ├── gameRules.js             # Tầng logic luật chơi (chuẩn hóa trên Client)
+│   ├── renderSync.js            # Engine kết nối WebSocket đồng bộ phòng đấu đa người chơi
+│   ├── playhtmlSync.js          # Module tích hợp thư viện playhtml.fun
+│   └── ai.js                    # Thuật toán AI Bot 3 cấp độ (RAM Transposition Table)
+│
+├── server/
+│   ├── server.js                # Node.js HTTP & WebSocket Server (Express + ws)
+│   ├── room.js                  # Quản lý danh sách phòng (RoomManager), người chơi & khán giả
+│   └── game.js                  # Authoritative Server Game Session (xác thực nước đi trên server)
 │
 ├── shared/
-│   ├── constants.js             # Hằng số dùng chung giữa client & server
-│   └── gameRules.js             # Pure logic kiểm tra nước đi 8 hướng, ăn quân & thắng cuộc
+│   ├── constants.js             # Hằng số dùng chung giữa server và client
+│   └── gameRules.js             # Bộ luật cờ OTTv2 dùng chung cho server validate
 │
-├── tests/
-│   └── rules.test.js            # Bộ Unit Test tự động kiểm thử 10/10 bài toán logic & AI RAM (Branch manh)
-│
-├── server/                      # Server Node.js tùy chọn (Express + WebSocket)
-│   ├── package.json
-│   ├── server.js                # Server chính chạy cổng 3000
-│   ├── game.js                  # Quản lý trận đấu phía server
-│   └── room.js                  # Quản lý danh sách phòng chơi
-│
-└── OTTv2/                       # Giao diện nhánh phát triển độc lập (Branch duong)
-    ├── index.html
-    ├── script.js
-    └── style.css
+└── tests/
+    └── rules.test.js            # Bộ kiểm thử Unit Test 12/12 bài kiểm tra luật chơi (100% Pass)
 ```
 
 ---
 
-## 6. Hướng dẫn cài đặt, chạy Local và Chạy Unit Test
+## 3. Quy Trình Tạo Phòng & Danh Sách Phòng Trực Tuyến
 
-### 6.1. Chạy Unit Test kiểm thử logic game & AI RAM (Đóng góp của SV Trần Văn Mạnh)
-Bộ unit test kiểm thử toàn bộ 12 ca kiểm thử:
-1. Chuyển đổi hệ tọa độ A1-I9.
-2. Di chuyển 1 ô theo 8 hướng (King's Move).
-3. Quy tắc ăn quân Đấm-Lá-Kéo & luật chặn đường hai quân cùng loại.
-4. Khởi tạo bàn cờ ban đầu cân đối 15 quân mỗi bên.
-5. Kiểm tra nước đi hợp lệ & không đi vào quân khắc chế.
-6. Điều kiện thắng diệt chủng 1 loại quân đối phương.
-7. Điều kiện thắng đột kích cứ điểm A1/I9.
-8. AI Engine với 3 cấp độ tư duy (Easy, Medium, Hard).
-9. Bộ nhớ RAM Transposition Table & Zobrist Hashing (lưu trữ và tái sử dụng thế cờ O(1)).
-10. AI phát hiện và thực hiện ngay nước đi dứt điểm ván đấu.
-11. Chế độ Tự chọn & Dàn trận tối đa 9 quân (`createCustomBoard`).
-12. AI tự động sinh đội hình 9 quân cân bằng chiến thuật (`generateAiDraftPlacement`).
+Theo đúng yêu cầu: **"Khi tạo một phòng, không cần phải copy link (copy cũng được), nhưng khi tạo phòng nó sẽ thành 1 phòng trong danh sách các phòng. 1 người chơi khác có thể chọn phòng đó từ danh sách để bắt đầu chơi."**
 
+### 3.1. Luồng hoạt động:
+1. **Người chơi 1 (Tạo phòng)**:
+   * Mở tab **`🌐 Phòng Đấu Online`**.
+   * Nhập tên phòng (ví dụ: *Phòng của Nam*) hoặc để trống để sinh mã tự động.
+   * Nhấn nút **`➕ Tạo phòng ngay`**.
+   * Máy chủ ghi nhận phòng mới, thiết lập Người chơi 1 là **Player 1 (Đỏ)**, và **lập tức phát sóng danh sách phòng mới (ROOMS_LIST) tới tất cả các client đang kết nối**.
+   * Màn hình của Người chơi 1 chuyển sang bàn cờ với trạng thái: *"Đang chờ đối thủ tham gia..."*.
+2. **Người chơi 2 (Vào chơi từ danh sách)**:
+   * Mở tab **`🌐 Phòng Đấu Online`** (ở một tab khác, trình duyệt khác, hoặc máy tính khác trong mạng).
+   * Ngay lập tức nhìn thấy phòng của Người chơi 1 trong danh sách với huy hiệu **`🟡 Chờ người chơi 2`**.
+   * Nhấn nút **`⚔️ Vào chơi (P2)`** trực tiếp từ danh sách.
+   * **Không cần copy link**! Người chơi 2 được gán vai trò **Player 2 (Xanh)** và vào trận ngay.
+   * Trận đấu chính thức bắt đầu và đồng bộ thời gian thực cho cả hai người chơi.
+3. **Khán giả (Spectator)**:
+   * Nếu một phòng đã có đủ 2 người chơi, trạng thái chuyển thành **`🟢 Đang thi đấu`**.
+   * Người thứ ba bấm **`👁️ Xem trực tiếp`** để theo dõi trận đấu theo thời gian thực.
+4. **Chia sẻ link tùy chọn**:
+   * Mỗi phòng đều có nút **`📋 Copy link`** nếu người chơi muốn gửi trực tiếp cho bạn bè qua chat/tin nhắn.
+
+---
+
+## 4. Hướng Dẫn Cài Đặt & Chạy Dự Án
+
+### Yêu cầu môi trường:
+* **Node.js** (phiên bản 18 trở lên).
+* **NPM** (đi kèm Node.js).
+* Bất kỳ trình duyệt web hiện đại nào (Chrome, Edge, Firefox, Safari).
+
+### Bước 1: Cài đặt thư viện dependencies
+Mở Terminal / PowerShell tại thư mục dự án và chạy:
 ```bash
-# Chạy bộ test tự động
+npm install
+```
+
+### Bước 2: Chạy bộ kiểm thử tự động (Unit Tests)
+Kiểm tra tính chính xác của toàn bộ engine luật chơi OTTv2:
+```bash
 npm test
 ```
-*Kết quả đầu ra: 12/12 bài test đều vượt qua xuất sắc (100% Pass).*
+*Kết quả: 12/12 bài kiểm thử vượt qua xuất sắc (100% Pass).*
 
----
-
-### 6.2. Chạy Frontend trực tiếp (Bài tập 1 & Bài tập 2)
-Toàn bộ frontend được viết bằng Vanilla ES Modules:
-1. Dùng Live Server trong VS Code: Chuột phải vào `index.html` hoặc `playfun.html` $\rightarrow$ chọn **Open with Live Server**.
-2. Hoặc mở terminal chạy bằng `npx serve`:
-   ```bash
-   npx --yes serve .
-   ```
-   * Mở Bài tập 1 (Local / AI / Online): `http://localhost:3000`
-   * Mở Bài tập 2 (`playfun.html`): `http://localhost:3000/playfun.html`
-
----
-
-### 6.3. Chạy Server Node.js độc lập (Server-Authoritative)
-Nếu cần nộp bài tập với yêu cầu chạy server Node.js:
+### Bước 3: Khởi chạy máy chủ Server Node.js
+Chạy lệnh:
 ```bash
-# Cài đặt thư viện
-npm install
-
-# Khởi động server
 npm start
 ```
-Server sẽ lắng nghe tại:
-* Game Web: `http://localhost:3000`
-* Sảnh xem tất cả các phòng (Room Hub): `http://localhost:3000/rooms.html`
-* Chế độ playfun.html: `http://localhost:3000/playfun.html`
-* WebSocket endpoint: `ws://localhost:3000`
-* API danh sách tất cả các phòng: `http://localhost:3000/api/rooms`
-* API kiểm tra sức khỏe server: `http://localhost:3000/api/health`
+hoặc:
+```bash
+node server/server.js
+```
+
+Sau khi khởi chạy, console sẽ thông báo:
+```
+===============================================
+🎮 OTTv2 Server running on http://0.0.0.0:3000 (Port: 3000)
+🌐 WebSockets listening for multiplayer rooms
+===============================================
+```
+
+### Bước 4: Mở và chơi game trên trình duyệt
+* Mở trình duyệt và truy cập: **`http://localhost:3000`** (hoặc `http://<địa-chỉ-IP-máy-bạn>:3000` đối với thiết bị khác trong cùng mạng LAN).
+* Để chơi **Chế độ 2 người chung máy (Local)**: Chọn tab `👥 2 Người (Local)`.
+* Để chơi **Multiplayer Server**:
+  * Người chơi 1: Chọn tab `🌐 Phòng Đấu Online`, bấm `➕ Tạo phòng ngay`.
+  * Người chơi 2: Mở một cửa sổ trình duyệt ẩn danh hoặc tab mới tại `http://localhost:3000`, chọn tab `🌐 Phòng Đấu Online`, bấm `⚔️ Vào chơi (P2)` trên phòng vừa tạo.
+* Để chơi **Bài tập 2 (`playfull.html`)**: Nhấn vào liên kết `⚡ playfull.html` trên thanh điều hướng hoặc truy cập `http://localhost:3000/playfun.html`.
 
 ---
 
-## 7. Hướng dẫn Deploy lên Vercel
+## 5. Hướng Dẫn Đẩy Mã Nguồn Lên Git (GitHub / GitLab)
 
-Game đã được tối ưu hóa 100% với file `vercel.json`:
-1. Đẩy code lên GitHub repository:
-   ```bash
-   git push origin manh
-   ```
-2. Truy cập [vercel.com](https://vercel.com) và đăng nhập bằng tài khoản GitHub.
-3. Nhấn **Add New Project** $\rightarrow$ Chọn repository `network-programming`.
-4. Nhấn **Deploy**. Cả 2 bài tập (`index.html` và `playfun.html`) sẽ hoạt động trực tiếp trên toàn cầu!
+Để upload toàn bộ dự án lên kho chứa Git của bạn:
 
----
+```bash
+# 1. Khởi tạo repository Git (nếu chưa có)
+git init
 
-## 8. Các điểm nổi bật trong thiết kế & kỹ thuật
+# 2. Kiểm tra trạng thái các file
+git status
 
-* **Bảng Chuyển Vị trong RAM (In-Memory Transposition Table)**:
-  * Ứng dụng cấu trúc dữ liệu bảng băm Zobrist trong RAM máy tính để ghi nhớ các nhánh thế cờ đã tính toán.
-  * Tái sử dụng thế cờ với độ phức tạp $O(1)$, giảm tới 60% thời gian duyệt cây Minimax ở độ sâu 3-4 ply.
-  * Bảng giám sát RAM Telemetry hiển thị trực tiếp số thế cờ lưu trong RAM, số nút duyệt và thời gian tính toán.
-* **Đồng hồ đếm ngược 30 giây (Turn Timer)**:
-  * Tự động đếm ngược mỗi lượt đi, cảnh báo âm thanh và hiệu ứng nhấp nháy khi còn dưới 5 giây.
-* **Đo Ping / Độ trễ truyền dẫn (RTT)**:
-  * Đo lường và hiển thị độ trễ mạng thực tế (`Ping: ~24ms`), thể hiện chuẩn kiến thức môn Lập trình mạng.
-* **Giao diện Cyber-Chess Glassmorphism**: Màu sắc tương phản cao giữa Ruby Red (P1) và Sapphire Blue (P2), bàn cờ 9x9 phản hồi mượt mà, hiệu ứng phát sáng cho 2 ô đích đặc biệt `A1` và `I9`.
-* **Hệ thống âm thanh tích hợp Web Audio API**: Tự tổng hợp âm thanh nước đi, âm thanh ăn quân, âm thanh va chạm/chặn và khúc nhạc chiến thắng không phụ thuộc file âm thanh ngoài.
-* **Kiểm tra luật chặt chẽ**:
-  * Tự động tính toán và đánh dấu các ô hợp lệ (màu xanh lá).
-  * Đánh dấu ô ăn quân với icon kiếm ⚔️ (màu đỏ).
-  * Chặn triệt để nước đi cùng loại hoặc đi vào quân khắc chế với hiệu ứng rung lắc (shake animation).
-  * Tự động phát hiện điều kiện thắng ngay khi một loại quân về 0 hoặc đưa quân vào A1/I9.
-* **Chế độ Tự Chọn & Dàn Trận 9 quân (Custom Draft Mode)**:
-  * Cho phép người chơi tự do lựa chọn tỷ lệ quân (Đấm/Lá/Kéo) tối đa 9 quân và bố trí tùy ý trên nửa bàn cờ trước khi khai cuộc.
-  * Hỗ trợ công cụ xếp quân trực quan, bộ đếm quân thực thời, tính năng Xếp nhanh tự động (Auto Deploy) và thuật toán AI tự động dàn trận đối trọng cân bằng.
-* **Đồng bộ thời gian thực chuẩn Bài tập 2**: Tận dụng triệt để thư viện `playhtml.fun` (`playfun.html`) với tính năng đồng bộ đa máy không cần cấu hình backend.
+# 3. Thêm toàn bộ các file vào staging
+git add .
+
+# 4. Commit với thông điệp rõ ràng
+git commit -m "feat: redesign OTTv2 minimalistic UI (no gradients) and live room lobby"
+
+# 5. Đặt nhánh chính là main
+git branch -M main
+
+# 6. Gán địa chỉ repository từ xa của bạn
+git remote add origin https://github.com/<tai-khoan-cua-ban>/<ten-repo>.git
+
+# 7. Đẩy mã nguồn lên GitHub
+git push -u origin main
+```

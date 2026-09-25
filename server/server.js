@@ -21,6 +21,9 @@ const roomManager = new RoomManager();
 
 const PORT = process.env.PORT || 3000;
 
+// Body parser
+app.use(express.json());
+
 // CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -43,13 +46,30 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Active rooms list endpoint (Lấy danh sách tất cả các phòng đang chơi)
+// Active rooms list endpoint
 app.get('/api/rooms', (req, res) => {
   res.json({
     status: 'ok',
     totalRooms: roomManager.rooms.size,
     rooms: roomManager.getAllRoomsSummary(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// Create room endpoint
+app.post('/api/rooms', (req, res) => {
+  const { roomId, roomName } = req.body || {};
+  const cleanId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
+  const cleanName = roomName || `Phòng ${cleanId}`;
+  const room = roomManager.getOrCreateRoom(cleanId, cleanName);
+
+  broadcastRoomsList();
+
+  res.json({
+    status: 'ok',
+    roomId: room.id,
+    name: room.name,
+    createdAt: room.createdAt
   });
 });
 
@@ -67,7 +87,7 @@ function broadcastRoomsList() {
 
 // WebSocket message dispatcher
 wss.on('connection', (ws) => {
-  // Send current rooms list on connect
+  // Send current rooms list immediately on connect
   ws.send(JSON.stringify({
     type: 'ROOMS_LIST',
     rooms: roomManager.getAllRoomsSummary()
@@ -76,7 +96,7 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const payload = JSON.parse(message.toString());
-      const { type, roomId, from, to, role, preset } = payload;
+      const { type, roomId, roomName, from, to, role, playerName } = payload;
 
       switch (type) {
         case 'GET_ROOMS': {
@@ -87,13 +107,39 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        case 'JOIN_ROOM': {
-          const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role);
+        case 'CREATE_ROOM': {
+          const newRoomId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
+          const cleanName = roomName || `Phòng ${newRoomId}`;
+          const { room, role: assignedRole } = roomManager.createRoom(newRoomId, cleanName, ws, playerName || 'Player 1');
+
           ws.send(JSON.stringify({
             type: 'ROOM_JOINED',
             roomId: room.id,
+            roomName: room.name,
             role: assignedRole,
-            gameState: room.gameSession.getState()
+            gameState: room.gameSession.getState(),
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
+          }));
+
+          broadcastRoomsList();
+          break;
+        }
+
+        case 'JOIN_ROOM': {
+          const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role, playerName);
+          ws.send(JSON.stringify({
+            type: 'ROOM_JOINED',
+            roomId: room.id,
+            roomName: room.name,
+            role: assignedRole,
+            gameState: room.gameSession.getState(),
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
           }));
 
           // Notify other clients in room
@@ -101,9 +147,23 @@ wss.on('connection', (ws) => {
             type: 'PLAYER_PRESENCE',
             roomId: room.id,
             role: assignedRole,
-            totalConnected: room.clients.size
+            playerName: playerName || assignedRole,
+            totalConnected: room.clients.size,
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
           });
 
+          broadcastRoomsList();
+          break;
+        }
+
+        case 'LEAVE_ROOM': {
+          roomManager.leaveRoom(ws);
+          ws.roomId = null;
+          ws.role = null;
+          ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
           broadcastRoomsList();
           break;
         }
@@ -131,7 +191,7 @@ wss.on('connection', (ws) => {
             return;
           }
 
-          // Broadcast authoritative state update to all clients
+          // Broadcast authoritative state update to all clients in room
           roomManager.broadcast(room, {
             type: 'STATE_UPDATE',
             gameState: result.gameState,
@@ -156,21 +216,6 @@ wss.on('connection', (ws) => {
             winnerInfo: null
           });
 
-          broadcastRoomsList();
-          break;
-        }
-
-        case 'MAKE_MOVE_BROADCAST': {
-          if (!ws.roomId) return;
-          const room = roomManager.rooms.get(ws.roomId);
-          if (!room) return;
-
-          roomManager.broadcast(room, {
-            type: 'STATE_UPDATE',
-            gameState: payload.gameState,
-            lastMove: payload.lastMove,
-            senderRole: ws.role
-          });
           broadcastRoomsList();
           break;
         }
