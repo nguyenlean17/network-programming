@@ -1,10 +1,11 @@
 /**
  * Oẳn Tù Tì v2 (OTTv2) - Server Room Manager
  * Manages active multiplayer rooms, client connections, player slot assignments,
- * and room list synchronization.
+ * and comprehensive room state synchronization (including board & piece counts).
  */
 
 import { ServerGameSession } from './game.js';
+import { countPlayerPieces } from '../shared/gameRules.js';
 
 export class RoomManager {
   constructor() {
@@ -13,7 +14,6 @@ export class RoomManager {
   }
 
   initDefaultRooms() {
-    // Optional starter room for instant testing
     const defaultRoomId = 'OTT-ROOM-1';
     this.rooms.set(defaultRoomId, {
       id: defaultRoomId,
@@ -132,6 +132,8 @@ export class RoomManager {
         roomStatus = 'EMPTY';
       }
 
+      const pieceCounts = countPlayerPieces(room.gameSession.board);
+
       list.push({
         id,
         name: room.name || `Phòng ${id}`,
@@ -146,12 +148,15 @@ export class RoomManager {
         turn: room.gameSession.currentTurn,
         moveCount: room.gameSession.moveHistory ? room.gameSession.moveHistory.length : 0,
         lastMove: room.gameSession.lastMove,
-        winner: room.gameSession.winnerInfo ? room.gameSession.winnerInfo.winner : null
+        winner: room.gameSession.winnerInfo ? room.gameSession.winnerInfo.winner : null,
+        winnerInfo: room.gameSession.winnerInfo,
+        pieceCounts,
+        board: room.gameSession.board
       });
     }
 
-    // Sort: Waiting first, then Playing, then Ended
-    const statusOrder = { WAITING: 1, PLAYING: 2, EMPTY: 3, ENDED: 4 };
+    // Sort: Playing first, then Waiting, then Ended
+    const statusOrder = { PLAYING: 1, WAITING: 2, EMPTY: 3, ENDED: 4 };
     list.sort((a, b) => {
       const orderDiff = (statusOrder[a.status] || 9) - (statusOrder[b.status] || 9);
       if (orderDiff !== 0) return orderDiff;

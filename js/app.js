@@ -67,7 +67,8 @@ class OttApp {
       onRemoteUpdate: (data) => this.handleRemoteUpdate(data),
       onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
       onRoomJoined: (roomId, role, roomName) => this.handleRoomJoined(roomId, role, roomName),
-      onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence)
+      onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence),
+      onRoomsList: (rooms) => this.renderRoomsList(rooms)
     });
 
     // Supabase Realtime Serverless Multiplayer sync
@@ -108,6 +109,21 @@ class OttApp {
   cacheDomElements() {
     this.dom = {
       boardContainer: document.getElementById('board-container'),
+      // Lobby & Active Room Bar Elements
+      lobbyRoomNameInput: document.getElementById('lobby-room-name-input'),
+      lobbyBtnCreateRoom: document.getElementById('lobby-btn-create-room'),
+      lobbyBtnRefresh: document.getElementById('lobby-btn-refresh'),
+      lobbyRoomCountBadge: document.getElementById('lobby-room-count-badge'),
+      roomsContainer: document.getElementById('rooms-container'),
+      activeRoomBar: document.getElementById('active-room-bar'),
+      activeRoomCode: document.getElementById('active-room-code'),
+      activeRoomName: document.getElementById('active-room-name'),
+      activeRoomRole: document.getElementById('active-room-role'),
+      activeRoomPresence: document.getElementById('active-room-presence'),
+      btnToggleLobby: document.getElementById('btn-toggle-lobby'),
+      btnCopyRoomLink: document.getElementById('btn-copy-room-link'),
+      btnRoomResetGame: document.getElementById('btn-room-reset-game'),
+      btnLeaveRoom: document.getElementById('btn-leave-room'),
       turnBanner: document.getElementById('turn-banner'),
       turnText: document.getElementById('turn-text'),
       turnBadge: document.getElementById('turn-badge'),
@@ -470,13 +486,72 @@ class OttApp {
       }
     });
 
-    this.dom.btnVictoryRestart.addEventListener('click', () => {
-      this.dom.victoryModal.classList.remove('open');
-      this.startNewGame();
-      if (this.gameMode === 'MULTIPLAYER') {
-        this.syncEngine.broadcastGameState(this.getSerializableState(), null);
-      }
-    });
+    // Lobby: Create Room Button
+    if (this.dom.lobbyBtnCreateRoom) {
+      this.dom.lobbyBtnCreateRoom.addEventListener('click', () => {
+        const roomName = (this.dom.lobbyRoomNameInput?.value || '').trim();
+        this.syncEngine.createRoom(roomName);
+        if (this.dom.lobbyRoomNameInput) this.dom.lobbyRoomNameInput.value = '';
+      });
+    }
+
+    // Lobby: Refresh Rooms
+    if (this.dom.lobbyBtnRefresh) {
+      this.dom.lobbyBtnRefresh.addEventListener('click', () => {
+        this.syncEngine.fetchRooms();
+        this.showToast('Đang cập nhật danh sách phòng...', 'info');
+      });
+    }
+
+    if (this.dom.btnToggleLobby) {
+      this.dom.btnToggleLobby.addEventListener('click', () => {
+        const isShown = this.dom.lobbySection && this.dom.lobbySection.style.display === 'flex';
+        if (this.dom.lobbySection) this.dom.lobbySection.style.display = isShown ? 'none' : 'flex';
+        this.dom.btnToggleLobby.textContent = isShown ? '📺 Xem các phòng khác' : '🔼 Thu gọn danh sách';
+        if (!isShown) {
+          this.syncEngine.fetchRooms();
+        }
+      });
+    }
+
+    // Active Room Actions
+    if (this.dom.btnCopyRoomLink) {
+      this.dom.btnCopyRoomLink.addEventListener('click', () => {
+        const link = this.syncEngine.getShareableLink();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(link).then(() => {
+            this.showToast('Đã copy liên kết mời vào phòng!', 'success');
+          });
+        }
+      });
+    }
+
+    if (this.dom.btnRoomResetGame) {
+      this.dom.btnRoomResetGame.addEventListener('click', () => {
+        this.startNewGame();
+        if (this.syncEngine && this.syncEngine.sendResetGame) {
+          this.syncEngine.sendResetGame();
+        }
+      });
+    }
+
+    if (this.dom.btnLeaveRoom) {
+      this.dom.btnLeaveRoom.addEventListener('click', () => {
+        if (this.syncEngine && this.syncEngine.leaveRoom) {
+          this.syncEngine.leaveRoom();
+        }
+      });
+    }
+
+    if (this.dom.btnVictoryRestart) {
+      this.dom.btnVictoryRestart.addEventListener('click', () => {
+        if (this.dom.victoryModal) this.dom.victoryModal.classList.remove('open');
+        this.startNewGame();
+        if (this.gameMode === 'MULTIPLAYER') {
+          this.syncEngine.broadcastGameState(this.getSerializableState(), null);
+        }
+      });
+    }
 
     // Chess Flip Board
     if (this.dom.btnFlipBoard) {
@@ -551,6 +626,188 @@ class OttApp {
         });
       });
     }
+  }
+
+  // -------------------------------------------------------------
+  // Room Lobby Rendering & Realtime Selection
+  // -------------------------------------------------------------
+  generateMiniBoardHtml(board) {
+    if (!board) return '<div class="mini-board-preview" style="display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:0.65rem;">Trống</div>';
+    let cellsHtml = '';
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const isLight = (r + c) % 2 === 0;
+        const isGoal = (r === 0 && c === 0) || (r === 8 && c === 8);
+        const piece = board[r] ? board[r][c] : null;
+
+        let pieceHtml = '';
+        if (piece) {
+          const pieceClass = (piece.player === 'P1' || piece.player === 'PLAYER_1') ? 'mini-piece-p1' : 'mini-piece-p2';
+          pieceHtml = `<div class="${pieceClass}"></div>`;
+        }
+
+        cellsHtml += `<div class="mini-cell ${isLight ? 'cell-light' : ''} ${isGoal ? 'is-goal' : ''}">${pieceHtml}</div>`;
+      }
+    }
+    return `<div class="mini-board-preview" title="Bản đồ thế cờ thu nhỏ 9x9 (A1 ở góc trên trái, I9 ở góc dưới phải)">${cellsHtml}</div>`;
+  }
+
+  renderRoomsList(rooms) {
+    const container = this.dom.roomsContainer;
+    if (!container) return;
+
+    if (this.dom.lobbyRoomCountBadge) {
+      this.dom.lobbyRoomCountBadge.textContent = `${rooms.length} phòng`;
+    }
+
+    if (!rooms || rooms.length === 0) {
+      container.innerHTML = `
+        <div class="empty-rooms-placeholder">
+          <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">📭</div>
+          <h4 style="color: #ffffff; margin-bottom: 0.35rem;">Chưa có phòng nào đang mở</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Hãy nhập tên phòng ở trên và bấm "Tạo phòng ngay" để trở thành người tạo phòng đầu tiên!
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = '';
+
+    rooms.forEach(room => {
+      const card = document.createElement('div');
+      card.className = 'room-card';
+
+      let statusBadgeClass = 'room-badge-waiting';
+      let statusText = '🟡 Chờ người chơi 2';
+
+      if (room.status === 'PLAYING') {
+        statusBadgeClass = 'room-badge-playing';
+        statusText = `🟢 Đang thi đấu (${room.turn === 'P1' ? 'Lượt P1' : 'Lượt P2'})`;
+      } else if (room.status === 'ENDED') {
+        statusBadgeClass = 'room-badge-ended';
+        statusText = '⚪ Đã kết thúc';
+      }
+
+      card.innerHTML = `
+        <div class="room-card-top">
+          <span class="room-title-text">
+            <span>⚔️</span> ${room.name || room.id}
+          </span>
+          <span class="room-badge-status ${statusBadgeClass}">${statusText}</span>
+        </div>
+
+        <div class="room-matchup-box">
+          <div class="room-player-side side-p1">
+            <span class="room-player-label">Player 1 (Đỏ)</span>
+            <span class="room-player-val">${room.p1Name || (room.hasP1 ? 'Sẵn sàng' : 'Trống')}</span>
+          </div>
+          <div class="room-vs-divider">VS</div>
+          <div class="room-player-side side-p2">
+            <span class="room-player-label">Player 2 (Xanh)</span>
+            <span class="room-player-val">${room.p2Name || (room.hasP2 ? 'Sẵn sàng' : 'Chờ tham gia...')}</span>
+          </div>
+        </div>
+
+        <!-- Room State: Mini-Board 9x9 Preview & Live Match Telemetry -->
+        <div class="room-state-body">
+          ${this.generateMiniBoardHtml(room.board)}
+          <div class="room-state-details">
+            <div class="state-row">
+              <span class="state-label">Lượt hiện tại:</span>
+              <span class="state-val" style="color: ${room.turn === 'P1' ? 'var(--p1-light)' : 'var(--p2-light)'};">
+                ${room.turn === 'P1' ? '🔴 Player 1 (Đỏ)' : '🔵 Player 2 (Xanh)'}
+              </span>
+            </div>
+            <div class="state-row">
+              <span class="state-label">Tiến trình:</span>
+              <span class="state-val">${room.moveCount || 0} nước đã đi</span>
+            </div>
+            ${room.pieceCounts ? `
+              <div class="state-row" style="margin-top: 2px;">
+                <span class="state-label">Quân P1:</span>
+                <span class="state-pieces-chip" style="color: var(--p1-light);">
+                  ✊${(room.pieceCounts.P1 || room.pieceCounts.PLAYER_1)?.ROCK ?? 0} ✋${(room.pieceCounts.P1 || room.pieceCounts.PLAYER_1)?.PAPER ?? 0} ✌️${(room.pieceCounts.P1 || room.pieceCounts.PLAYER_1)?.SCISSORS ?? 0} (Σ${(room.pieceCounts.P1 || room.pieceCounts.PLAYER_1)?.total ?? 0})
+                </span>
+              </div>
+              <div class="state-row">
+                <span class="state-label">Quân P2:</span>
+                <span class="state-pieces-chip" style="color: var(--p2-light);">
+                  ✊${(room.pieceCounts.P2 || room.pieceCounts.PLAYER_2)?.ROCK ?? 0} ✋${(room.pieceCounts.P2 || room.pieceCounts.PLAYER_2)?.PAPER ?? 0} ✌️${(room.pieceCounts.P2 || room.pieceCounts.PLAYER_2)?.SCISSORS ?? 0} (Σ${(room.pieceCounts.P2 || room.pieceCounts.PLAYER_2)?.total ?? 0})
+                </span>
+              </div>
+            ` : ''}
+            ${room.lastMove ? `
+              <div class="state-row" style="margin-top: 2px;">
+                <span class="state-label">Nước cuối:</span>
+                <span style="font-family: var(--font-mono); color: var(--gold-light); font-size: 0.72rem;">
+                  ${room.lastMove.from} → ${room.lastMove.to} ${room.lastMove.isCapture ? '⚔️' : ''}
+                </span>
+              </div>
+            ` : ''}
+            ${room.winner ? `
+              <div class="state-row" style="margin-top: 2px; color: var(--gold); font-weight: 800;">
+                <span>🏆 Thắng:</span>
+                <span>${room.winner === 'PLAYER_1' || room.winner === 'P1' ? 'Player 1' : 'Player 2'}</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="room-card-footer">
+          <div class="room-card-info">
+            Mã: <code style="color: var(--gold-light);">${room.id}</code> · 👁️ ${room.spectators || 0} khán giả
+          </div>
+          <div class="room-card-actions">
+            ${!room.hasP2 && room.status !== 'ENDED' ? `
+              <button class="btn btn-primary btn-sm btn-join-p2" data-room="${room.id}">
+                ⚔️ Vào chơi (P2)
+              </button>
+            ` : `
+              <button class="btn btn-sm btn-spectate" data-room="${room.id}">
+                👁️ Xem trực tiếp
+              </button>
+            `}
+            <button class="btn btn-sm btn-copy-card-link" data-room="${room.id}" title="Copy link phòng">
+              📋 Link
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Event listener for Join P2
+      const btnJoin = card.querySelector('.btn-join-p2');
+      if (btnJoin) {
+        btnJoin.addEventListener('click', () => {
+          this.syncEngine.joinRoom(room.id, 'P2');
+        });
+      }
+
+      // Event listener for Spectate
+      const btnSpec = card.querySelector('.btn-spectate');
+      if (btnSpec) {
+        btnSpec.addEventListener('click', () => {
+          this.syncEngine.joinRoom(room.id, 'SPECTATOR');
+        });
+      }
+
+      // Event listener for Copy Link
+      const btnCopy = card.querySelector('.btn-copy-card-link');
+      if (btnCopy) {
+        btnCopy.addEventListener('click', () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('room', room.id);
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(url.toString()).then(() => {
+              this.showToast(`Đã copy link phòng ${room.id}!`, 'success');
+            });
+          }
+        });
+      }
+
+      container.appendChild(card);
+    });
   }
 
   // -------------------------------------------------------------

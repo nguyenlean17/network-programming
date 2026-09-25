@@ -162,6 +162,182 @@ body {
   border: 1px solid rgba(52, 211, 153, 0.3);
 }
 
+.room-badge-waiting {
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning);
+}
+
+.room-badge-playing {
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success);
+}
+
+.room-badge-ended {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.room-matchup-box {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+/* Room State Body with Mini-Board 9x9 Preview & Live Stats */
+.room-state-body {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem;
+}
+
+.mini-board-preview {
+  display: grid;
+  grid-template-columns: repeat(9, 12px);
+  grid-template-rows: repeat(9, 12px);
+  gap: 1px;
+  background-color: #0b0e14;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 1px;
+  flex-shrink: 0;
+}
+
+.mini-cell {
+  width: 12px;
+  height: 12px;
+  background-color: #171b24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.mini-cell.cell-light {
+  background-color: #1e2430;
+}
+
+.mini-cell.is-goal {
+  border: 1px solid var(--gold);
+  background-color: var(--gold-bg);
+}
+
+.mini-piece-p1 {
+  width: 8px;
+  height: 8px;
+  background-color: var(--p1-color);
+  border-radius: 2px;
+}
+
+.mini-piece-p2 {
+  width: 8px;
+  height: 8px;
+  background-color: var(--p2-color);
+  border-radius: 2px;
+}
+
+.room-state-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  flex: 1;
+}
+
+.state-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.state-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.state-val {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.state-pieces-chip {
+  display: inline-flex;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
+
+.room-player-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.room-player-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.side-p1 .room-player-label { color: var(--p1-light); }
+.side-p2 .room-player-label { color: var(--p2-light); }
+
+.room-player-val {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.room-vs-divider {
+  font-weight: 800;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.room-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-subtle);
+  gap: 0.5rem;
+}
+
+.room-card-info {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.room-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.empty-rooms-placeholder {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
 /* Main Layout */
 .main-container {
   width: 100%;

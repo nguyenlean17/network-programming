@@ -59,6 +59,31 @@
     </div>
   </header>
 
+  <!-- Active Room Status Banner (Only visible when connected to an online room) -->
+  <div id="active-room-bar" class="active-room-bar" style="display: none; width: 100%; max-width: 1280px; margin: 0.75rem auto; padding: 0.75rem 1.25rem;">
+    <div class="room-meta-group">
+      <span id="active-room-code" class="room-id-chip">OTT-0000</span>
+      <span id="active-room-name" class="room-title-text">Phòng Đấu Trực Tuyến</span>
+      <span id="active-room-role" class="room-role-chip room-role-p1">Bạn là: Player 1 (Đỏ)</span>
+      <span id="active-room-presence" class="room-badge-status room-badge-waiting">Đang chờ đối thủ tham gia...</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <a href="rooms.html" id="btn-toggle-lobby" class="btn btn-sm" title="Xem danh sách tất cả các phòng đang thi đấu" style="text-decoration:none;">
+        📺 Xem các phòng khác
+      </a>
+      <button id="btn-copy-room-link" class="btn btn-sm" title="Sao chép liên kết trực tiếp nếu muốn gửi cho bạn bè">
+        📋 Copy link
+      </button>
+      <button id="btn-room-reset-game" class="btn btn-sm" title="Đặt lại bàn cờ mới cho cả 2 người">
+        🔄 Ván mới
+      </button>
+      <button id="btn-leave-room" class="btn btn-danger btn-sm" title="Rời khỏi phòng đấu này và quay lại sảnh">
+        🚪 Rời phòng
+      </button>
+    </div>
+  </div>
+
   <!-- Main Game Layout: Playchess 2-Column Arena (Stage + Dock) -->
   <main class="main-container playchess-arena">
 
