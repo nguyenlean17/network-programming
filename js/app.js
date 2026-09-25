@@ -21,7 +21,9 @@ import {
   createCustomBoard,
   generateAiDraftPlacement,
   countPlayerPieces,
-  checkWinCondition
+  checkWinCondition,
+  validateMove,
+  posToCoord
 } from './gameRules.js';
 
 import { BoardRenderer } from './board.js';
@@ -95,8 +97,12 @@ class OttApp {
       turnBanner: document.getElementById('turn-banner'),
       turnText: document.getElementById('turn-text'),
       turnBadge: document.getElementById('turn-badge'),
+      turnAvatar: document.getElementById('turn-avatar'),
+      turnSubtext: document.getElementById('turn-subtext'),
       turnTimerBadge: document.getElementById('turn-timer-badge'),
       turnTimerText: document.getElementById('turn-timer-text'),
+      turnTimerBar: document.getElementById('turn-timer-bar'),
+      moveHintText: document.getElementById('move-hint-text'),
       pingBadge: document.getElementById('ping-badge'),
       battleLog: document.getElementById('battle-log'),
       toastAlert: document.getElementById('toast-alert'),
@@ -107,6 +113,9 @@ class OttApp {
       p1PaperCount: document.getElementById('p1-paper-count'),
       p1ScissorsCount: document.getElementById('p1-scissors-count'),
       p1TotalCount: document.getElementById('p1-total-count'),
+      p1ArmyStatus: document.getElementById('p1-army-status'),
+      p1ArmyBar: document.getElementById('p1-army-bar'),
+      p1MeterLabel: document.getElementById('p1-meter-label'),
 
       // Player 2 Cards
       p2Card: document.getElementById('player2-card'),
@@ -114,6 +123,9 @@ class OttApp {
       p2PaperCount: document.getElementById('p2-paper-count'),
       p2ScissorsCount: document.getElementById('p2-scissors-count'),
       p2TotalCount: document.getElementById('p2-total-count'),
+      p2ArmyStatus: document.getElementById('p2-army-status'),
+      p2ArmyBar: document.getElementById('p2-army-bar'),
+      p2MeterLabel: document.getElementById('p2-meter-label'),
 
       // Controls
       gameModeSelect: document.getElementById('game-mode-select'),
@@ -128,6 +140,7 @@ class OttApp {
 
       newGameBtn: document.getElementById('btn-new-game'),
       rulesBtn: document.getElementById('btn-rules'),
+      btnQuickGuide: document.getElementById('btn-quick-guide'),
       soundBtn: document.getElementById('btn-sound'),
       onlineBtn: document.getElementById('btn-online-room'),
       presetSelect: document.getElementById('board-preset-select'),
@@ -141,6 +154,7 @@ class OttApp {
       draftCountPaper: document.getElementById('draft-count-paper'),
       draftCountScissors: document.getElementById('draft-count-scissors'),
       draftTotalPlaced: document.getElementById('draft-total-placed'),
+      draftProgressBar: document.getElementById('draft-progress-bar'),
       btnDraftAuto: document.getElementById('btn-draft-auto'),
       btnDraftClear: document.getElementById('btn-draft-clear'),
       btnDraftConfirm: document.getElementById('btn-draft-confirm'),
@@ -172,6 +186,11 @@ class OttApp {
       presenceP2: document.getElementById('presence-p2'),
       presenceSpecs: document.getElementById('presence-specs'),
 
+      // Quick Guide Modal
+      guideModal: document.getElementById('guide-modal'),
+      closeGuideModal: document.getElementById('close-guide-modal'),
+      btnGuideGotIt: document.getElementById('btn-guide-got-it'),
+
       // Rules Modal
       rulesModal: document.getElementById('rules-modal'),
       closeRulesModal: document.getElementById('close-rules-modal'),
@@ -187,7 +206,10 @@ class OttApp {
   initBoardRenderer() {
     this.renderer = new BoardRenderer(this.dom.boardContainer, {
       onMove: (moveData) => this.handleMove(moveData),
-      onInvalidClick: (msg) => this.showToast(msg, 'warning')
+      onInvalidClick: (msg) => this.showToast(msg, 'warning'),
+      onCellHover: (x, y, coord, selectedPos, board, currentTurn) => this.handleCellHover(x, y, coord, selectedPos, board, currentTurn),
+      onCellLeave: () => this.handleCellLeave(),
+      onSelectPiece: (piece, coord, validMoves) => this.handlePieceSelected(piece, coord, validMoves)
     });
     this.renderer.initBoard();
   }
@@ -276,6 +298,22 @@ class OttApp {
     this.dom.closeRulesModal.addEventListener('click', () => {
       this.dom.rulesModal.classList.remove('open');
     });
+
+    if (this.dom.btnQuickGuide) {
+      this.dom.btnQuickGuide.addEventListener('click', () => {
+        this.dom.guideModal?.classList.add('open');
+      });
+    }
+    if (this.dom.closeGuideModal) {
+      this.dom.closeGuideModal.addEventListener('click', () => {
+        this.dom.guideModal?.classList.remove('open');
+      });
+    }
+    if (this.dom.btnGuideGotIt) {
+      this.dom.btnGuideGotIt.addEventListener('click', () => {
+        this.dom.guideModal?.classList.remove('open');
+      });
+    }
 
     this.dom.onlineBtn.addEventListener('click', () => {
       this.openRoomModal();
@@ -460,11 +498,17 @@ class OttApp {
     if (this.dom.draftCountRock) this.dom.draftCountRock.textContent = rocks;
     if (this.dom.draftCountPaper) this.dom.draftCountPaper.textContent = papers;
     if (this.dom.draftCountScissors) this.dom.draftCountScissors.textContent = scissors;
-    if (this.dom.draftTotalPlaced) this.dom.draftTotalPlaced.textContent = this.draftPlacedP1.length;
+    const total = this.draftPlacedP1.length;
+    if (this.dom.draftTotalPlaced) this.dom.draftTotalPlaced.textContent = total;
+
+    if (this.dom.draftProgressBar) {
+      const pct = Math.round((total / 9) * 100);
+      this.dom.draftProgressBar.style.width = `${pct}%`;
+    }
 
     // Bật nút Vào trận nếu đã đặt ít nhất 1 quân
     if (this.dom.btnDraftConfirm) {
-      this.dom.btnDraftConfirm.disabled = (this.draftPlacedP1.length === 0);
+      this.dom.btnDraftConfirm.disabled = (total === 0);
     }
   }
 
@@ -621,6 +665,16 @@ class OttApp {
   updateTimerDisplay() {
     if (!this.dom.turnTimerText) return;
     this.dom.turnTimerText.textContent = `${this.timerRemaining}s`;
+
+    const pct = Math.max(0, Math.min(100, (this.timerRemaining / this.turnDuration) * 100));
+    if (this.dom.turnTimerBar) {
+      this.dom.turnTimerBar.style.width = `${pct}%`;
+      if (this.timerRemaining <= 5) {
+        this.dom.turnTimerBar.classList.add('warning');
+      } else {
+        this.dom.turnTimerBar.classList.remove('warning');
+      }
+    }
 
     if (this.timerRemaining <= 5) {
       this.dom.turnTimerBadge?.classList.add('warning');
@@ -799,6 +853,22 @@ class OttApp {
     this.dom.p1ScissorsCount.textContent = p1[PIECE_TYPES.SCISSORS];
     this.dom.p1TotalCount.textContent = p1.total;
 
+    const p1Max = this.boardPreset === 'CUSTOM_DRAFT' ? 9 : 15;
+    const p1Pct = Math.min(100, Math.round((p1.total / p1Max) * 100));
+    if (this.dom.p1ArmyBar) this.dom.p1ArmyBar.style.width = `${p1Pct}%`;
+    if (this.dom.p1MeterLabel) this.dom.p1MeterLabel.innerHTML = `<strong>${p1.total}</strong> / ${p1Max} quân (${p1Pct}%)`;
+
+    const p1Danger = (p1[PIECE_TYPES.ROCK] === 1 || p1[PIECE_TYPES.PAPER] === 1 || p1[PIECE_TYPES.SCISSORS] === 1);
+    if (this.dom.p1ArmyStatus) {
+      if (p1Danger) {
+        this.dom.p1ArmyStatus.className = 'army-status-pill danger';
+        this.dom.p1ArmyStatus.textContent = '⚠️ Cận kề thất bại';
+      } else {
+        this.dom.p1ArmyStatus.className = 'army-status-pill';
+        this.dom.p1ArmyStatus.textContent = 'Sẵn sàng';
+      }
+    }
+
     // Highlight critical count (0 or 1 piece left)
     this.highlightDanger(this.dom.p1RockCount, p1[PIECE_TYPES.ROCK]);
     this.highlightDanger(this.dom.p1PaperCount, p1[PIECE_TYPES.PAPER]);
@@ -810,6 +880,22 @@ class OttApp {
     this.dom.p2PaperCount.textContent = p2[PIECE_TYPES.PAPER];
     this.dom.p2ScissorsCount.textContent = p2[PIECE_TYPES.SCISSORS];
     this.dom.p2TotalCount.textContent = p2.total;
+
+    const p2Max = this.boardPreset === 'CUSTOM_DRAFT' ? 9 : 15;
+    const p2Pct = Math.min(100, Math.round((p2.total / p2Max) * 100));
+    if (this.dom.p2ArmyBar) this.dom.p2ArmyBar.style.width = `${p2Pct}%`;
+    if (this.dom.p2MeterLabel) this.dom.p2MeterLabel.innerHTML = `<strong>${p2.total}</strong> / ${p2Max} quân (${p2Pct}%)`;
+
+    const p2Danger = (p2[PIECE_TYPES.ROCK] === 1 || p2[PIECE_TYPES.PAPER] === 1 || p2[PIECE_TYPES.SCISSORS] === 1);
+    if (this.dom.p2ArmyStatus) {
+      if (p2Danger) {
+        this.dom.p2ArmyStatus.className = 'army-status-pill danger';
+        this.dom.p2ArmyStatus.textContent = '⚠️ Cận kề thất bại';
+      } else {
+        this.dom.p2ArmyStatus.className = 'army-status-pill';
+        this.dom.p2ArmyStatus.textContent = 'Sẵn sàng';
+      }
+    }
 
     this.highlightDanger(this.dom.p2RockCount, p2[PIECE_TYPES.ROCK]);
     this.highlightDanger(this.dom.p2PaperCount, p2[PIECE_TYPES.PAPER]);
@@ -829,11 +915,127 @@ class OttApp {
   updateTurnDisplay() {
     const isP1 = this.currentTurn === PLAYERS.PLAYER_1;
     this.dom.turnBanner.className = `turn-banner turn-${this.currentTurn.toLowerCase()}`;
-    this.dom.turnBadge.textContent = isP1 ? 'P1' : 'P2';
-    this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Player 1' : 'Player 2'}`;
+    if (this.dom.turnBadge) this.dom.turnBadge.textContent = isP1 ? 'P1' : 'P2';
+    if (this.dom.turnAvatar) this.dom.turnAvatar.textContent = isP1 ? 'P1' : 'P2';
+
+    if (this.gameMode === 'BOT' && !isP1) {
+      this.dom.turnText.textContent = `Lượt của Máy (AI ${this.ai.difficulty.toUpperCase()})`;
+      if (this.dom.turnSubtext) this.dom.turnSubtext.textContent = 'Bộ não AI đang tính toán nước đi trong RAM...';
+    } else {
+      this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
+      if (this.dom.turnSubtext) {
+        this.dom.turnSubtext.textContent = isP1
+          ? 'Ruby Legion · Chọn 1 quân cờ để di chuyển'
+          : 'Sapphire Order · Chọn 1 quân cờ để di chuyển';
+      }
+    }
 
     this.dom.p1Card.classList.toggle('active-turn', isP1);
     this.dom.p2Card.classList.toggle('active-turn', !isP1);
+
+    if (this.dom.moveHintText) {
+      this.dom.moveHintText.innerHTML = `💡 Đến lượt <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Chọn 1 quân của bạn để xem 8 hướng di chuyển.`;
+    }
+  }
+
+  handlePieceSelected(piece, coord, validMoves) {
+    if (!this.dom.moveHintText) return;
+    const pieceName = PIECE_NAMES_VI[piece.type] || piece.type;
+    const count = validMoves.length;
+    this.dom.moveHintText.innerHTML = `🎯 Đã chọn quân <strong>${pieceName} [${coord}]</strong>: Có <strong>${count}</strong> ô có thể đi. Rê chuột vào các ô lân cận để xem trước kết quả ăn quân/chặn đường.`;
+  }
+
+  handleCellHover(x, y, coord, selectedPos, board, currentTurn) {
+    if (!this.dom.moveHintText) return;
+
+    if (this.isDraftPhase) {
+      const typeName = PIECE_NAMES_VI[this.draftSelectedType] || this.draftSelectedType;
+      if (y >= 5 && y <= 8) {
+        const existing = board && board[y] ? board[y][x] : null;
+        if (existing) {
+          this.dom.moveHintText.innerHTML = `🛡️ Ô [<strong>${coord}</strong>] đang có quân <strong>${PIECE_NAMES_VI[existing.type]}</strong>. Click để đổi loại hoặc gỡ quân.`;
+        } else {
+          this.dom.moveHintText.innerHTML = `➕ Click vào ô [<strong>${coord}</strong>] để đặt quân <strong>${typeName}</strong>.`;
+        }
+      } else {
+        this.dom.moveHintText.innerHTML = `⚠️ Ô [<strong>${coord}</strong>] nằm ngoài nửa sân dàn trận! Chỉ được đặt ở Hàng 6 - 9.`;
+      }
+      return;
+    }
+
+    if (!selectedPos) {
+      const piece = board && board[y] ? board[y][x] : null;
+      if (piece) {
+        const isMine = piece.player === currentTurn;
+        const ownerName = piece.player === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)';
+        const pName = PIECE_NAMES_VI[piece.type] || piece.type;
+        if (isMine) {
+          this.dom.moveHintText.innerHTML = `👉 Nhấp để chọn quân <strong>${pName} (${ownerName})</strong> tại ô [<strong>${coord}</strong>].`;
+        } else {
+          this.dom.moveHintText.innerHTML = `🛡️ Quân địch <strong>${pName} (${ownerName})</strong> tại ô [<strong>${coord}</strong>].`;
+        }
+      } else {
+        this.dom.moveHintText.innerHTML = `Ô trống [<strong>${coord}</strong>]. Chọn một quân cờ của bạn để bắt đầu di chuyển.`;
+      }
+      return;
+    }
+
+    // A piece is selected!
+    const { x: selX, y: selY } = selectedPos;
+    const selPiece = board[selY][selX];
+    const selCoord = posToCoord(selX, selY);
+    const selName = PIECE_NAMES_VI[selPiece.type] || selPiece.type;
+
+    if (x === selX && y === selY) {
+      this.dom.moveHintText.innerHTML = `🎯 Đang chọn quân <strong>${selName}</strong> tại [<strong>${selCoord}</strong>]. Click lại để bỏ chọn.`;
+      return;
+    }
+
+    const check = validateMove(board, { from: selCoord, to: coord, player: currentTurn }, currentTurn);
+    const targetPiece = board[y][x];
+
+    if (check.valid) {
+      if (check.isCapture && targetPiece) {
+        const targetName = PIECE_NAMES_VI[targetPiece.type] || targetPiece.type;
+        this.dom.moveHintText.innerHTML = `⚔️ <strong>ĂN QUÂN HỢP LỆ</strong>: ${selName} ăn ${targetName} tại ô [<strong>${coord}</strong>]!`;
+      } else if (coord === 'A1' || coord === 'I9') {
+        this.dom.moveHintText.innerHTML = `👑 <strong>ĐỘT KÍCH CỨ ĐIỂM [${coord}]</strong>: Đi vào ô đích này để CHIẾN THẮNG TRẬN ĐẤU NGAY!`;
+      } else {
+        this.dom.moveHintText.innerHTML = `➡️ Di chuyển 1 ô đến ô trống [<strong>${coord}</strong>].`;
+      }
+    } else {
+      if (targetPiece) {
+        const targetName = PIECE_NAMES_VI[targetPiece.type] || targetPiece.type;
+        if (targetPiece.player === currentTurn) {
+          this.dom.moveHintText.innerHTML = `🤝 Ô [<strong>${coord}</strong>] đã có quân cùng phe (<strong>${targetName}</strong>).`;
+        } else if (targetPiece.type === selPiece.type) {
+          this.dom.moveHintText.innerHTML = `🛡️ <strong>CHẶN ĐƯỜNG</strong>: Hai quân <strong>${selName}</strong> cùng loại không thể ăn nhau, chỉ đứng chặn đường!`;
+        } else {
+          this.dom.moveHintText.innerHTML = `⚠️ <strong>BỊ KHẮC CHẾ</strong>: Quân <strong>${selName}</strong> không thể ăn <strong>${targetName}</strong>!`;
+        }
+      } else {
+        this.dom.moveHintText.innerHTML = `🚫 ${check.reason || 'Nước đi không hợp lệ'}`;
+      }
+    }
+  }
+
+  handleCellLeave(selectedPos) {
+    if (!this.dom.moveHintText) return;
+    if (this.isDraftPhase) {
+      this.dom.moveHintText.innerHTML = `🛡️ Giai đoạn dàn trận: Chọn loại quân rồi click ô Hàng 6 - 9 để bố trí tối đa 9 quân.`;
+      return;
+    }
+    if (selectedPos && this.board) {
+      const { x, y } = selectedPos;
+      const piece = this.board[y][x];
+      if (piece) {
+        const pName = PIECE_NAMES_VI[piece.type] || piece.type;
+        this.dom.moveHintText.innerHTML = `🎯 Đang chọn <strong>${pName}</strong> tại [<strong>${posToCoord(x, y)}</strong>]. Click ô xanh lá để đi, hoặc ô đỏ ⚔️ để ăn quân.`;
+        return;
+      }
+    }
+    const isP1 = this.currentTurn === PLAYERS.PLAYER_1;
+    this.dom.moveHintText.innerHTML = `💡 Đến lượt <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Chọn 1 quân của bạn để xem 8 hướng di chuyển.`;
   }
 
   addLog(msg, type = 'normal') {

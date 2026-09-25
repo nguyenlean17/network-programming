@@ -26,6 +26,8 @@ export class BoardRenderer {
     this.onMove = options.onMove || null;
     this.onSelectPiece = options.onSelectPiece || null;
     this.onInvalidClick = options.onInvalidClick || null;
+    this.onCellHover = options.onCellHover || null;
+    this.onCellLeave = options.onCellLeave || null;
 
     this.selectedPos = null;
     this.validMoves = [];
@@ -101,11 +103,25 @@ export class BoardRenderer {
         label.textContent = coord;
         cell.appendChild(label);
 
-        // Click listener
+        // Click and Hover listeners
         cell.addEventListener('click', (e) => this.handleCellClick(c, r, coord, e));
+        cell.addEventListener('mouseenter', () => this.handleCellHover(c, r, coord));
+        cell.addEventListener('mouseleave', () => this.handleCellLeave());
 
         this.container.appendChild(cell);
       }
+    }
+  }
+
+  handleCellHover(x, y, coord) {
+    if (this.onCellHover) {
+      this.onCellHover(x, y, coord, this.selectedPos, this.currentBoard, this.currentTurn);
+    }
+  }
+
+  handleCellLeave() {
+    if (this.onCellLeave) {
+      this.onCellLeave(this.selectedPos);
     }
   }
 
@@ -160,12 +176,13 @@ export class BoardRenderer {
         pieceEl.dataset.type = piece.type;
         pieceEl.dataset.player = piece.player;
 
-        // Content
+        // Content with high readability
+        const pieceName = PIECE_NAMES_VI[piece.type] || piece.type;
         pieceEl.innerHTML = `
           <span class="piece-icon">${PIECE_SYMBOLS[piece.type]}</span>
-          <span class="piece-tag">${piece.player}</span>
+          <span class="piece-tag">${pieceName}</span>
         `;
-        pieceEl.title = `${piece.player === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2'} - ${PIECE_NAMES_VI[piece.type]}`;
+        pieceEl.title = `${piece.player === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'} - Quân ${pieceName}`;
       } else if (pieceEl) {
         pieceEl.remove();
       }
