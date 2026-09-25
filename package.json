@@ -1,0 +1,30 @@
+{
+  "name": "ottv2-game",
+  "version": "1.0.0",
+  "description": "Trò chơi Oẳn Tù Tì v2 (OTTv2) trên bàn cờ 9x9 - Hỗ trợ chơi cục bộ và nhiều người chơi trực tuyến qua mạng",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js",
+    "test": "node tests/game-engine.test.js"
+  },
+  "keywords": [
+    "boardgame",
+    "rock-paper-scissors",
+    "oan-tu-ti",
+    "playhtml",
+    "socket.io",
+    "multiplayer",
+    "lap-trinh-mang"
+  ],
+  "author": "Nhóm Sinh Viên UET - Lập Trình Mạng",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

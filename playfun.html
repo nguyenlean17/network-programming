@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTTv2 - Chế Độ playfun.html (Thư Viện playhtml Real-Time Server)</title>
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Thư viện playhtml (playhtml.fun / playfun.html) đồng bộ Real-Time Multiplayer -->
+  <script type="module">
+    import { playhtml } from "https://unpkg.com/playhtml@latest";
+    try {
+      // Khởi tạo playhtml với hỗ trợ đồng bộ multiplayer realtime & live cursors
+      playhtml.init({
+        room: "ottv2-boardgame-uet",
+        presence: true
+      });
+      console.log("✓ Đã khởi tạo thư viện playhtml (playfun.html) thành công!");
+      const statusEl = document.getElementById("playfun-status");
+      if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#10b981;">🟢 Thư viện playhtml (playfun.html) đang kết nối đồng bộ trực tuyến!</span>';
+      }
+    } catch (err) {
+      console.warn("playhtml init warning:", err);
+    }
+  </script>
+
+  <!-- Fallback Socket.IO Client -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span style="font-size: 1.8rem;">⚡</span>
+      <div>
+        <h1>OTTv2 — Chế Độ Thư Viện playfun.html</h1>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Đồng bộ phần tử HTML trực tuyến (playhtml.fun / PartyKit)</div>
+      </div>
+      <span class="badge-tag" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.4);">
+        Real-Time Synced
+      </span>
+    </div>
+
+    <nav class="nav-tabs">
+      <a href="index.html" class="nav-tab-btn" style="text-decoration: none;">
+        <span>🏠</span> Trang Chủ & Chơi Cục Bộ
+      </a>
+      <button class="nav-tab-btn active">
+        <span>⚡</span> playfun.html Live
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Container -->
+  <main style="max-width: 1300px; margin: 20px auto; padding: 0 16px;">
+
+    <!-- Information Banner -->
+    <div class="panel" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h2 style="font-size: 1.15rem; color: var(--accent-gold); margin-bottom: 4px;">
+          Bài tập 2: Ứng Dụng Thư Viện playfun.html Cho Phép Nhiều Người Chơi Cùng Lúc
+        </h2>
+        <div id="playfun-status" style="font-size: 0.85rem; color: var(--text-muted);">
+          Đang khởi tạo kết nối hạ tầng đồng bộ thời gian thực...
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button id="btn-sync-reset" class="btn" style="padding: 6px 14px; font-size: 0.82rem;">
+          🔄 Đặt Lại Bàn Cờ Mới
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Synced Game Area -->
+    <div style="display: grid; grid-template-columns: 300px 1fr 300px; gap: 20px; align-items: start;">
+
+      <!-- Left Panel: P2 Info -->
+      <aside class="panel">
+        <div class="panel-title"><span>🔵</span> Phe Xanh (Player 2)</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Cứ điểm bảo vệ: <strong>i9</strong></div>
+        <div class="piece-counts">
+          <div class="piece-stat-box"><div class="piece-stat-icon">✊</div><div id="pf-p2-rock" class="piece-stat-val">3</div></div>
+          <div class="piece-stat-box"><div class="piece-stat-icon">✋</div><div id="pf-p2-paper" class="piece-stat-val">3</div></div>
+          <div class="piece-stat-box"><div class="piece-stat-icon">✌️</div><div id="pf-p2-scissors" class="piece-stat-val">3</div></div>
+        </div>
+
+        <div style="margin-top: 16px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">
+          <strong style="color: #60a5fa;">Mục tiêu chiến thắng:</strong><br>
+          1. Đột kích quân vào ô <strong>a1</strong> của Phe Đỏ.<br>
+          2. Hoặc ăn sạch 1 loại quân (Đấm, Lá, hoặc Kéo) của Phe Đỏ.
+        </div>
+      </aside>
+
+      <!-- Center: The Live PlayHTML Synced 9x9 Board -->
+      <section class="game-center">
+        <div id="pf-turn-banner" class="turn-banner">
+          <div id="pf-turn-dot" class="turn-indicator-dot"></div>
+          <span id="pf-turn-text">Lượt đi: Người chơi 1 (Đỏ)</span>
+        </div>
+
+        <div class="board-wrapper">
+          <div class="coord-cols"><div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div></div>
+          <div class="board-with-side">
+            <div class="coord-rows"><div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div></div>
+            <!-- Grid container with playhtml capability attribute -->
+            <div id="playfun-board-grid" class="board-grid" can-play id="ottv2-synced-board"></div>
+            <div class="coord-rows"><div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div></div>
+          </div>
+          <div class="coord-cols" style="margin-top: 6px; margin-bottom: 0;"><div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div></div>
+        </div>
+      </section>
+
+      <!-- Right Panel: P1 Info & Instructions -->
+      <aside class="panel">
+        <div class="panel-title"><span>🔴</span> Phe Đỏ (Player 1)</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Cứ điểm bảo vệ: <strong>a1</strong></div>
+        <div class="piece-counts">
+          <div class="piece-stat-box"><div class="piece-stat-icon">✊</div><div id="pf-p1-rock" class="piece-stat-val">3</div></div>
+          <div class="piece-stat-box"><div class="piece-stat-icon">✋</div><div id="pf-p1-paper" class="piece-stat-val">3</div></div>
+          <div class="piece-stat-box"><div class="piece-stat-icon">✌️</div><div id="pf-p1-scissors" class="piece-stat-val">3</div></div>
+        </div>
+
+        <div style="margin-top: 16px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">
+          <strong style="color: #f87171;">Mục tiêu chiến thắng:</strong><br>
+          1. Đột kích quân vào ô <strong>i9</strong> của Phe Xanh.<br>
+          2. Hoặc ăn sạch 1 loại quân (Đấm, Lá, hoặc Kéo) của Phe Xanh.
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <script src="js/game-engine.js"></script>
+  <script>
+    // Logic điều khiển cho trang playfun.html
+    const engine = new OTTv2Engine();
+    let selectedCell = null;
+    let validMoves = [];
+
+    const boardEl = document.getElementById('playfun-board-grid');
+    const turnDot = document.getElementById('pf-turn-dot');
+    const turnText = document.getElementById('pf-turn-text');
+
+    function getPieceEmoji(type) {
+      switch (type) {
+        case 'ROCK': return '✊';
+        case 'PAPER': return '✋';
+        case 'SCISSORS': return '✌️';
+        default: return '';
+      }
+    }
+
+    function render() {
+      if (!boardEl) return;
+      boardEl.innerHTML = '';
+
+      for (let r = 8; r >= 0; r--) {
+        for (let c = 0; c < 9; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+
+          if (r === 0 && c === 0) cell.classList.add('base-a1');
+          if (r === 8 && c === 8) cell.classList.add('base-i9');
+
+          if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+            cell.classList.add('selected');
+          }
+
+          const validMove = validMoves.find(m => m.toR === r && m.toC === c);
+          if (validMove) {
+            if (validMove.action === 'CAPTURE') cell.classList.add('valid-capture');
+            else cell.classList.add('valid-move');
+          }
+
+          const piece = engine.board[r][c];
+          if (piece) {
+            const pieceEl = document.createElement('div');
+            pieceEl.className = `piece ${piece.player.toLowerCase()}`;
+            pieceEl.innerHTML = `
+              <span class="piece-icon">${getPieceEmoji(piece.type)}</span>
+              <span class="piece-tag">${piece.type === 'ROCK' ? 'ĐẤM' : piece.type === 'PAPER' ? 'LÁ' : 'KÉO'}</span>
+            `;
+            cell.appendChild(pieceEl);
+          }
+
+          boardEl.appendChild(cell);
+        }
+      }
+
+      // Update turn
+      if (engine.turn === 'P1') {
+        turnDot.style.background = 'var(--p1-color)';
+        turnText.innerText = 'Lượt đi: Người chơi 1 (Đỏ)';
+      } else {
+        turnDot.style.background = 'var(--p2-color)';
+        turnText.innerText = 'Lượt đi: Người chơi 2 (Xanh)';
+      }
+
+      // Update piece counts
+      const p1 = engine.getRemainingPieces('P1');
+      const p2 = engine.getRemainingPieces('P2');
+      document.getElementById('pf-p1-rock').innerText = p1.ROCK;
+      document.getElementById('pf-p1-paper').innerText = p1.PAPER;
+      document.getElementById('pf-p1-scissors').innerText = p1.SCISSORS;
+      document.getElementById('pf-p2-rock').innerText = p2.ROCK;
+      document.getElementById('pf-p2-paper').innerText = p2.PAPER;
+      document.getElementById('pf-p2-scissors').innerText = p2.SCISSORS;
+    }
+
+    boardEl.addEventListener('click', (e) => {
+      const cell = e.target.closest('.cell');
+      if (!cell || engine.isGameOver) return;
+      const r = parseInt(cell.dataset.r, 10);
+      const c = parseInt(cell.dataset.c, 10);
+
+      if (selectedCell) {
+        const move = validMoves.find(m => m.toR === r && m.toC === c);
+        if (move) {
+          const res = engine.makeMove(selectedCell.r, selectedCell.c, r, c);
+          selectedCell = null;
+          validMoves = [];
+          render();
+          if (res.gameOver) {
+            alert('🎉 ' + res.reason);
+          }
+          return;
+        }
+      }
+
+      const piece = engine.board[r][c];
+      if (piece && piece.player === engine.turn) {
+        selectedCell = { r, c };
+        validMoves = engine.getValidMoves(r, c);
+      } else {
+        selectedCell = null;
+        validMoves = [];
+      }
+      render();
+    });
+
+    document.getElementById('btn-sync-reset').addEventListener('click', () => {
+      engine.initBoard();
+      selectedCell = null;
+      validMoves = [];
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

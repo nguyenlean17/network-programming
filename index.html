@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTTv2 - Oẳn Tù Tì Bàn Cờ 9x9 (Chơi Cục Bộ & Nhiều Người Trực Tuyến)</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Socket.IO Client library -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span style="font-size: 1.8rem;">✊✋✌️</span>
+      <div>
+        <h1>OTTv2 — Bàn Cờ Oẳn Tù Tì</h1>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Môn Lập Trình Mạng • ĐH Công Nghệ (VNU-UET)</div>
+      </div>
+      <span class="badge-tag">Bàn Cờ 9x9</span>
+    </div>
+
+    <!-- Mode Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab-btn active" data-tab="tab-local">
+        <span>🎮</span> Chơi Cục Bộ & Đấu AI
+      </button>
+      <button class="nav-tab-btn" data-tab="tab-online">
+        <span>🌐</span> Đấu Mạng (Server)
+      </button>
+      <a href="playfun.html" class="nav-tab-btn" style="text-decoration: none;">
+        <span>⚡</span> playfun.html
+      </a>
+      <button class="nav-tab-btn" data-tab="tab-about">
+        <span>📜</span> Luật Chơi & Phân Chia Nhóm
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Game Container -->
+  <main>
+
+    <!-- ================================================================= -->
+    <!-- TAB 1: LOCAL GAME (2 Players Hotseat & vs Computer AI)            -->
+    <!-- ================================================================= -->
+    <div id="tab-local" class="tab-content active">
+
+      <!-- Left Column: Player Stats & Mode Switcher -->
+      <aside class="panel">
+        <div class="panel-title">
+          <span>👥</span> Trạng Thái Người Chơi
+        </div>
+
+        <!-- Mode Toggle -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button id="btn-mode-pvp" class="btn btn-primary" style="flex: 1; font-size: 0.82rem;">2 Người (1 Máy)</button>
+          <button id="btn-mode-ai" class="btn" style="flex: 1; font-size: 0.82rem;">Đấu Với Máy (AI)</button>
+        </div>
+
+        <!-- Player 2 (Blue) Card -->
+        <div id="local-p2-card" class="player-card p2">
+          <div class="player-card-header">
+            <div id="local-p2-name" class="player-name">🔵 Người chơi 2 (Xanh)</div>
+            <span class="base-badge">Cứ điểm: i9</span>
+          </div>
+          <div class="piece-counts">
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✊</div>
+              <div id="local-p2-rock" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Đấm</div>
+            </div>
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✋</div>
+              <div id="local-p2-paper" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Lá</div>
+            </div>
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✌️</div>
+              <div id="local-p2-scissors" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Kéo</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player 1 (Red) Card -->
+        <div id="local-p1-card" class="player-card p1 active-turn">
+          <div class="player-card-header">
+            <div class="player-name">🔴 Người chơi 1 (Đỏ)</div>
+            <span class="base-badge">Cứ điểm: a1</span>
+          </div>
+          <div class="piece-counts">
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✊</div>
+              <div id="local-p1-rock" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Đấm</div>
+            </div>
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✋</div>
+              <div id="local-p1-paper" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Lá</div>
+            </div>
+            <div class="piece-stat-box">
+              <div class="piece-stat-icon">✌️</div>
+              <div id="local-p1-scissors" class="piece-stat-val">3</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">Kéo</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Rule Highlights -->
+        <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; font-size: 0.78rem; line-height: 1.4; color: var(--text-muted);">
+          <strong style="color: var(--accent-gold);">⚡ Luật ăn quân & chặn đường:</strong><br>
+          • ✊ Đấm ăn ✌️ Kéo | ✌️ Kéo ăn ✋ Lá | ✋ Lá ăn ✊ Đấm<br>
+          • <strong>Hai quân cùng loại:</strong> Không thể ăn nhau, chỉ đứng chặn đường nhau!<br>
+          • <strong>Thắng cuộc:</strong> Ăn sạch 1 loại quân của đối phương HOẶC đi quân vào ô <strong>a1 / i9</strong>!
+        </div>
+      </aside>
+
+      <!-- Center: 9x9 Board -->
+      <section class="game-center">
+        <!-- Turn indicator Banner -->
+        <div id="local-turn-banner" class="turn-banner">
+          <div id="local-turn-dot" class="turn-indicator-dot"></div>
+          <span id="local-turn-text">Lượt đi: Người chơi 1 (Đỏ)</span>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">| Thời gian: <strong id="local-timer-val" style="color: var(--accent-gold);">30s</strong></span>
+        </div>
+
+        <!-- Board Wrapper -->
+        <div class="board-wrapper">
+          <!-- Top Col Coordinates (a - i) -->
+          <div class="coord-cols">
+            <div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div>
+          </div>
+
+          <div class="board-with-side">
+            <!-- Left Row Coordinates (9 down to 1) -->
+            <div class="coord-rows">
+              <div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div>
+            </div>
+
+            <!-- 9x9 Grid -->
+            <div id="local-board-grid" class="board-grid"></div>
+
+            <!-- Right Row Coordinates (9 down to 1) -->
+            <div class="coord-rows">
+              <div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div>
+            </div>
+          </div>
+
+          <!-- Bottom Col Coordinates (a - i) -->
+          <div class="coord-cols" style="margin-top: 6px; margin-bottom: 0;">
+            <div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Controls & Move History -->
+      <aside class="panel controls-panel">
+        <div class="panel-title">
+          <span>⚙️</span> Điều Khiển Trận Đấu
+        </div>
+
+        <button id="btn-local-restart" class="btn btn-primary">
+          <span>🔄</span> Bắt Đầu Lại (Reset)
+        </button>
+        <button id="btn-local-undo" class="btn">
+          <span>↩️</span> Đi Lại Nước Cờ (Undo)
+        </button>
+
+        <div class="panel-title" style="margin-top: 10px;">
+          <span>📜</span> Lịch Sử Nước Đi
+        </div>
+        <div id="local-history-list" class="history-box"></div>
+      </aside>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 2: ONLINE MULTIPLAYER (Socket.IO Server)                      -->
+    <!-- ================================================================= -->
+    <div id="tab-online" class="tab-content" style="grid-template-columns: 1fr;">
+
+      <!-- View A: Lobby / Rooms List -->
+      <div id="online-lobby-view" class="panel" style="max-width: 900px; margin: 0 auto; width: 100%;">
+        <div class="panel-title">
+          <span>🌐</span> Sảnh Đấu Trực Tuyến OTTv2 (Multiplayer Server)
+        </div>
+
+        <div class="lobby-container">
+          <!-- Create Room Form -->
+          <div style="background: rgba(0,0,0,0.25); padding: 18px; border-radius: 12px; border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--accent-gold);">Tạo Phòng Mới</h3>
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Tên Của Bạn:</label>
+              <input id="online-player-name" type="text" value="Chiến Binh Đỏ" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+            </div>
+            <div style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Tên Phòng Đấu:</label>
+              <input id="online-new-room-name" type="text" value="Đấu Trường OTTv2" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+            </div>
+            <button id="btn-create-room" class="btn btn-primary" style="width: 100%;">
+              <span>⚔️</span> Tạo Phòng & Chờ Đối Thủ
+            </button>
+          </div>
+
+          <!-- Active Rooms List -->
+          <div style="background: rgba(0,0,0,0.25); padding: 18px; border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 1.1rem; color: var(--accent-gold);">Danh Sách Phòng Đang Mở</h3>
+              <button id="btn-refresh-rooms" class="btn" style="padding: 4px 10px; font-size: 0.75rem;">Làm mới 🔄</button>
+            </div>
+            <div id="online-rooms-list" style="max-height: 240px; overflow-y: auto;">
+              <div style="color: var(--text-muted); font-size: 0.85rem;">Đang kết nối tới máy chủ Socket.IO...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View B: In-Game Room -->
+      <div id="online-game-view" style="display: none; grid-template-columns: 320px 1fr 340px; gap: 20px; align-items: start; width: 100%;">
+        <!-- Left Column: Players -->
+        <aside class="panel">
+          <div class="panel-title">
+            <span>🛡️</span> <span id="online-room-badge">Phòng Thi Đấu</span>
+          </div>
+          <div id="online-my-role" style="font-weight: 700; color: var(--accent-gold); margin-bottom: 12px; font-size: 0.95rem;"></div>
+
+          <div id="online-p2-card" class="player-card p2">
+            <div class="player-card-header">
+              <div id="online-p2-name" class="player-name">🔵 Đang chờ đối thủ...</div>
+              <span class="base-badge">i9</span>
+            </div>
+            <div class="piece-counts">
+              <div class="piece-stat-box"><div class="piece-stat-icon">✊</div><div id="online-p2-rock" class="piece-stat-val">3</div></div>
+              <div class="piece-stat-box"><div class="piece-stat-icon">✋</div><div id="online-p2-paper" class="piece-stat-val">3</div></div>
+              <div class="piece-stat-box"><div class="piece-stat-icon">✌️</div><div id="online-p2-scissors" class="piece-stat-val">3</div></div>
+            </div>
+          </div>
+
+          <div id="online-p1-card" class="player-card p1 active-turn">
+            <div class="player-card-header">
+              <div id="online-p1-name" class="player-name">🔴 Người chơi 1</div>
+              <span class="base-badge">a1</span>
+            </div>
+            <div class="piece-counts">
+              <div class="piece-stat-box"><div class="piece-stat-icon">✊</div><div id="online-p1-rock" class="piece-stat-val">3</div></div>
+              <div class="piece-stat-box"><div class="piece-stat-icon">✋</div><div id="online-p1-paper" class="piece-stat-val">3</div></div>
+              <div class="piece-stat-box"><div class="piece-stat-icon">✌️</div><div id="online-p1-scissors" class="piece-stat-val">3</div></div>
+            </div>
+          </div>
+
+          <button id="btn-leave-room" class="btn btn-danger" style="width: 100%; margin-top: 10px;">
+            <span>🚪</span> Rời Khỏi Phòng
+          </button>
+        </aside>
+
+        <!-- Center: Board -->
+        <section class="game-center">
+          <div id="online-turn-banner" class="turn-banner">
+            <div id="online-turn-dot" class="turn-indicator-dot"></div>
+            <span id="online-turn-text">Lượt đi: Người chơi 1 (Đỏ)</span>
+          </div>
+
+          <div class="board-wrapper">
+            <div class="coord-cols"><div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div></div>
+            <div class="board-with-side">
+              <div class="coord-rows"><div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div></div>
+              <div id="online-board-grid" class="board-grid"></div>
+              <div class="coord-rows"><div>9</div><div>8</div><div>7</div><div>6</div><div>5</div><div>4</div><div>3</div><div>2</div><div>1</div></div>
+            </div>
+            <div class="coord-cols" style="margin-top: 6px; margin-bottom: 0;"><div>a</div><div>b</div><div>c</div><div>d</div><div>e</div><div>f</div><div>g</div><div>h</div><div>i</div></div>
+          </div>
+        </section>
+
+        <!-- Right Column: Room Chat & Admin -->
+        <aside class="panel controls-panel">
+          <div class="panel-title">
+            <span>💬</span> Trò Chuyện Trực Tuyến
+          </div>
+          <div class="chat-box">
+            <div id="online-chat-messages" class="chat-messages"></div>
+            <div class="chat-input-row">
+              <input id="online-chat-input" type="text" placeholder="Nhập tin nhắn..." maxlength="120">
+              <button id="btn-send-chat" class="btn btn-primary" style="padding: 6px 14px;">Gửi</button>
+            </div>
+          </div>
+
+          <button id="btn-online-restart" class="btn" style="margin-top: 10px;">
+            <span>🔄</span> Chơi Ván Mới
+          </button>
+        </aside>
+      </div>
+
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 3: RULES & 4-STUDENT TEAM WORKLOAD DISTRIBUTION               -->
+    <!-- ================================================================= -->
+    <div id="tab-about" class="tab-content" style="grid-template-columns: 1fr;">
+      <div class="panel" style="max-width: 1000px; margin: 0 auto; width: 100%; line-height: 1.6;">
+        <div class="panel-title">
+          <span>📖</span> Hướng Dẫn Luật Chơi OTTv2 & Bản Phân Chia Công Việc Nhóm 4 Sinh Viên
+        </div>
+
+        <h3 style="color: var(--accent-gold); margin: 12px 0 6px;">1. Quy Tắc Trò Chơi OTTv2 (Oẳn Tù Tì v2 Bàn Cờ 9x9)</h3>
+        <ul style="padding-left: 20px; font-size: 0.92rem; color: #cbd5e1;">
+          <li><strong>Bàn cờ:</strong> Kích thước 9x9 ô vuông (tọa độ từ <code>a1</code> đến <code>i9</code>).</li>
+          <li><strong>Quân cờ:</strong> Mỗi bên gồm 9 quân (3 Đấm ✊, 3 Lá ✋, 3 Kéo ✌️) xuất phát ở 2 hàng của phe mình.</li>
+          <li><strong>Di chuyển:</strong> Mỗi quân cờ được di chuyển <strong>1 ô theo mọi hướng trong 8 hướng</strong> (ngang, dọc, chéo) tương tự như quân Vua trong cờ vua.</li>
+          <li><strong>Quy tắc ăn quân:</strong>
+            <ul>
+              <li>✊ Đấm thắng ✌️ Kéo | ✌️ Kéo thắng ✋ Lá | ✋ Lá thắng ✊ Đấm.</li>
+              <li><strong>Luật hai quân cùng loại:</strong> Hai quân cùng loại (Đấm gặp Đấm, Lá gặp Lá, Kéo gặp Kéo) <strong>không thể ăn nhau mà chỉ đứng chặn đường nhau</strong> (không được đi vào ô của quân cùng loại của đối phương).</li>
+            </ul>
+          </li>
+          <li><strong>Điều kiện chiến thắng:</strong>
+            <ul>
+              <li><strong>Tiêu diệt chủng loại:</strong> Ăn hết sạch hoàn toàn 1 loại quân của đối phương (ví dụ đối phương không còn quân Đấm nào, hoặc hết sạch quân Lá, hoặc hết sạch quân Kéo) $\implies$ Thắng ngay lập tức!</li>
+              <li><strong>Đột kích căn cứ:</strong> Đưa bất kỳ quân nào của mình xâm nhập thành công vào ô cứ điểm của đối phương (<strong>ô i9 đối với Đỏ / P1</strong>, hoặc <strong>ô a1 đối với Xanh / P2</strong>) $\implies$ Thắng ngay lập tức!</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3 style="color: var(--accent-gold); margin: 20px 0 6px;">2. Bảng Phân Chia Công Việc Nhóm (Tối Đa 4 Sinh Viên)</h3>
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th>Sinh Viên / Vai Trò</th>
+              <th>Nhiệm Vụ Trọng Tâm</th>
+              <th>Module / Tệp Đảm Nhận</th>
+              <th>Mục Tiêu Đạt Được</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Sinh viên 1: Trưởng nhóm (Game Logic Lead)</strong></td>
+              <td>Thiết kế mô hình dữ liệu bàn cờ 9x9, xây dựng Game Engine, thuật toán di chuyển 8 hướng, logic ăn quân Đấm-Lá-Kéo, chặn đường cùng loại và kiểm tra điều kiện thắng (a1/i9 hoặc diệt sạch 1 loại quân).</td>
+              <td><code>js/game-engine.js</code><br><code>tests/game-engine.test.js</code></td>
+              <td>Pass 100% 7 bộ test kiểm thử tính đúng đắn của luật game.</td>
+            </tr>
+            <tr>
+              <td><strong>Sinh viên 2: Frontend & UI/UX Engineer</strong></td>
+              <td>Thiết kế giao diện bàn cờ 9x9 trực quan bằng CSS Grid, responsive layout, hiệu ứng highlight nước đi hợp lệ, animation ăn quân, SVG icons, âm thanh Web Audio và dashboard đếm quân bị bắt.</td>
+              <td><code>index.html</code><br><code>css/style.css</code></td>
+              <td>Giao diện mượt mà, thân thiện, trực quan trên cả máy tính và điện thoại.</td>
+            </tr>
+            <tr>
+              <td><strong>Sinh viên 3: Local Controller & AI Developer</strong></td>
+              <td>Phát triển chế độ chơi 2 người trên cùng 1 máy (Hotseat), cơ chế Undo/Reset, đồng hồ đếm ngược lượt đi (Timer 30s), và lập trình Bot AI ngoại tuyến thông minh (đánh giá thế trận, ưu tiên ăn quân/đột kích).</td>
+              <td><code>js/local-controller.js</code></td>
+              <td>Cho phép chơi offline mượt mà không cần mạng Internet.</td>
+            </tr>
+            <tr>
+              <td><strong>Sinh viên 4: Network & Multiplayer Engineer</strong></td>
+              <td>Xây dựng Server Node.js + Express + Socket.IO đa phòng chơi thời gian thực, đồng bộ hóa trạng thái qua mạng, hệ thống chat phòng, và tích hợp thư viện <code>playhtml.fun</code> (<code>playfun.html</code>).</td>
+              <td><code>server/server.js</code><br><code>js/online-controller.js</code><br><code>playfun.html</code></td>
+              <td>Nhiều cặp người chơi có thể thi đấu trực tuyến song song qua mạng LAN/Internet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Victory Modal -->
+  <div id="game-modal-overlay" class="modal-overlay">
+    <div class="modal-card">
+      <div id="modal-title" class="modal-title" style="color: var(--accent-gold);">🎉 CHIẾN THẮNG!</div>
+      <p id="modal-desc" class="modal-desc">Người chơi đã đạt điều kiện thắng cuộc.</p>
+      <button id="modal-restart-btn" class="btn btn-primary" style="margin: 0 auto; padding: 10px 24px;">
+        Chơi Ván Mới 🔄
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Switcher Script -->
+  <script>
+    document.querySelectorAll('.nav-tab-btn[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.dataset.tab;
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) targetEl.classList.add('active');
+      });
+    });
+  </script>
+
+  <!-- Game Scripts -->
+  <script src="js/game-engine.js"></script>
+  <script src="js/local-controller.js"></script>
+  <script src="js/online-controller.js"></script>
+
+</body>
+</html>
