@@ -1,7 +1,8 @@
 /**
  * Oẳn Tù Tì v2 (OTTv2) - Main Application Controller
  * Orchestrates game rules, board renderer, 3-level AI engine with RAM Transposition Table,
- * 30s turn timer, network ping RTT monitor, and playhtml.fun multiplayer sync.
+ * 30s turn timer, network ping RTT monitor, playhtml.fun multiplayer sync,
+ * and Pre-game Custom Draft & Placement Mode (tối đa 9 quân tự chọn dàn trận).
  */
 
 import {
@@ -16,6 +17,9 @@ import {
 
 import {
   createInitialBoard,
+  createEmptyBoard,
+  createCustomBoard,
+  generateAiDraftPlacement,
   countPlayerPieces,
   checkWinCondition
 } from './gameRules.js';
@@ -27,7 +31,7 @@ import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 class OttApp {
   constructor() {
     this.gameMode = 'LOCAL'; // 'LOCAL', 'BOT', 'MULTIPLAYER'
-    this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' | 'DIAGONAL'
+    this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' | 'DIAGONAL' | 'CUSTOM_DRAFT'
     this.goalMode = 'OPPOSITE'; // P1 (row 9) -> A1 (row 1) | P2 (row 1) -> I9 (row 9)
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
@@ -46,6 +50,11 @@ class OttApp {
 
     // Ping RTT monitor
     this.pingInterval = null;
+
+    // Custom Draft Mode State (Tự chọn & Dàn trận 9 quân)
+    this.isDraftPhase = false;
+    this.draftSelectedType = PIECE_TYPES.ROCK;
+    this.draftPlacedP1 = []; // [{ x, y, type }]
 
     // Multiplayer sync
     this.syncEngine = new PlayhtmlSyncEngine({
@@ -118,6 +127,19 @@ class OttApp {
       onlineBtn: document.getElementById('btn-online-room'),
       presetSelect: document.getElementById('board-preset-select'),
 
+      // Custom Draft Toolbar Elements
+      draftToolbar: document.getElementById('draft-toolbar'),
+      draftBtnRock: document.getElementById('draft-btn-rock'),
+      draftBtnPaper: document.getElementById('draft-btn-paper'),
+      draftBtnScissors: document.getElementById('draft-btn-scissors'),
+      draftCountRock: document.getElementById('draft-count-rock'),
+      draftCountPaper: document.getElementById('draft-count-paper'),
+      draftCountScissors: document.getElementById('draft-count-scissors'),
+      draftTotalPlaced: document.getElementById('draft-total-placed'),
+      btnDraftAuto: document.getElementById('btn-draft-auto'),
+      btnDraftClear: document.getElementById('btn-draft-clear'),
+      btnDraftConfirm: document.getElementById('btn-draft-confirm'),
+
       // Room Modal
       roomModal: document.getElementById('room-modal'),
       closeRoomModal: document.getElementById('close-room-modal'),
@@ -188,8 +210,40 @@ class OttApp {
     if (this.dom.presetSelect) {
       this.dom.presetSelect.addEventListener('change', (e) => {
         this.boardPreset = e.target.value;
-        this.startNewGame();
+        if (this.boardPreset === 'CUSTOM_DRAFT') {
+          this.startDraftPhase();
+        } else {
+          this.endDraftPhase();
+          this.startNewGame();
+        }
       });
+    }
+
+    // Custom Draft Piece Buttons
+    [
+      { btn: this.dom.draftBtnRock, type: PIECE_TYPES.ROCK },
+      { btn: this.dom.draftBtnPaper, type: PIECE_TYPES.PAPER },
+      { btn: this.dom.draftBtnScissors, type: PIECE_TYPES.SCISSORS }
+    ].forEach(({ btn, type }) => {
+      if (btn) {
+        btn.addEventListener('click', () => {
+          [this.dom.draftBtnRock, this.dom.draftBtnPaper, this.dom.draftBtnScissors].forEach(b => b?.classList.remove('active'));
+          btn.classList.add('active');
+          this.draftSelectedType = type;
+        });
+      }
+    });
+
+    if (this.dom.btnDraftAuto) {
+      this.dom.btnDraftAuto.addEventListener('click', () => this.autoDraftPlacement());
+    }
+
+    if (this.dom.btnDraftClear) {
+      this.dom.btnDraftClear.addEventListener('click', () => this.clearDraftPlacement());
+    }
+
+    if (this.dom.btnDraftConfirm) {
+      this.dom.btnDraftConfirm.addEventListener('click', () => this.confirmDraftPlacement());
     }
 
     this.dom.soundBtn.addEventListener('click', () => {
@@ -272,7 +326,194 @@ class OttApp {
     });
   }
 
+  // -------------------------------------------------------------
+  // Custom Draft & Placement Mode (Tự chọn & Dàn trận 9 quân)
+  // -------------------------------------------------------------
+  startDraftPhase() {
+    this.isDraftPhase = true;
+    this.stopTurnTimer();
+    this.board = createEmptyBoard();
+    this.draftPlacedP1 = [];
+
+    if (this.dom.draftToolbar) this.dom.draftToolbar.style.display = 'block';
+
+    this.renderer.clearSelection();
+    this.renderer.setInteractive(true);
+    this.renderer.setPlacementMode(true, (x, y, coord, piece) => {
+      this.handleDraftCellClick(x, y, coord, piece);
+    }, 5, 8); // P1 rows 6-9 (indices y = 5..8)
+
+    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
+    this.renderer.highlightPlacementZone(5, 8);
+
+    this.updateDraftCounters();
+    this.addLog('🛡️ <strong>Giai đoạn Dàn Trận</strong>: Chọn Đấm/Lá/Kéo rồi click vào nửa sân của bạn (Hàng 6 - 9) để đặt tối đa 9 quân!', 'info');
+    this.showToast('Giai đoạn dàn trận: Hãy đặt tối đa 9 quân cờ vào hàng 6-9!', 'info');
+  }
+
+  endDraftPhase() {
+    this.isDraftPhase = false;
+    if (this.dom.draftToolbar) this.dom.draftToolbar.style.display = 'none';
+    this.renderer.setPlacementMode(false);
+  }
+
+  handleDraftCellClick(x, y, coord, piece) {
+    if (!this.isDraftPhase) return;
+
+    // Click vào quân đã đặt của P1 -> Gỡ bỏ quân
+    if (piece && piece.player === PLAYERS.PLAYER_1) {
+      this.board[y][x] = null;
+      this.draftPlacedP1 = this.draftPlacedP1.filter(p => !(p.x === x && p.y === y));
+      sounds.select();
+      this.updateDraftCounters();
+      this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
+      this.renderer.highlightPlacementZone(5, 8);
+      return;
+    }
+
+    // Kiểm tra nửa sân hợp lệ của P1 (hàng 6-9, y: 5..8)
+    if (y < 5 || y > 8) {
+      this.showToast('Chỉ được đặt quân trên nửa sân của bạn (Hàng 6 - 9)!', 'warning');
+      sounds.block();
+      this.renderer.shakeCell(coord);
+      return;
+    }
+
+    // Giới hạn tối đa 9 quân
+    if (this.draftPlacedP1.length >= 9) {
+      this.showToast('Bạn chỉ được chọn tối đa 9 quân cờ!', 'warning');
+      sounds.block();
+      return;
+    }
+
+    // Đặt quân đang chọn
+    this.board[y][x] = { player: PLAYERS.PLAYER_1, type: this.draftSelectedType };
+    this.draftPlacedP1.push({ x, y, type: this.draftSelectedType });
+    sounds.select();
+
+    this.updateDraftCounters();
+    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
+    this.renderer.highlightPlacementZone(5, 8);
+  }
+
+  updateDraftCounters() {
+    let rocks = 0, papers = 0, scissors = 0;
+    for (const p of this.draftPlacedP1) {
+      if (p.type === PIECE_TYPES.ROCK) rocks++;
+      else if (p.type === PIECE_TYPES.PAPER) papers++;
+      else if (p.type === PIECE_TYPES.SCISSORS) scissors++;
+    }
+
+    if (this.dom.draftCountRock) this.dom.draftCountRock.textContent = rocks;
+    if (this.dom.draftCountPaper) this.dom.draftCountPaper.textContent = papers;
+    if (this.dom.draftCountScissors) this.dom.draftCountScissors.textContent = scissors;
+    if (this.dom.draftTotalPlaced) this.dom.draftTotalPlaced.textContent = this.draftPlacedP1.length;
+
+    // Bật nút Vào trận nếu đã đặt ít nhất 1 quân
+    if (this.dom.btnDraftConfirm) {
+      this.dom.btnDraftConfirm.disabled = (this.draftPlacedP1.length === 0);
+    }
+  }
+
+  autoDraftPlacement() {
+    this.clearDraftPlacement();
+
+    // Tự động bố trí 3 Đấm, 3 Lá, 3 Kéo cân bằng trên hàng 7 và 8
+    const slots = [
+      { x: 1, y: 7, type: PIECE_TYPES.ROCK },
+      { x: 3, y: 7, type: PIECE_TYPES.PAPER },
+      { x: 5, y: 7, type: PIECE_TYPES.SCISSORS },
+      { x: 7, y: 7, type: PIECE_TYPES.ROCK },
+      { x: 2, y: 8, type: PIECE_TYPES.PAPER },
+      { x: 4, y: 8, type: PIECE_TYPES.SCISSORS },
+      { x: 6, y: 8, type: PIECE_TYPES.ROCK },
+      { x: 3, y: 6, type: PIECE_TYPES.PAPER },
+      { x: 5, y: 6, type: PIECE_TYPES.SCISSORS }
+    ];
+
+    for (const s of slots) {
+      this.board[s.y][s.x] = { player: PLAYERS.PLAYER_1, type: s.type };
+      this.draftPlacedP1.push({ x: s.x, y: s.y, type: s.type });
+    }
+
+    sounds.select();
+    this.updateDraftCounters();
+    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
+    this.renderer.highlightPlacementZone(5, 8);
+    this.showToast('Đã xếp nhanh đội hình 9 quân cân bằng!', 'success');
+  }
+
+  clearDraftPlacement() {
+    for (const p of this.draftPlacedP1) {
+      this.board[p.y][p.x] = null;
+    }
+    this.draftPlacedP1 = [];
+    this.updateDraftCounters();
+    this.renderer.render(this.board, PLAYERS.PLAYER_1, null);
+    this.renderer.highlightPlacementZone(5, 8);
+  }
+
+  confirmDraftPlacement() {
+    if (this.draftPlacedP1.length === 0) {
+      this.showToast('Vui lòng đặt ít nhất 1 quân cờ!', 'warning');
+      return;
+    }
+
+    // Bố trí quân cho Player 2
+    if (this.gameMode === 'BOT') {
+      // AI tự động sinh đội hình 9 quân cân bằng trên nửa sân của Bot (hàng 1-3)
+      const aiPieces = generateAiDraftPlacement(Math.min(9, Math.max(this.draftPlacedP1.length, 6)));
+      for (const p of aiPieces) {
+        this.board[p.y][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
+      }
+      this.addLog(`🤖 AI Bot đã tự động dàn trận đội hình 9 quân đối đầu!`, 'info');
+    } else {
+      // Local 2-Player: Tự động bố trí đội hình 9 quân đối xứng cho P2
+      const p2Pieces = [
+        { x: 1, y: 1, type: PIECE_TYPES.SCISSORS },
+        { x: 3, y: 1, type: PIECE_TYPES.ROCK },
+        { x: 5, y: 1, type: PIECE_TYPES.PAPER },
+        { x: 7, y: 1, type: PIECE_TYPES.SCISSORS },
+        { x: 2, y: 0, type: PIECE_TYPES.ROCK },
+        { x: 4, y: 0, type: PIECE_TYPES.PAPER },
+        { x: 6, y: 0, type: PIECE_TYPES.SCISSORS },
+        { x: 3, y: 2, type: PIECE_TYPES.ROCK },
+        { x: 5, y: 2, type: PIECE_TYPES.PAPER }
+      ];
+      for (const p of p2Pieces) {
+        this.board[p.y][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
+      }
+    }
+
+    // Kết thúc giai đoạn dàn trận và bắt đầu ván cờ!
+    this.endDraftPhase();
+    this.currentTurn = PLAYERS.PLAYER_1;
+    this.gameStatus = GAME_STATUS.PLAYING;
+    this.lastMove = null;
+    this.moveHistory = [];
+    this.winnerInfo = null;
+
+    this.renderer.setInteractive(true);
+    this.renderer.render(this.board, this.currentTurn, null);
+    this.updateStatsDisplay();
+    this.updateTurnDisplay();
+    this.startTurnTimer();
+
+    this.addLog(`⚔️ <strong>ĐÃ DÀN TRẬN XONG!</strong> Trận đấu chính thức bắt đầu! Lượt đầu tiên: Player 1.`, 'win');
+    this.showToast('Dàn trận thành công! Bắt đầu ván đấu!', 'success');
+    sounds.victory();
+  }
+
+  // -------------------------------------------------------------
+  // Standard Gameplay Controls
+  // -------------------------------------------------------------
   startNewGame() {
+    if (this.boardPreset === 'CUSTOM_DRAFT') {
+      this.startDraftPhase();
+      return;
+    }
+
+    this.endDraftPhase();
     this.board = createInitialBoard(this.boardPreset);
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
@@ -298,7 +539,7 @@ class OttApp {
     this.updateTimerDisplay();
 
     this.timerInterval = setInterval(() => {
-      if (this.gameStatus === GAME_STATUS.ENDED) {
+      if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) {
         this.stopTurnTimer();
         return;
       }
@@ -352,7 +593,7 @@ class OttApp {
   }
 
   handleMove(moveData) {
-    if (this.gameStatus === GAME_STATUS.ENDED) return;
+    if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
 
     // Apply move to board
     const { fromPos, toPos, piece, isCapture, capturedPiece, from, to } = moveData;
@@ -422,7 +663,7 @@ class OttApp {
     this.dom.turnText.textContent = `Máy đang tư duy (${this.ai.difficulty.toUpperCase()})...`;
 
     setTimeout(() => {
-      if (this.gameStatus === GAME_STATUS.ENDED) return;
+      if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
       const aiMove = this.ai.getBestMove(this.board, PLAYERS.PLAYER_2, this.goalMode);
 
       // Cập nhật bảng Telemetry Bộ não AI trong RAM

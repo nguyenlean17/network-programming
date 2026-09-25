@@ -15,7 +15,9 @@ import {
   countPlayerPieces,
   checkWinCondition,
   createEmptyBoard,
-  createInitialBoard
+  createInitialBoard,
+  createCustomBoard,
+  generateAiDraftPlacement
 } from '../shared/gameRules.js';
 
 import {
@@ -227,6 +229,75 @@ const winMove = aiSniper.getBestMove(instantWinBoard, PLAYERS.PLAYER_2, 'OPPOSIT
 assert.strictEqual(winMove.to, 'I9', 'AI phải chọn ngay nước đi vào cứ điểm I9 để thắng trận');
 console.log('  ✓ AI phát hiện và thực hiện ngay nước đi chiến thắng vào cứ điểm I9\n');
 
+// -------------------------------------------------------------
+// Test 11: Chế độ Tự Chọn & Dàn Trận (Custom Draft & Pre-game Placement)
+// -------------------------------------------------------------
+console.log('11. Kiểm tra khởi tạo bàn cờ tùy chọn với đội hình tự chọn tối đa 9 quân (createCustomBoard)...');
+const p1Custom = [
+  { x: 2, y: 7, type: PIECE_TYPES.ROCK },
+  { x: 3, y: 7, type: PIECE_TYPES.ROCK },
+  { x: 4, y: 7, type: PIECE_TYPES.ROCK },
+  { x: 2, y: 8, type: PIECE_TYPES.PAPER },
+  { x: 3, y: 8, type: PIECE_TYPES.PAPER },
+  { x: 4, y: 8, type: PIECE_TYPES.PAPER },
+  { x: 5, y: 8, type: PIECE_TYPES.SCISSORS },
+  { x: 6, y: 8, type: PIECE_TYPES.SCISSORS },
+  { x: 7, y: 8, type: PIECE_TYPES.SCISSORS }
+];
+const p2Custom = [
+  { x: 1, y: 1, type: PIECE_TYPES.ROCK },
+  { x: 2, y: 1, type: PIECE_TYPES.PAPER },
+  { x: 3, y: 1, type: PIECE_TYPES.SCISSORS }
+];
+
+const customBoard = createCustomBoard(p1Custom, p2Custom);
+const customCounts = countPlayerPieces(customBoard);
+
+assert.strictEqual(customCounts.P1.total, 9, 'P1 phải có chính xác 9 quân');
+assert.strictEqual(customCounts.P1.ROCK, 3, 'P1 có 3 quân Đấm');
+assert.strictEqual(customCounts.P1.PAPER, 3, 'P1 có 3 quân Lá');
+assert.strictEqual(customCounts.P1.SCISSORS, 3, 'P1 có 3 quân Kéo');
+assert.strictEqual(customCounts.P2.total, 3, 'P2 có 3 quân');
+assert.strictEqual(customBoard[7][2].type, PIECE_TYPES.ROCK, 'Ô (2, 7) là quân Đấm của P1');
+assert.strictEqual(customBoard[7][2].player, PLAYERS.PLAYER_1, 'Ô (2, 7) thuộc sở hữu P1');
+assert.strictEqual(customBoard[1][1].player, PLAYERS.PLAYER_2, 'Ô (1, 1) thuộc sở hữu P2');
+console.log('  ✓ Bàn cờ tùy biến dàn trận khởi tạo chính xác theo tọa độ và phân bổ loại quân\n');
+
+// -------------------------------------------------------------
+// Test 12: AI Tự Động Dàn Trận 9 Quân Cân Bằng (generateAiDraftPlacement)
+// -------------------------------------------------------------
+console.log('12. Kiểm tra thuật toán tự động sinh dàn trận cho AI (generateAiDraftPlacement)...');
+const aiDraft = generateAiDraftPlacement(9);
+assert.strictEqual(aiDraft.length, 9, 'AI phải sinh đúng 9 quân cờ');
+
+let aiRock = 0;
+let aiPaper = 0;
+let aiScissors = 0;
+const occupiedCoords = new Set();
+
+for (const piece of aiDraft) {
+  // Kiểm tra nằm trên nửa sân của AI: Hàng 1-3 (y = 0..2)
+  assert.ok(piece.y >= 0 && piece.y <= 2, `Tọa độ y (${piece.y}) phải nằm trên nửa sân AI (0..2)`);
+  assert.ok(piece.x >= 0 && piece.x < 9, `Tọa độ x (${piece.x}) phải nằm trong bàn cờ (0..8)`);
+  
+  // Không được đặt đè lên ô cứ điểm A1 (0, 0)
+  assert.ok(!(piece.x === 0 && piece.y === 0), 'Không được đặt quân chặn ô cứ điểm A1');
+
+  // Đảm bảo không trùng tọa độ
+  const coordKey = `${piece.x},${piece.y}`;
+  assert.ok(!occupiedCoords.has(coordKey), `Ô cờ (${coordKey}) không được có 2 quân trùng nhau`);
+  occupiedCoords.add(coordKey);
+
+  if (piece.type === PIECE_TYPES.ROCK) aiRock++;
+  if (piece.type === PIECE_TYPES.PAPER) aiPaper++;
+  if (piece.type === PIECE_TYPES.SCISSORS) aiScissors++;
+}
+
+assert.strictEqual(aiRock, 3, 'AI phải dàn trận 3 quân Đấm');
+assert.strictEqual(aiPaper, 3, 'AI phải dàn trận 3 quân Lá');
+assert.strictEqual(aiScissors, 3, 'AI phải dàn trận 3 quân Kéo');
+console.log('  ✓ Đội hình AI sinh ngẫu nhiên đủ 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân không trùng lặp và không chặn A1\n');
+
 console.log('================================================================');
-console.log('🎉 TẤT CẢ 10/10 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
+console.log('🎉 TẤT CẢ 12/12 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
 console.log('================================================================\n');

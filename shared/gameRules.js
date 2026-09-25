@@ -386,3 +386,65 @@ export function createInitialBoard(preset = 'FRONTLINE') {
 
   return board;
 }
+
+/**
+ * Tạo bàn cờ từ danh sách quân tự chọn (Tối đa 9 quân mỗi bên)
+ */
+export function createCustomBoard(p1Pieces = [], p2Pieces = []) {
+  const board = createEmptyBoard();
+  for (const p of p1Pieces) {
+    if (p.x >= 0 && p.x < BOARD_SIZE && p.y >= 0 && p.y < BOARD_SIZE) {
+      board[p.y][p.x] = { player: PLAYERS.PLAYER_1, type: p.type };
+    }
+  }
+  for (const p of p2Pieces) {
+    if (p.x >= 0 && p.x < BOARD_SIZE && p.y >= 0 && p.y < BOARD_SIZE) {
+      board[p.y][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
+    }
+  }
+  return board;
+}
+
+/**
+ * Tự động sinh đội hình 9 quân cân bằng chiến thuật cho AI trên nửa sân của AI (Hàng 1-3)
+ */
+export function generateAiDraftPlacement(armySize = 9) {
+  const pieces = [];
+  // 3 Đấm, 3 Lá, 3 Kéo
+  for (let i = 0; i < 3; i++) {
+    pieces.push(PIECE_TYPES.ROCK);
+    pieces.push(PIECE_TYPES.PAPER);
+    pieces.push(PIECE_TYPES.SCISSORS);
+  }
+
+  // Shuffle pieces
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+  }
+
+  // AI nửa sân: rows 1-3 (y: 0..2)
+  const availableSlots = [];
+  for (let y = 0; y <= 2; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      if (x === 0 && y === 0) continue; // Ô A1
+      availableSlots.push({ x, y });
+    }
+  }
+
+  for (let i = availableSlots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [availableSlots[i], availableSlots[j]] = [availableSlots[j], availableSlots[i]];
+  }
+
+  const result = [];
+  for (let i = 0; i < Math.min(armySize, pieces.length); i++) {
+    result.push({
+      x: availableSlots[i].x,
+      y: availableSlots[i].y,
+      type: pieces[i]
+    });
+  }
+
+  return result;
+}

@@ -44,6 +44,25 @@ export class BoardRenderer {
     this.localPlayerRole = role;
   }
 
+  setPlacementMode(active, callback = null, validMinY = 5, validMaxY = 8) {
+    this.placementMode = active;
+    this.onPlacementClick = callback;
+    this.clearSelection();
+    this.highlightPlacementZone(validMinY, validMaxY);
+  }
+
+  highlightPlacementZone(validMinY = 5, validMaxY = 8) {
+    const cells = this.container.querySelectorAll('.board-cell');
+    cells.forEach(cell => {
+      const y = parseInt(cell.dataset.y, 10);
+      if (this.placementMode && y >= validMinY && y <= validMaxY) {
+        cell.classList.add('cell-placement-valid');
+      } else {
+        cell.classList.remove('cell-placement-valid');
+      }
+    });
+  }
+
   /**
    * Initializes the 9x9 board DOM structure with coordinate headers
    */
@@ -158,6 +177,14 @@ export class BoardRenderer {
    */
   handleCellClick(x, y, coord, event) {
     if (!this.interactive || !this.currentBoard) return;
+
+    // Khi đang trong giai đoạn Tự Chọn & Dàn Trận
+    if (this.placementMode) {
+      if (this.onPlacementClick) {
+        this.onPlacementClick(x, y, coord, this.currentBoard[y][x]);
+      }
+      return;
+    }
 
     // Check player role lock in multiplayer
     if (this.localPlayerRole && this.localPlayerRole !== this.currentTurn) {

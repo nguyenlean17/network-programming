@@ -15,7 +15,7 @@ Dự án được phân bổ khoa học theo mô hình **RACI Matrix** cho nhóm
 |:---:|:---|:---|:---|:---|:---:|
 | 1 | **Nguyễn Lê An** *(Nhóm trưởng)* | **Project Lead & Architecture**<br>`main` | • Thiết kế kiến trúc tổng thể dự án, cấu trúc dữ liệu bàn cờ 9x9.<br>• Xây dựng bộ điều khiển trung tâm (Game Controller, State Machine).<br>• Cấu hình triển khai tự động Vercel (`vercel.json`) và tổng hợp mã nguồn. | `index.html`<br>`js/app.js`<br>`vercel.json` | 25% |
 | 2 | **Nguyễn Tùng Dương** | **Frontend & UI/UX Engineer**<br>`duong` | • Thiết kế giao diện Dark Glassmorphism phong cách Cyber-Chess.<br>• Renderer bàn cờ 9x9 tương tác chuột, highlight ô hợp lệ / ô ăn quân.<br>• Xây dựng và kiểm thử nhánh giao diện đồ họa `OTTv2/`. | `css/style.css`<br>`js/board.js`<br>`OTTv2/*` | 25% |
-| 3 | **Trần Văn Mạnh** | **Multiplayer, AI & QA Lead**<br>`manh` | • **Bài tập 2**: Phát triển chế độ đồng bộ trực tuyến với thư viện `playfun.html` (`playhtml.fun` qua PartyKit serverless).<br>• **Bộ não AI 3 cấp độ dùng RAM tư duy**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị (Transposition Table) trong RAM với mã băm Zobrist.<br>• **Tính năng Mạng nâng cao**: Đồng hồ đếm ngược 30s, Đo Ping RTT, Biểu cảm thời gian thực.<br>• **Kiểm thử tự động**: Bộ Unit Test `tests/rules.test.js` kiểm thử 10/10 bài test (100% Pass). | `playfun.html`<br>`js/ai.js`<br>`tests/rules.test.js`<br>`js/playhtmlSync.js`<br>`package.json` | 25% |
+| 3 | **Trần Văn Mạnh** | **Multiplayer, AI & QA Lead**<br>`manh` | • **Bài tập 2**: Phát triển chế độ đồng bộ trực tuyến với thư viện `playfun.html` (`playhtml.fun` qua PartyKit serverless).<br>• **Bộ não AI 3 cấp độ dùng RAM tư duy**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị (Transposition Table) trong RAM với mã băm Zobrist.<br>• **Chế độ Tự Chọn & Dàn Trận 9 quân (Custom Draft)**: Tự do chọn và dàn trận tối đa 9 quân tùy ý (Đấm/Lá/Kéo) trên nửa sân trước khi vào trận.<br>• **Tính năng Mạng nâng cao & Sảnh xem**: Sảnh xem trực tiếp `rooms.html`, đồng hồ đếm ngược 30s, Đo Ping RTT, Biểu cảm thời gian thực.<br>• **Kiểm thử tự động**: Bộ Unit Test `tests/rules.test.js` kiểm thử 12/12 bài test (100% Pass). | `playfun.html`<br>`rooms.html`<br>`js/ai.js`<br>`tests/rules.test.js`<br>`js/playhtmlSync.js`<br>`package.json` | 25% |
 | 4 | **Lê Đình Phúc** | **Server & AI Developer**<br>`phuc` | • Lập trình Server Node.js độc lập (Express + WebSocket authoritative server).<br>• Phát triển hệ thống phòng đấu và đồng bộ đa người chơi qua socket.<br>• Xây dựng API kiểm tra sức khỏe server (`/api/health`). | `server/*`<br>`shared/*` | 25% |
 
 ---
@@ -70,7 +70,13 @@ Người chơi giành chiến thắng ngay lập tức khi đạt **một trong 
      * 🟢 **Cấp 1: Dễ (Tập sự)**: Heuristic 1-ply nhanh, ngẫu nhiên hóa nhẹ cho người mới bắt đầu.
      * 🟡 **Cấp 2: Vừa (Chiến thuật gia)**: Minimax 2-ply với Alpha-Beta Pruning, biết bảo vệ quân và phòng thủ cứ điểm.
      * 🔴 **Cấp 3: Khó (Đại kiện tướng)**: Minimax sâu 3-4 ply + Cắt tỉa Alpha-Beta + Sắp xếp nước đi (Move Ordering) + **Bảng Chuyển Vị (Transposition Table) trong RAM máy tính** lưu trữ hàng chục nghìn thế cờ qua mã băm Zobrist. Hiển thị bảng Telemetry đo lường dung lượng RAM và thời gian tư duy trực tiếp!
+   * **Chế độ Tự Chọn & Dàn Trận Tùy Ý (Custom Draft & Pre-game Placement Mode)**:
+     * Tự chọn số lượng Kéo, Búa (Đấm), Bao (Lá) tùy ý **tối đa 9 quân**.
+     * Tự do sắp xếp trên nửa bàn cờ (Hàng 6-9 cho P1 Đỏ, Hàng 1-3 cho AI Bot Xanh).
+     * Hỗ trợ thanh công cụ dàn trận: chọn loại quân ✊/✋/✌️, bộ đếm $0/9$, Xếp nhanh ngẫu nhiên (Auto Deploy), Xóa hết (Clear), Vào Trận Ngay (Confirm).
+     * AI Bot tự động phân bổ cân bằng 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân đối diện.
    * **Server Node.js WebSocket**: Đấu online qua server độc lập chạy tại cổng 3000.
+   * **Sảnh Xem Trực Tiếp (`rooms.html`)**: Theo dõi và làm khán giả (Spectator) cho tất cả các phòng multiplayer.
 2. **Bài tập 2 - Thư viện playfun.html (`playfun.html`)**:
    * Chơi trực tuyến nhiều người cùng lúc mà không cần tự host backend riêng.
    * Sử dụng hạ tầng đồng bộ thời gian thực PartyKit serverless của thư viện `playhtml.fun`.
@@ -138,7 +144,7 @@ network-programming/
 ## 6. Hướng dẫn cài đặt, chạy Local và Chạy Unit Test
 
 ### 6.1. Chạy Unit Test kiểm thử logic game & AI RAM (Đóng góp của SV Trần Văn Mạnh)
-Bộ unit test kiểm thử toàn bộ 10 ca kiểm thử:
+Bộ unit test kiểm thử toàn bộ 12 ca kiểm thử:
 1. Chuyển đổi hệ tọa độ A1-I9.
 2. Di chuyển 1 ô theo 8 hướng (King's Move).
 3. Quy tắc ăn quân Đấm-Lá-Kéo & luật chặn đường hai quân cùng loại.
@@ -149,12 +155,14 @@ Bộ unit test kiểm thử toàn bộ 10 ca kiểm thử:
 8. AI Engine với 3 cấp độ tư duy (Easy, Medium, Hard).
 9. Bộ nhớ RAM Transposition Table & Zobrist Hashing (lưu trữ và tái sử dụng thế cờ O(1)).
 10. AI phát hiện và thực hiện ngay nước đi dứt điểm ván đấu.
+11. Chế độ Tự chọn & Dàn trận tối đa 9 quân (`createCustomBoard`).
+12. AI tự động sinh đội hình 9 quân cân bằng chiến thuật (`generateAiDraftPlacement`).
 
 ```bash
 # Chạy bộ test tự động
 npm test
 ```
-*Kết quả đầu ra: 10/10 bài test đều vượt qua xuất sắc (100% Pass).*
+*Kết quả đầu ra: 12/12 bài test đều vượt qua xuất sắc (100% Pass).*
 
 ---
 
@@ -219,4 +227,7 @@ Game đã được tối ưu hóa 100% với file `vercel.json`:
   * Đánh dấu ô ăn quân với icon kiếm ⚔️ (màu đỏ).
   * Chặn triệt để nước đi cùng loại hoặc đi vào quân khắc chế với hiệu ứng rung lắc (shake animation).
   * Tự động phát hiện điều kiện thắng ngay khi một loại quân về 0 hoặc đưa quân vào A1/I9.
+* **Chế độ Tự Chọn & Dàn Trận 9 quân (Custom Draft Mode)**:
+  * Cho phép người chơi tự do lựa chọn tỷ lệ quân (Đấm/Lá/Kéo) tối đa 9 quân và bố trí tùy ý trên nửa bàn cờ trước khi khai cuộc.
+  * Hỗ trợ công cụ xếp quân trực quan, bộ đếm quân thực thời, tính năng Xếp nhanh tự động (Auto Deploy) và thuật toán AI tự động dàn trận đối trọng cân bằng.
 * **Đồng bộ thời gian thực chuẩn Bài tập 2**: Tận dụng triệt để thư viện `playhtml.fun` (`playfun.html`) với tính năng đồng bộ đa máy không cần cấu hình backend.

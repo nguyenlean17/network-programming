@@ -111,6 +111,49 @@
         </div>
       </div>
 
+      <!-- Custom Draft & Placement Toolbar -->
+      <div id="draft-toolbar" class="glass-card" style="display: none; margin-bottom: 1rem; border-color: rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.05); padding: 0.85rem 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h3 style="margin: 0; font-size: 0.95rem; color: var(--gold); display: flex; align-items: center; gap: 0.4rem;">
+              🛡️ GIAI ĐOẠN DÀN TRẬN: TỰ CHỌN ĐỘI HÌNH TỐI ĐA 9 QUÂN
+            </h3>
+            <p style="margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--text-muted);">
+              Chọn loại quân rồi click vào nửa sân của bạn (Hàng 6 - 9) để đặt hoặc gỡ quân cờ.
+            </p>
+          </div>
+
+          <!-- Piece selector buttons -->
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button id="draft-btn-rock" class="btn btn-draft active" data-type="ROCK">
+              ✊ Đấm (<span id="draft-count-rock">0</span>)
+            </button>
+            <button id="draft-btn-paper" class="btn btn-draft" data-type="PAPER">
+              ✋ Lá (<span id="draft-count-paper">0</span>)
+            </button>
+            <button id="draft-btn-scissors" class="btn btn-draft" data-type="SCISSORS">
+              ✌️ Kéo (<span id="draft-count-scissors">0</span>)
+            </button>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">
+              Đã đặt: <span id="draft-total-placed" style="color: var(--gold);">0</span> / 9
+            </span>
+            <button id="btn-draft-auto" class="btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Tự động xếp nhanh 3 Đấm, 3 Lá, 3 Kéo">
+              ⚡ Xếp nhanh
+            </button>
+            <button id="btn-draft-clear" class="btn btn-danger" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Xóa hết để đặt lại">
+              🗑️ Xóa hết
+            </button>
+            <button id="btn-draft-confirm" class="btn btn-primary" style="padding: 0.35rem 1rem; font-size: 0.85rem;" disabled>
+              ⚔️ Vào Trận Ngay
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 9x9 Chess Board Container -->
       <div class="board-wrapper">
         <div id="board-container" class="board-grid"></div>
@@ -179,8 +222,9 @@
         <div class="form-group">
           <label class="form-label" for="board-preset-select">Bố cục quân ban đầu</label>
           <select id="board-preset-select" class="form-select">
-            <option value="FRONTLINE">Chiến tuyến đối đầu (Hàng 1-2 vs 8-9)</option>
-            <option value="DIAGONAL">Đối xứng đường chéo (Góc A9 vs I1)</option>
+            <option value="FRONTLINE">Chiến tuyến đối đầu (15 quân)</option>
+            <option value="DIAGONAL">Đối xứng đường chéo (15 quân)</option>
+            <option value="CUSTOM_DRAFT">🛡️ Tự chọn & Dàn trận (Tối đa 9 quân)</option>
           </select>
         </div>
       </div>
