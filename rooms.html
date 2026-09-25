@@ -301,7 +301,7 @@
 
     <div class="header-actions">
       <div id="hub-ping-badge" class="status-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
-        📶 Ping: 22ms
+        📶 Ping: --
       </div>
       <a href="index.html" class="btn" style="text-decoration: none;">
         🏠 Trang Chủ (Bài 1)
@@ -394,137 +394,8 @@
     const searchInput = document.getElementById('room-search-input');
     const filterTabs = document.querySelectorAll('.filter-tab');
 
-    // 8 Active Showcase Rooms (4 on Page 1, 4 on Page 2) with real 9x9 chessboards
-    let allRooms = [
-      {
-        id: 'OTT-CHAMPIONS',
-        title: 'Chung Kết UET Grandmaster',
-        status: 'PLAYING',
-        p1Name: 'Nguyễn Lê An',
-        p2Name: 'Trần Văn Mạnh',
-        hasP1: true,
-        hasP2: true,
-        spectators: 18,
-        turn: 'P1',
-        moveCount: 14,
-        clockP1: '04:12',
-        clockP2: '04:45',
-        lastMove: { from: 'D2', to: 'D3' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-ALPHA-BOT',
-        title: 'Thử Thách Siêu AI Bot (RAM 3-ply)',
-        status: 'PLAYING',
-        p1Name: 'Wolf-Alone',
-        p2Name: 'OttBot Hard 🤖',
-        hasP1: true,
-        hasP2: true,
-        spectators: 7,
-        turn: 'P2',
-        moveCount: 8,
-        clockP1: '07:30',
-        clockP2: '08:15',
-        lastMove: { from: 'E8', to: 'E7' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-SPEED-BLITZ',
-        title: 'Giải Đấu Cờ Chớp 3 Phút',
-        status: 'PLAYING',
-        p1Name: 'BlitzMaster',
-        p2Name: 'Speedster_09',
-        hasP1: true,
-        hasP2: true,
-        spectators: 12,
-        turn: 'P1',
-        moveCount: 22,
-        clockP1: '01:10',
-        clockP2: '01:42',
-        lastMove: { from: 'C2', to: 'C3' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-PRO-LEAGUE',
-        title: 'Sảnh Chờ Thách Đấu Mở',
-        status: 'WAITING',
-        p1Name: 'DragonSlayer',
-        p2Name: 'Đang đợi...',
-        hasP1: true,
-        hasP2: false,
-        spectators: 3,
-        turn: 'P1',
-        moveCount: 0,
-        clockP1: '10:00',
-        clockP2: '10:00',
-        lastMove: null,
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-TACTICS-ARENA',
-        title: 'Vòng Bảng: Đột Kích Cứ Điểm A1',
-        status: 'PLAYING',
-        p1Name: 'Tactician_VNU',
-        p2Name: 'ShadowKnight',
-        hasP1: true,
-        hasP2: true,
-        spectators: 5,
-        turn: 'P2',
-        moveCount: 18,
-        clockP1: '03:40',
-        clockP2: '03:15',
-        lastMove: { from: 'F8', to: 'F7' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-ROOKIE-DERBY',
-        title: 'Đấu Tập Tân Thủ K67',
-        status: 'PLAYING',
-        p1Name: 'Rookie_CS',
-        p2Name: 'Junior_Dev',
-        hasP1: true,
-        hasP2: true,
-        spectators: 2,
-        turn: 'P1',
-        moveCount: 6,
-        clockP1: '08:50',
-        clockP2: '09:10',
-        lastMove: { from: 'B2', to: 'B3' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-OPEN-CUP',
-        title: 'Cúp Mở Rộng Cuối Tuần',
-        status: 'WAITING',
-        p1Name: 'Phoenix_Ace',
-        p2Name: 'Đang đợi...',
-        hasP1: true,
-        hasP2: false,
-        spectators: 1,
-        turn: 'P1',
-        moveCount: 0,
-        clockP1: '05:00',
-        clockP2: '05:00',
-        lastMove: null,
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-ENDGAME-MASTER',
-        title: 'Thế Cờ Tàn Cuộc Đỉnh Cao',
-        status: 'PLAYING',
-        p1Name: 'Grandmaster_X',
-        p2Name: 'AlphaBot Hard 🤖',
-        hasP1: true,
-        hasP2: true,
-        spectators: 9,
-        turn: 'P1',
-        moveCount: 26,
-        clockP1: '02:05',
-        clockP2: '02:30',
-        lastMove: { from: 'G2', to: 'G3' },
-        board: createInitialBoard('CHESS_9')
-      }
-    ];
+    // Real rooms synchronized from server/database (No mock/fake rooms)
+    let allRooms = [];
 
     /**
      * Get filtered rooms
@@ -557,13 +428,42 @@
       statSpectators.textContent = allRooms.reduce((acc, r) => acc + (r.spectators || 0), 0);
 
       if (totalRooms === 0) {
-        roomsContainer.innerHTML = `
-          <div class="empty-state" style="grid-column: 1 / -1;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔍</div>
-            <h3>Không tìm thấy bàn cờ nào phù hợp!</h3>
-            <p>Hãy thử lọc theo tiêu chí khác hoặc bấm nút "Tạo phòng mới" ở góc trên.</p>
-          </div>
-        `;
+        if (allRooms.length === 0) {
+          roomsContainer.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1; padding: 3.5rem 1.5rem; text-align: center; background: rgba(15, 23, 42, 0.6); border: 1.5px dashed rgba(255, 255, 255, 0.15); border-radius: 16px;">
+              <div style="font-size: 3.2rem; margin-bottom: 0.75rem;">🏟️</div>
+              <h3 style="font-size: 1.35rem; color: #f8fafc; margin-bottom: 0.4rem;">Chưa có phòng thi đấu trực tuyến nào</h3>
+              <p style="color: var(--text-muted); max-width: 480px; margin: 0 auto 1.5rem auto; line-height: 1.6; font-size: 0.9rem;">
+                Hiện tại không có trận đấu nào đang mở trên máy chủ. Bạn có thể tạo phòng mới ngay để thi đấu cùng bạn bè hoặc mở nhiều tab để thi đấu!
+              </p>
+              <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+                <button id="btn-empty-create" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; padding: 0.65rem 1.4rem;">
+                  ➕ Tạo phòng thi đấu mới
+                </button>
+                <a href="index.html" class="btn" style="display:inline-flex; align-items:center; gap:0.4rem; padding: 0.65rem 1.2rem; text-decoration:none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-weight: 700; font-size: 0.85rem;">
+                  🎮 Đấu với Máy AI (Solo)
+                </a>
+              </div>
+            </div>
+          `;
+          const btnEmptyCreate = document.getElementById('btn-empty-create');
+          if (btnEmptyCreate) {
+            btnEmptyCreate.onclick = () => {
+              const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+              let code = '';
+              for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+              window.location.href = `index.html?room=ottv2-${code}&role=P1`;
+            };
+          }
+        } else {
+          roomsContainer.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+              <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔍</div>
+              <h3>Không tìm thấy bàn cờ nào phù hợp bộ lọc!</h3>
+              <p>Hãy thử lọc theo tiêu chí khác hoặc bấm nút "Tất cả".</p>
+            </div>
+          `;
+        }
         paginationContainer.innerHTML = '';
         return;
       }
@@ -710,69 +610,6 @@
       paginationContainer.appendChild(infoSpan);
     }
 
-    /**
-     * Autonomous Live Simulation Loop (Simulates real blitz match moves)
-     */
-    function simulateLiveMoves() {
-      // Pick a random PLAYING room
-      const playingRooms = allRooms.filter(r => r.status === 'PLAYING');
-      if (playingRooms.length === 0) return;
-
-      const room = playingRooms[Math.floor(Math.random() * playingRooms.length)];
-      if (!room.board) return;
-
-      const currentTurn = room.turn;
-      const candidatePieces = [];
-
-      for (let y = 0; y < 9; y++) {
-        for (let x = 0; x < 9; x++) {
-          const piece = room.board[y][x];
-          if (piece && piece.player === currentTurn) {
-            const validMoves = getValidMovesForPiece(room.board, x, y, currentTurn, 'OPPOSITE');
-            if (validMoves.length > 0) {
-              candidatePieces.push({ x, y, piece, validMoves });
-            }
-          }
-        }
-      }
-
-      if (candidatePieces.length > 0) {
-        const chosen = candidatePieces[Math.floor(Math.random() * candidatePieces.length)];
-        const move = chosen.validMoves[Math.floor(Math.random() * chosen.validMoves.length)];
-
-        // Execute Move
-        room.board[chosen.y][chosen.x] = null;
-        room.board[move.y][move.x] = chosen.piece;
-        room.lastMove = { from: move.from, to: move.to };
-        room.moveCount = (room.moveCount || 0) + 1;
-        room.turn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
-
-        // Check victory
-        const win = checkWinCondition(room.board, room.lastMove, 'OPPOSITE');
-        if (win.hasWinner) {
-          room.status = 'ENDED';
-          room.title += ` 🏆 ${win.winner === 'P1' ? 'P1 Thắng!' : 'P2 Thắng!'}`;
-          // Reset after 8s
-          setTimeout(() => {
-            room.board = createInitialBoard('CHESS_9');
-            room.status = 'PLAYING';
-            room.moveCount = 0;
-            room.title = room.title.replace(/ 🏆.*/, '');
-            renderRooms();
-          }, 8000);
-        }
-
-        // Re-render live mini board if currently visible
-        const targetContainer = document.getElementById(`mini-board-container-${room.id}`);
-        if (targetContainer) {
-          BoardRenderer.renderMiniBoard(targetContainer, room.board, {
-            turn: room.turn,
-            lastMove: room.lastMove
-          });
-        }
-      }
-    }
-
     // Filter Tabs
     filterTabs.forEach(tab => {
       tab.addEventListener('click', () => {
@@ -799,18 +636,106 @@
       window.location.href = `index.html?room=ottv2-${code}&role=P1`;
     });
 
-    // Auto Ping monitor
+    // Real Ping Monitor (RTT via /api/health)
     const hubPingEl = document.getElementById('hub-ping-badge');
-    setInterval(() => {
+    async function updateRealPing() {
       if (!hubPingEl) return;
-      const base = 22;
-      const jitter = Math.floor(Math.random() * 10 - 5);
-      hubPingEl.textContent = `📶 Ping: ${Math.max(3, base + jitter)}ms`;
-    }, 4000);
+      const t0 = performance.now();
+      try {
+        const resp = await fetch('/api/health', { cache: 'no-store' });
+        if (resp.ok) {
+          const rtt = Math.round(performance.now() - t0);
+          hubPingEl.textContent = `📶 Ping: ${rtt}ms`;
+          hubPingEl.style.color = '#34d399';
+        } else {
+          hubPingEl.textContent = '📶 Ngoại tuyến';
+          hubPingEl.style.color = 'var(--text-muted)';
+        }
+      } catch {
+        hubPingEl.textContent = '📶 Ngoại tuyến';
+        hubPingEl.style.color = 'var(--text-muted)';
+      }
+    }
+    updateRealPing();
+    setInterval(updateRealPing, 5000);
 
-    // Initial render & active simulation loop every 2.8s
-    renderRooms();
-    setInterval(simulateLiveMoves, 2800);
+    // Real Rooms Sync (HTTP /api/rooms + WebSocket)
+    async function fetchRealRooms() {
+      try {
+        const resp = await fetch('/api/rooms', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && Array.isArray(data.rooms)) {
+            allRooms = data.rooms.map(r => ({
+              id: r.id,
+              title: r.title || `Phòng ${r.id}`,
+              status: r.status || (r.hasP1 && r.hasP2 ? 'PLAYING' : 'WAITING'),
+              p1Name: r.p1Name || (r.hasP1 ? 'Player 1' : 'Đang chờ...'),
+              p2Name: r.p2Name || (r.hasP2 ? 'Player 2' : 'Đang chờ...'),
+              hasP1: r.hasP1,
+              hasP2: r.hasP2,
+              spectators: r.spectators || 0,
+              turn: r.turn || 'P1',
+              moveCount: r.moveCount || 0,
+              clockP1: r.clockP1 || '05:00',
+              clockP2: r.clockP2 || '05:00',
+              lastMove: r.lastMove || null,
+              board: r.board || createInitialBoard('CHESS_9')
+            }));
+            renderRooms();
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback when server is not running or offline
+      }
+      renderRooms();
+    }
+
+    function initWebSocket() {
+      if (typeof WebSocket === 'undefined') return;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}`;
+      try {
+        const ws = new WebSocket(wsUrl);
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'ROOMS_LIST' && Array.isArray(data.rooms)) {
+              allRooms = data.rooms.map(r => ({
+                id: r.id,
+                title: r.title || `Phòng ${r.id}`,
+                status: r.status || (r.hasP1 && r.hasP2 ? 'PLAYING' : 'WAITING'),
+                p1Name: r.p1Name || (r.hasP1 ? 'Player 1' : 'Đang chờ...'),
+                p2Name: r.p2Name || (r.hasP2 ? 'Player 2' : 'Đang chờ...'),
+                hasP1: r.hasP1,
+                hasP2: r.hasP2,
+                spectators: r.spectators || 0,
+                turn: r.turn || 'P1',
+                moveCount: r.moveCount || 0,
+                clockP1: r.clockP1 || '05:00',
+                clockP2: r.clockP2 || '05:00',
+                lastMove: r.lastMove || null,
+                board: r.board || createInitialBoard('CHESS_9')
+              }));
+              renderRooms();
+            }
+          } catch (e) {
+            console.warn('WS message error', e);
+          }
+        };
+        ws.onclose = () => {
+          setTimeout(initWebSocket, 6000);
+        };
+      } catch (e) {
+        // Fallback to polling
+      }
+    }
+
+    // Initial load & periodic poll
+    fetchRealRooms();
+    initWebSocket();
+    setInterval(fetchRealRooms, 3500);
   </script>
 </body>
 </html>

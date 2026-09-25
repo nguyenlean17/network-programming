@@ -1020,15 +1020,31 @@ class OttApp {
 
   startPingMonitor() {
     if (this.pingInterval) clearInterval(this.pingInterval);
-    const updatePing = () => {
+    const updatePing = async () => {
       if (!this.dom.pingBadge) return;
-      const basePing = this.gameMode === 'MULTIPLAYER' ? 24 : 6;
-      const jitter = Math.floor(Math.random() * 12 - 6);
-      const ping = Math.max(3, basePing + jitter);
-      this.dom.pingBadge.textContent = `📶 Ping: ${ping}ms`;
+      if (this.gameMode !== 'MULTIPLAYER') {
+        this.dom.pingBadge.textContent = '⚡ Cục bộ (0ms)';
+        this.dom.pingBadge.style.color = 'var(--text-muted)';
+        return;
+      }
+      const t0 = performance.now();
+      try {
+        const resp = await fetch('/api/health', { cache: 'no-store' });
+        if (resp.ok) {
+          const rtt = Math.round(performance.now() - t0);
+          this.dom.pingBadge.textContent = `📶 Ping: ${rtt}ms`;
+          this.dom.pingBadge.style.color = rtt < 100 ? '#34d399' : '#facc15';
+        } else {
+          this.dom.pingBadge.textContent = '📶 Ngoại tuyến';
+          this.dom.pingBadge.style.color = 'var(--text-muted)';
+        }
+      } catch {
+        this.dom.pingBadge.textContent = this.syncEngine?.isOnline ? '📶 Online (Cloud)' : '📶 Ngoại tuyến';
+        this.dom.pingBadge.style.color = this.syncEngine?.isOnline ? '#34d399' : 'var(--text-muted)';
+      }
     };
     updatePing();
-    this.pingInterval = setInterval(updatePing, 4000);
+    this.pingInterval = setInterval(updatePing, 5000);
   }
 
   handleVictory(win) {
@@ -1458,153 +1474,50 @@ class OttApp {
     this.dom.chessNotationList.scrollTop = this.dom.chessNotationList.scrollHeight;
   }
 
-  initMultiBoardData() {
-    this.multiBoardRooms = [
-      {
-        id: 'OTT-GRAND-MASTER',
-        title: 'Đại Chiến Cao Thủ OTT 🏆',
-        status: 'PLAYING',
-        p1Name: 'Nguyễn Văn A (Elo 1850)',
-        p2Name: 'Trần Thị B (Elo 1820)',
-        hasP1: true,
-        hasP2: true,
-        spectators: 14,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 18,
-        clockP1: '03:45',
-        clockP2: '04:12',
-        lastMove: { from: 'E8', to: 'E7' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-SPEED-CHESS',
-        title: 'Siêu Tốc Blitz 3m ⚡',
-        status: 'PLAYING',
-        p1Name: 'SpeedDemon',
-        p2Name: 'Vua Co Tuong',
-        hasP1: true,
-        hasP2: true,
-        spectators: 8,
-        turn: PLAYERS.PLAYER_2,
-        moveCount: 12,
-        clockP1: '01:50',
-        clockP2: '02:15',
-        lastMove: { from: 'C2', to: 'D3' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-BLITZ-ARENA',
-        title: 'Đấu Trường Sinh Tử ⚔️',
-        status: 'PLAYING',
-        p1Name: 'KnightRider',
-        p2Name: 'AlphaBot Hard 🤖',
-        hasP1: true,
-        hasP2: true,
-        spectators: 21,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 9,
-        clockP1: '04:10',
-        clockP2: '04:35',
-        lastMove: { from: 'B8', to: 'B7' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-ROOKIE-CUP',
-        title: 'Giải Đấu Tập Sự Mở Rộng 🎓',
-        status: 'WAITING',
-        p1Name: 'Tập Chơi OTT',
-        p2Name: 'Đang đợi...',
-        hasP1: true,
-        hasP2: false,
-        spectators: 3,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 0,
-        clockP1: '05:00',
-        clockP2: '05:00',
-        lastMove: null,
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-CHAMPION-LEAGUE',
-        title: 'Chung Kết Cúp Hoàng Gia 👑',
-        status: 'PLAYING',
-        p1Name: 'DragonSlayer',
-        p2Name: 'QueenGambit',
-        hasP1: true,
-        hasP2: true,
-        spectators: 37,
-        turn: PLAYERS.PLAYER_2,
-        moveCount: 31,
-        clockP1: '00:55',
-        clockP2: '01:20',
-        lastMove: { from: 'F2', to: 'F3' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-TACTICS-ZONE',
-        title: 'CLB Cờ Đột Kích Cứ Điểm 🎯',
-        status: 'PLAYING',
-        p1Name: 'StealthMaster',
-        p2Name: 'FortressGuard',
-        hasP1: true,
-        hasP2: true,
-        spectators: 11,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 15,
-        clockP1: '03:10',
-        clockP2: '02:50',
-        lastMove: { from: 'A8', to: 'A7' },
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-LOBBY-VIP',
-        title: 'Phòng VIP Giao Lưu Quốc Tế 🌐',
-        status: 'WAITING',
-        p1Name: 'Alex_Master',
-        p2Name: 'Đang đợi...',
-        hasP1: true,
-        hasP2: false,
-        spectators: 1,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 0,
-        clockP1: '05:00',
-        clockP2: '05:00',
-        lastMove: null,
-        board: createInitialBoard('CHESS_9')
-      },
-      {
-        id: 'OTT-ENDGAME-MASTER',
-        title: 'Thế Cờ Tàn Cuộc Đỉnh Cao 🔥',
-        status: 'PLAYING',
-        p1Name: 'Grandmaster_X',
-        p2Name: 'AlphaBot Hard 🤖',
-        hasP1: true,
-        hasP2: true,
-        spectators: 9,
-        turn: PLAYERS.PLAYER_1,
-        moveCount: 26,
-        clockP1: '02:05',
-        clockP2: '02:30',
-        lastMove: { from: 'G2', to: 'G3' },
-        board: createInitialBoard('CHESS_9')
+  async fetchRealMultiBoardRooms() {
+    try {
+      const resp = await fetch('/api/rooms', { cache: 'no-store' });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Array.isArray(data.rooms)) {
+          this.multiBoardRooms = data.rooms.map(r => ({
+            id: r.id,
+            title: r.title || `Phòng ${r.id}`,
+            status: r.status || (r.hasP1 && r.hasP2 ? 'PLAYING' : 'WAITING'),
+            p1Name: r.p1Name || (r.hasP1 ? 'Player 1' : 'Đang chờ...'),
+            p2Name: r.p2Name || (r.hasP2 ? 'Player 2' : 'Đang chờ...'),
+            hasP1: r.hasP1,
+            hasP2: r.hasP2,
+            spectators: r.spectators || 0,
+            turn: r.turn || PLAYERS.PLAYER_1,
+            moveCount: r.moveCount || 0,
+            clockP1: r.clockP1 || '05:00',
+            clockP2: r.clockP2 || '05:00',
+            lastMove: r.lastMove || null,
+            board: r.board || createInitialBoard('CHESS_9')
+          }));
+          this.renderModalMultiBoard();
+          return;
+        }
       }
-    ];
+    } catch {
+      // Server offline or static mode
+    }
+    this.multiBoardRooms = [];
+    this.renderModalMultiBoard();
   }
 
   openMultiBoardModal() {
     if (!this.dom.multiBoardModal) return;
-    if (this.multiBoardRooms.length === 0) {
-      this.initMultiBoardData();
-    }
     this.dom.multiBoardModal.classList.add('open');
-    this.renderModalMultiBoard();
-    this.startMultiBoardSimulation();
+    this.fetchRealMultiBoardRooms();
+    this.startMultiBoardSync();
   }
 
   closeMultiBoardModal() {
     if (!this.dom.multiBoardModal) return;
     this.dom.multiBoardModal.classList.remove('open');
-    this.stopMultiBoardSimulation();
+    this.stopMultiBoardSync();
   }
 
   renderModalMultiBoard() {
@@ -1622,12 +1535,36 @@ class OttApp {
     if (this.multiBoardPage > totalPages) this.multiBoardPage = totalPages;
 
     if (totalRooms === 0) {
-      this.dom.modalMultiBoardGrid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
-          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
-          <p>Không có bàn cờ nào phù hợp bộ lọc hiện tại.</p>
-        </div>
-      `;
+      if (this.multiBoardRooms.length === 0) {
+        this.dom.modalMultiBoardGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; background: rgba(15, 23, 42, 0.6); border: 1.5px dashed rgba(255, 255, 255, 0.15); border-radius: 14px;">
+            <div style="font-size: 2.8rem; margin-bottom: 0.6rem;">🏟️</div>
+            <h3 style="font-size: 1.25rem; color: #f8fafc; margin-bottom: 0.4rem;">Chưa có phòng thi đấu trực tuyến nào</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; max-width: 460px; margin: 0 auto 1.5rem auto; line-height: 1.6;">
+              Hiện tại không có trận đấu nào đang diễn ra trên máy chủ. Bạn có thể tạo phòng mới ngay để thi đấu cùng người chơi khác!
+            </p>
+            <div style="display: flex; justify-content: center; gap: 0.75rem;">
+              <button id="btn-modal-create-room" class="btn btn-primary" style="padding: 0.6rem 1.4rem; font-size: 0.9rem;">
+                ➕ Tạo phòng đấu mới ngay
+              </button>
+            </div>
+          </div>
+        `;
+        const btnModalCreate = document.getElementById('btn-modal-create-room');
+        if (btnModalCreate) {
+          btnModalCreate.onclick = () => {
+            this.closeMultiBoardModal();
+            this.openRoomModal();
+          };
+        }
+      } else {
+        this.dom.modalMultiBoardGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
+            <p>Không có bàn cờ nào phù hợp bộ lọc hiện tại.</p>
+          </div>
+        `;
+      }
       if (this.dom.modalPaginationBar) this.dom.modalPaginationBar.innerHTML = '';
       return;
     }
@@ -1759,73 +1696,21 @@ class OttApp {
     this.dom.modalPaginationBar.appendChild(infoSpan);
   }
 
-  startMultiBoardSimulation() {
-    this.stopMultiBoardSimulation();
-    this.multiBoardSimInterval = setInterval(() => {
-      if (!this.dom.multiBoardModal?.classList.contains('open')) return;
-
-      const playingRooms = this.multiBoardRooms.filter(r => r.status === 'PLAYING');
-      if (playingRooms.length === 0) return;
-
-      const room = playingRooms[Math.floor(Math.random() * playingRooms.length)];
-      if (!room.board) return;
-
-      const currentTurn = room.turn;
-      const candidatePieces = [];
-
-      for (let y = 0; y < 9; y++) {
-        for (let x = 0; x < 9; x++) {
-          const piece = room.board[y][x];
-          if (piece && piece.player === currentTurn) {
-            const validMoves = getValidMovesForPiece(room.board, x, y, currentTurn, 'OPPOSITE');
-            if (validMoves.length > 0) {
-              candidatePieces.push({ x, y, piece, validMoves });
-            }
-          }
-        }
+  startMultiBoardSync() {
+    this.stopMultiBoardSync();
+    this.multiBoardSyncInterval = setInterval(() => {
+      if (!this.dom.multiBoardModal?.classList.contains('open')) {
+        this.stopMultiBoardSync();
+        return;
       }
-
-      if (candidatePieces.length > 0) {
-        const chosen = candidatePieces[Math.floor(Math.random() * candidatePieces.length)];
-        const move = chosen.validMoves[Math.floor(Math.random() * chosen.validMoves.length)];
-
-        // Move piece
-        room.board[chosen.y][chosen.x] = null;
-        room.board[move.y][move.x] = chosen.piece;
-        room.lastMove = { from: move.from, to: move.to };
-        room.moveCount = (room.moveCount || 0) + 1;
-        room.turn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
-
-        const win = checkWinCondition(room.board, room.lastMove, 'OPPOSITE');
-        if (win.hasWinner) {
-          room.status = 'ENDED';
-          room.title += ` 🏆 ${win.winner === 'P1' ? 'P1 Thắng!' : 'P2 Thắng!'}`;
-          setTimeout(() => {
-            room.board = createInitialBoard('CHESS_9');
-            room.status = 'PLAYING';
-            room.moveCount = 0;
-            room.title = room.title.replace(/ 🏆.*/, '');
-            if (this.dom.multiBoardModal?.classList.contains('open')) {
-              this.renderModalMultiBoard();
-            }
-          }, 8000);
-        }
-
-        const target = document.getElementById(`modal-mini-container-${room.id}`);
-        if (target) {
-          BoardRenderer.renderMiniBoard(target, room.board, {
-            turn: room.turn,
-            lastMove: room.lastMove
-          });
-        }
-      }
-    }, 2400);
+      this.fetchRealMultiBoardRooms();
+    }, 3500);
   }
 
-  stopMultiBoardSimulation() {
-    if (this.multiBoardSimInterval) {
-      clearInterval(this.multiBoardSimInterval);
-      this.multiBoardSimInterval = null;
+  stopMultiBoardSync() {
+    if (this.multiBoardSyncInterval) {
+      clearInterval(this.multiBoardSyncInterval);
+      this.multiBoardSyncInterval = null;
     }
   }
 

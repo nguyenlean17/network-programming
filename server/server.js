@@ -21,6 +21,7 @@ const roomManager = new RoomManager();
 
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
 // Serve static frontend files
 app.use(express.static(rootDir));
 
@@ -41,6 +42,26 @@ app.get('/api/rooms', (req, res) => {
     totalRooms: roomManager.rooms.size,
     rooms: roomManager.getAllRoomsSummary(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// Create new room endpoint
+app.post('/api/rooms', (req, res) => {
+  const { roomId, title, preset, goalMode } = req.body || {};
+  const id = roomId || `ottv2-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const room = roomManager.getOrCreateRoom(id);
+  if (title) room.title = title;
+  if (preset) room.gameSession.preset = preset;
+  if (goalMode) room.gameSession.goalMode = goalMode;
+  broadcastRoomsList();
+  res.json({
+    status: 'ok',
+    roomId: id,
+    room: {
+      id,
+      title: room.title || `Phòng ${id}`,
+      status: room.gameSession.status
+    }
   });
 });
 
@@ -67,7 +88,7 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const payload = JSON.parse(message.toString());
-      const { type, roomId, from, to, role, preset } = payload;
+      const { type, roomId, from, to, role, preset, playerName } = payload;
 
       switch (type) {
         case 'GET_ROOMS': {
@@ -79,7 +100,7 @@ wss.on('connection', (ws) => {
         }
 
         case 'JOIN_ROOM': {
-          const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role);
+          const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role, playerName);
           ws.send(JSON.stringify({
             type: 'ROOM_JOINED',
             roomId: room.id,

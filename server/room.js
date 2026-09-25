@@ -21,7 +21,7 @@ export class RoomManager {
     return this.rooms.get(roomId);
   }
 
-  joinRoom(roomId, ws, preferredRole = null) {
+  joinRoom(roomId, ws, preferredRole = null, playerName = null) {
     const room = this.getOrCreateRoom(roomId);
     room.clients.add(ws);
 
@@ -42,6 +42,7 @@ export class RoomManager {
 
     ws.roomId = roomId;
     ws.role = assignedRole;
+    ws.playerName = playerName || (assignedRole === 'P1' ? 'Player 1' : (assignedRole === 'P2' ? 'Player 2' : 'Spectator'));
 
     return { room, role: assignedRole };
   }
@@ -83,14 +84,18 @@ export class RoomManager {
 
       list.push({
         id,
+        title: room.title || `Phòng ${id}`,
         status: room.gameSession.status || 'PLAYING',
         totalConnected,
         hasP1,
         hasP2,
+        p1Name: room.players.P1?.playerName || (hasP1 ? 'Player 1' : 'Đang chờ...'),
+        p2Name: room.players.P2?.playerName || (hasP2 ? 'Player 2' : 'Đang chờ...'),
         spectators,
         turn: room.gameSession.currentTurn,
         moveCount: room.gameSession.moveHistory ? room.gameSession.moveHistory.length : 0,
         lastMove: room.gameSession.lastMove,
+        board: state.board,
         winner: room.gameSession.winnerInfo ? room.gameSession.winnerInfo.winner : null
       });
     }
