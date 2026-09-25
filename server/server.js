@@ -34,14 +34,50 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Active rooms list endpoint (Lấy danh sách tất cả các phòng đang chơi)
+app.get('/api/rooms', (req, res) => {
+  res.json({
+    status: 'ok',
+    totalRooms: roomManager.rooms.size,
+    rooms: roomManager.getAllRoomsSummary(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+function broadcastRoomsList() {
+  const summary = JSON.stringify({
+    type: 'ROOMS_LIST',
+    rooms: roomManager.getAllRoomsSummary()
+  });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      client.send(summary);
+    }
+  }
+}
+
 // WebSocket message dispatcher
 wss.on('connection', (ws) => {
+  // Send current rooms list on connect
+  ws.send(JSON.stringify({
+    type: 'ROOMS_LIST',
+    rooms: roomManager.getAllRoomsSummary()
+  }));
+
   ws.on('message', (message) => {
     try {
       const payload = JSON.parse(message.toString());
       const { type, roomId, from, to, role, preset } = payload;
 
       switch (type) {
+        case 'GET_ROOMS': {
+          ws.send(JSON.stringify({
+            type: 'ROOMS_LIST',
+            rooms: roomManager.getAllRoomsSummary()
+          }));
+          break;
+        }
+
         case 'JOIN_ROOM': {
           const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role);
           ws.send(JSON.stringify({
@@ -58,6 +94,8 @@ wss.on('connection', (ws) => {
             role: assignedRole,
             totalConnected: room.clients.size
           });
+
+          broadcastRoomsList();
           break;
         }
 
@@ -91,6 +129,8 @@ wss.on('connection', (ws) => {
             lastMove: result.lastMove,
             winnerInfo: result.winnerInfo
           });
+
+          broadcastRoomsList();
           break;
         }
 
@@ -106,6 +146,8 @@ wss.on('connection', (ws) => {
             lastMove: null,
             winnerInfo: null
           });
+
+          broadcastRoomsList();
           break;
         }
 
@@ -119,6 +161,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     roomManager.leaveRoom(ws);
+    broadcastRoomsList();
   });
 });
 

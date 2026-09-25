@@ -97,6 +97,7 @@ Người chơi giành chiến thắng ngay lập tức khi đạt **một trong 
 network-programming/
 ├── index.html                   # Giao diện chính của game: Local, AI Bot (3 cấp độ) & Online (Bài tập 1)
 ├── playfun.html                 # Giao diện Bài tập 2: Tích hợp thư viện playfun.html (playhtml.fun)
+├── rooms.html                   # Sảnh xem trực tiếp: Theo dõi tất cả các phòng đấu multiplayer (Spectator Hub)
 ├── vercel.json                  # Cấu hình deploy tự động Vercel
 ├── package.json                 # Cấu hình npm scripts & dependencies
 ├── .gitignore                   # Loại trừ node_modules, temp files
@@ -180,8 +181,10 @@ npm start
 ```
 Server sẽ lắng nghe tại:
 * Game Web: `http://localhost:3000`
+* Sảnh xem tất cả các phòng (Room Hub): `http://localhost:3000/rooms.html`
 * Chế độ playfun.html: `http://localhost:3000/playfun.html`
 * WebSocket endpoint: `ws://localhost:3000`
+* API danh sách tất cả các phòng: `http://localhost:3000/api/rooms`
 * API kiểm tra sức khỏe server: `http://localhost:3000/api/health`
 
 ---

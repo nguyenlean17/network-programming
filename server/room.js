@@ -68,4 +68,32 @@ export class RoomManager {
       }
     }
   }
+
+  /**
+   * Lấy tổng hợp danh sách tất cả các phòng đang hoạt động
+   */
+  getAllRoomsSummary() {
+    const list = [];
+    for (const [id, room] of this.rooms.entries()) {
+      const state = room.gameSession.getState();
+      const hasP1 = !!room.players.P1;
+      const hasP2 = !!room.players.P2;
+      const totalConnected = room.clients.size;
+      const spectators = Math.max(0, totalConnected - (hasP1 ? 1 : 0) - (hasP2 ? 1 : 0));
+
+      list.push({
+        id,
+        status: room.gameSession.status || 'PLAYING',
+        totalConnected,
+        hasP1,
+        hasP2,
+        spectators,
+        turn: room.gameSession.currentTurn,
+        moveCount: room.gameSession.moveHistory ? room.gameSession.moveHistory.length : 0,
+        lastMove: room.gameSession.lastMove,
+        winner: room.gameSession.winnerInfo ? room.gameSession.winnerInfo.winner : null
+      });
+    }
+    return list;
+  }
 }
