@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oẳn Tù Tì v2 (OTTv2) - Cờ Chiến Thuật 9x9</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-wrapper">
+    <!-- Header -->
+    <header class="game-header">
+      <h1 class="game-title">OẲN TÙ TÌ v2</h1>
+      <p class="game-subtitle">Game chiến thuật bàn cờ 9×9 dành cho 2 người chơi</p>
+    </header>
+
+    <!-- Scoreboard / Status Panel -->
+    <section class="status-panel">
+      <!-- Player 1 Card -->
+      <div id="p1-card" class="player-card player-1 active-turn">
+        <div class="player-header">
+          <div class="player-avatar p1-avatar">
+            <span class="piece-icon">⚔️</span>
+          </div>
+          <div class="player-info">
+            <span class="player-label">Người chơi 1</span>
+            <h3 class="player-name">Player 1</h3>
+          </div>
+        </div>
+        <div class="player-stats">
+          <div class="stat-item">
+            <span class="stat-title">Tổng quân:</span>
+            <span id="p1-count" class="stat-value">12</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-title">Ô đích:</span>
+            <span class="stat-value goal-badge p1-goal-badge">a1</span>
+          </div>
+        </div>
+        <div class="player-types-breakdown">
+          <span class="type-pill" title="Kéo (Scissors)">✌️ <strong id="p1-scissors">4</strong></span>
+          <span class="type-pill" title="Búa (Rock)">✊ <strong id="p1-rock">4</strong></span>
+          <span class="type-pill" title="Bao (Paper)">✋ <strong id="p1-paper">4</strong></span>
+        </div>
+      </div>
+
+      <!-- Turn & Event Center -->
+      <div class="center-status">
+        <div class="turn-indicator">
+          <span class="turn-title">LƯỢT HIỆN TẠI</span>
+          <div id="turn-display" class="current-turn-badge turn-p1">
+            <span class="turn-dot"></span>
+            <span id="turn-text">Player 1</span>
+          </div>
+        </div>
+        <div class="rps-quick-rule">
+          <span>✊ đập ✌️</span> • <span>✌️ cắt ✋</span> • <span>✋ bọc ✊</span>
+        </div>
+        <div id="status-message" class="status-message">
+          Player 1 đi trước. Hãy chọn một quân cờ đỏ!
+        </div>
+      </div>
+
+      <!-- Player 2 Card -->
+      <div id="p2-card" class="player-card player-2">
+        <div class="player-header">
+          <div class="player-avatar p2-avatar">
+            <span class="piece-icon">🛡️</span>
+          </div>
+          <div class="player-info">
+            <span class="player-label">Người chơi 2</span>
+            <h3 class="player-name">Player 2</h3>
+          </div>
+        </div>
+        <div class="player-stats">
+          <div class="stat-item">
+            <span class="stat-title">Tổng quân:</span>
+            <span id="p2-count" class="stat-value">12</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-title">Ô đích:</span>
+            <span class="stat-value goal-badge p2-goal-badge">i9</span>
+          </div>
+        </div>
+        <div class="player-types-breakdown">
+          <span class="type-pill" title="Kéo (Scissors)">✌️ <strong id="p2-scissors">4</strong></span>
+          <span class="type-pill" title="Búa (Rock)">✊ <strong id="p2-rock">4</strong></span>
+          <span class="type-pill" title="Bao (Paper)">✋ <strong id="p2-paper">4</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Game Board Container -->
+    <main class="board-container">
+      <!-- Target Goal Reminders -->
+      <div class="goals-legend">
+        <div class="legend-item">
+          <span class="legend-dot p1-dot"></span>
+          <span>Đích của Player 1: <strong>a1</strong> (Góc trên - trái)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot p2-dot"></span>
+          <span>Đích của Player 2: <strong>i9</strong> (Góc dưới - phải)</span>
+        </div>
+      </div>
+
+      <!-- 9x9 Board with Coordinates -->
+      <div class="board-outer-frame">
+        <!-- Top Column Labels: a b c d e f g h i -->
+        <div class="col-labels top-labels">
+          <div class="label-corner"></div>
+          <div class="label-cell">a</div>
+          <div class="label-cell">b</div>
+          <div class="label-cell">c</div>
+          <div class="label-cell">d</div>
+          <div class="label-cell">e</div>
+          <div class="label-cell">f</div>
+          <div class="label-cell">g</div>
+          <div class="label-cell">h</div>
+          <div class="label-cell">i</div>
+          <div class="label-corner"></div>
+        </div>
+
+        <div class="board-middle-row">
+          <!-- Left Row Labels: 1 to 9 -->
+          <div class="row-labels left-labels">
+            <div class="label-cell">1</div>
+            <div class="label-cell">2</div>
+            <div class="label-cell">3</div>
+            <div class="label-cell">4</div>
+            <div class="label-cell">5</div>
+            <div class="label-cell">6</div>
+            <div class="label-cell">7</div>
+            <div class="label-cell">8</div>
+            <div class="label-cell">9</div>
+          </div>
+
+          <!-- Board Grid: 81 Cells -->
+          <div id="board" class="board-grid" aria-label="Bàn cờ Oẳn tù tì v2 9x9">
+            <!-- 81 squares generated by script.js -->
+          </div>
+
+          <!-- Right Row Labels: 1 to 9 -->
+          <div class="row-labels right-labels">
+            <div class="label-cell">1</div>
+            <div class="label-cell">2</div>
+            <div class="label-cell">3</div>
+            <div class="label-cell">4</div>
+            <div class="label-cell">5</div>
+            <div class="label-cell">6</div>
+            <div class="label-cell">7</div>
+            <div class="label-cell">8</div>
+            <div class="label-cell">9</div>
+          </div>
+        </div>
+
+        <!-- Bottom Column Labels: a b c d e f g h i -->
+        <div class="col-labels bottom-labels">
+          <div class="label-corner"></div>
+          <div class="label-cell">a</div>
+          <div class="label-cell">b</div>
+          <div class="label-cell">c</div>
+          <div class="label-cell">d</div>
+          <div class="label-cell">e</div>
+          <div class="label-cell">f</div>
+          <div class="label-cell">g</div>
+          <div class="label-cell">h</div>
+          <div class="label-cell">i</div>
+          <div class="label-corner"></div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="game-controls">
+        <button id="btn-reset" class="btn btn-primary" title="Khởi động lại ván chơi mới">
+          <span class="btn-icon">🔄</span> Chơi lại / Reset Game
+        </button>
+        <button id="btn-rules" class="btn btn-secondary" title="Xem hướng dẫn luật chơi">
+          <span class="btn-icon">📖</span> Hướng dẫn luật chơi
+        </button>
+      </div>
+
+      <!-- Move History Log -->
+      <div class="move-history-card">
+        <div class="history-header">
+          <h4>Nhật ký nước đi</h4>
+          <span id="move-count-badge" class="badge">0 nước</span>
+        </div>
+        <div id="move-log-list" class="move-log-list">
+          <div class="log-placeholder">Ván đấu mới đã sẵn sàng. Player 1 đi trước.</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal Winner Announcement -->
+    <div id="win-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-content winner-modal-card">
+        <div class="modal-trophy">🏆</div>
+        <h2 id="modal-winner-title" class="winner-title">PLAYER 1 CHIẾN THẮNG!</h2>
+        <p id="modal-winner-reason" class="winner-reason">Đã đưa quân vào ô đích a1 thành công!</p>
+        <div class="winner-stats">
+          <div class="wstat">
+            <span class="wstat-label">Tổng số nước đi:</span>
+            <span id="modal-total-moves" class="wstat-val">0</span>
+          </div>
+          <div class="wstat">
+            <span class="wstat-label">Quân P1 còn lại:</span>
+            <span id="modal-p1-left" class="wstat-val">12</span>
+          </div>
+          <div class="wstat">
+            <span class="wstat-label">Quân P2 còn lại:</span>
+            <span id="modal-p2-left" class="wstat-val">12</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-modal-restart" class="btn btn-primary btn-large">
+            <span class="btn-icon">🎮</span> Bắt đầu ván mới
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Rules Explanation -->
+    <div id="rules-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-content rules-modal-card">
+        <div class="modal-header-row">
+          <h3>📖 Luật chơi Oẳn Tù Tì v2 (OTTv2)</h3>
+          <button id="btn-close-rules" class="btn-close" aria-label="Đóng">&times;</button>
+        </div>
+        <div class="rules-body">
+          <div class="rule-block">
+            <h4>1. Bàn cờ và Bố trí ban đầu</h4>
+            <ul>
+              <li>Bàn cờ gồm <strong>9 × 9 = 81 ô</strong> với tọa độ cột <code>a → i</code> và hàng <code>1 → 9</code>.</li>
+              <li>Mỗi bên có đúng <strong>12 quân</strong> gồm 3 loại: <strong>4 Kéo (✌️), 4 Búa (✊), 4 Bao (✋)</strong>.</li>
+              <li>Quân của hai bên được đặt <strong>đối xứng hoàn toàn qua đường chéo chính (a1 → i9)</strong>.</li>
+              <li>Không có quân nào đứng sẵn trên đường chéo chính lúc bắt đầu.</li>
+            </ul>
+          </div>
+          <div class="rule-block">
+            <h4>2. Ba loại quân và Quy tắc ăn quân Oẳn Tù Tì</h4>
+            <ul>
+              <li>Mỗi lượt, người chơi chọn 1 quân di chuyển đúng <strong>1 ô theo 8 hướng</strong> (như quân Vua trong cờ vua).</li>
+              <li><strong>Luật ăn quân Oẳn tù tì:</strong>
+                <ul>
+                  <li>✌️ <strong>Kéo ăn Bao</strong> (Kéo cắt Bao)</li>
+                  <li>✊ <strong>Búa ăn Kéo</strong> (Búa đập Kéo)</li>
+                  <li>✋ <strong>Bao ăn Búa</strong> (Bao bọc Búa)</li>
+                </ul>
+              </li>
+              <li><strong>Quân cùng loại hoặc yếu hơn không thể ăn:</strong>
+                <ul>
+                  <li>Quân cùng loại (Kéo gặp Kéo, Búa gặp Búa, Bao gặp Bao) không thể ăn nhau và sẽ <strong>chặn đường nhau</strong>.</li>
+                  <li>Quân cùng phe mình không thể đi vào ô nhau (chặn đường).</li>
+                  <li>Quân yếu hơn không thể đi vào ô quân mạnh hơn của đối phương.</li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <div class="rule-block">
+            <h4>3. Điều kiện chiến thắng (Thắng ngay khi đạt 1 trong 2)</h4>
+            <ul>
+              <li><strong>Điều kiện 1:</strong> Ăn hết một loại quân của đối phương (ví dụ đối phương hết sạch Kéo, hoặc hết Búa, hoặc hết Bao) hoặc ăn hết toàn bộ 12 quân đối phương.</li>
+              <li><strong>Điều kiện 2:</strong> Đưa ít nhất 1 quân của mình vào ô đích cố định:
+                <ul>
+                  <li>Player 1 thắng ngay khi đưa quân vào ô <strong>a1</strong>.</li>
+                  <li>Player 2 thắng ngay khi đưa quân vào ô <strong>i9</strong>.</li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <div class="rule-block">
+            <h4>4. Lượt chơi</h4>
+            <p>Player 1 luôn đi trước. Người chơi lần lượt luân phiên nhau (Player 1 ⇄ Player 2).</p>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-close-rules-bottom" class="btn btn-secondary">Đã hiểu luật</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="game-footer">
+      <p>Bài tập Oẳn tù tì v2 (OTTv2) - Bản địa phương 2 người chơi trên 1 máy</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
