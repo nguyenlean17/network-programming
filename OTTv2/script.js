@@ -1,14 +1,11 @@
 /**
  * ========================================================
- * OẲN TÙ TÌ v2 (OTTv2) - 3 LOẠI QUÂN: KÉO - BÚA - BAO
- * Quy tắc ăn quân Oẳn tù tì:
- * - Kéo ăn Bao (✌️ > ✋)
- * - Búa ăn Kéo (✊ > ✌️)
- * - Bao ăn Búa (✋ > ✊)
- * - Quân cùng loại hoặc yếu hơn không thể ăn nhau (bị chặn đường).
- * - Quân cùng phe chặn đường nhau.
- * - Điều kiện thắng: Ăn hết 1 loại quân đối phương (hoặc hết sạch quân)
- *   hoặc đưa quân vào ô đích (P1 -> a1, P2 -> i9).
+ * OẲN TÙ TÌ v2 (OTTv2) - PHIÊN BẢN CẢI TIẾN
+ * - 2 Ô đích cố định: a9 và i1 (Tuyệt đối không spawn quân ở đó)
+ * - Hệ thống POOL nhiều kiểu bố trí quân khởi đầu cân bằng
+ * - 3 loại quân: Kéo (✌️), Búa (✊), Bao (✋)
+ * - Quy tắc ăn quân Oẳn Tù Tì: Kéo > Bao > Búa > Kéo
+ * - Đối xứng hoàn hảo qua đường chéo chính a1 -> i9
  * ========================================================
  */
 
@@ -16,9 +13,9 @@
 const COLS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
 const BOARD_SIZE = 9;
 
-// Tọa độ ô đích cố định của hai bên
-const GOAL_P1 = { row: 0, col: 0 }; // a1
-const GOAL_P2 = { row: 8, col: 8 }; // i9
+// Tọa độ 2 ô đích cố định
+const GOAL_A9 = { row: 8, col: 0 }; // a9 (Góc dưới - trái)
+const GOAL_I1 = { row: 0, col: 8 }; // i1 (Góc trên - phải)
 
 // 8 hướng di chuyển xung quanh 1 ô (King move)
 const DIRECTIONS = [
@@ -53,10 +50,93 @@ const PIECE_CONFIG = {
 };
 
 /**
- * Kiểm tra xem quân tấn công có ăn được quân phòng thủ theo luật Oẳn tù tì hay không
- * Kéo ăn Bao (scissors > paper)
- * Búa ăn Kéo (rock > scissors)
- * Bao ăn Búa (paper > rock)
+ * POOL CÁC KIỂU BỐ TRÍ BAN ĐẦU (4 KIỂU CHIẾN THUẬT)
+ * Tất cả các kiểu đều thỏa mãn:
+ * - 12 quân P1 (4 Kéo, 4 Búa, 4 Bao) nằm dưới đường chéo chính (row > col).
+ * - Tuyệt đối không spawn trên a9 (8, 0) và i1 (0, 8).
+ * - Player 2 được sinh đối xứng hoàn hảo (col, row) cùng loại quân.
+ */
+const POOL_LAYOUTS = [
+  {
+    id: 'central_fortress',
+    name: 'Pháo Đài Trung Tâm',
+    desc: 'Tập trung ở khu vực trung lộ, cơ động tỏa ra 8 hướng',
+    pieces: [
+      { row: 3, col: 1, type: 'rock' },     // b4: Búa
+      { row: 3, col: 2, type: 'scissors' }, // c4: Kéo
+      { row: 4, col: 1, type: 'paper' },    // b5: Bao
+      { row: 4, col: 2, type: 'rock' },     // c5: Búa
+      { row: 4, col: 3, type: 'scissors' }, // d5: Kéo
+      { row: 5, col: 1, type: 'scissors' }, // b6: Kéo
+      { row: 5, col: 2, type: 'paper' },    // c6: Bao
+      { row: 5, col: 3, type: 'rock' },     // d6: Búa
+      { row: 5, col: 4, type: 'paper' },    // e6: Bao
+      { row: 6, col: 2, type: 'rock' },     // c7: Búa
+      { row: 6, col: 3, type: 'paper' },    // d7: Bao
+      { row: 6, col: 4, type: 'scissors' }  // e7: Kéo
+    ]
+  },
+  {
+    id: 'southwest_flank',
+    name: 'Tiền Tuyến Tây Nam',
+    desc: 'Bố trí ở cánh Tây Nam, che chắn cẩn mật nhưng ô a9 hoàn toàn trống',
+    pieces: [
+      { row: 5, col: 2, type: 'rock' },     // c6: Búa
+      { row: 5, col: 3, type: 'scissors' }, // d6: Kéo
+      { row: 6, col: 1, type: 'paper' },    // b7: Bao
+      { row: 6, col: 2, type: 'rock' },     // c7: Búa
+      { row: 6, col: 3, type: 'paper' },    // d7: Bao
+      { row: 7, col: 0, type: 'scissors' }, // a8: Kéo
+      { row: 7, col: 1, type: 'paper' },    // b8: Bao
+      { row: 7, col: 2, type: 'rock' },     // c8: Búa
+      { row: 7, col: 3, type: 'scissors' }, // d8: Kéo
+      { row: 8, col: 1, type: 'rock' },     // b9: Búa
+      { row: 8, col: 2, type: 'scissors' }, // c9: Kéo
+      { row: 8, col: 3, type: 'paper' }     // d9: Bao
+    ]
+  },
+  {
+    id: 'tactical_pincer',
+    name: 'Gọng Kìm Chiến Thuật',
+    desc: 'Chia thành 2 cánh bao vây, tạo không gian cơ động rộng mở',
+    pieces: [
+      { row: 2, col: 0, type: 'scissors' }, // a3: Kéo
+      { row: 3, col: 0, type: 'rock' },     // a4: Búa
+      { row: 3, col: 1, type: 'paper' },    // b4: Bao
+      { row: 4, col: 0, type: 'paper' },    // a5: Bao
+      { row: 4, col: 1, type: 'scissors' }, // b5: Kéo
+      { row: 4, col: 2, type: 'rock' },     // c5: Búa
+      { row: 6, col: 3, type: 'scissors' }, // d7: Kéo
+      { row: 6, col: 4, type: 'rock' },     // e7: Búa
+      { row: 7, col: 4, type: 'paper' },    // e8: Bao
+      { row: 7, col: 5, type: 'rock' },     // f8: Búa
+      { row: 8, col: 4, type: 'scissors' }, // e9: Kéo
+      { row: 8, col: 5, type: 'paper' }     // f9: Bao
+    ]
+  },
+  {
+    id: 'defensive_wall',
+    name: 'Bức Tường Bọc Lót',
+    desc: 'Bức tường phòng ngự chéo kiên cố, sẵn sàng phản công',
+    pieces: [
+      { row: 4, col: 0, type: 'rock' },     // a5: Búa
+      { row: 4, col: 1, type: 'paper' },    // b5: Bao
+      { row: 4, col: 2, type: 'scissors' }, // c5: Kéo
+      { row: 5, col: 0, type: 'paper' },    // a6: Bao
+      { row: 5, col: 1, type: 'rock' },     // b6: Búa
+      { row: 5, col: 2, type: 'scissors' }, // c6: Kéo
+      { row: 5, col: 3, type: 'paper' },    // d6: Bao
+      { row: 6, col: 1, type: 'scissors' }, // b7: Kéo
+      { row: 6, col: 2, type: 'rock' },     // c7: Búa
+      { row: 6, col: 3, type: 'scissors' }, // d7: Kéo
+      { row: 7, col: 2, type: 'paper' },    // c8: Bao
+      { row: 7, col: 3, type: 'rock' }      // d8: Búa
+    ]
+  }
+];
+
+/**
+ * Kiểm tra xem quân tấn công có ăn được quân phòng thủ theo luật Oẳn tù tì không
  */
 function canCapture(attackerType, defenderType) {
   if (!attackerType || !defenderType) return false;
@@ -64,50 +144,44 @@ function canCapture(attackerType, defenderType) {
 }
 
 /**
- * 12 vị trí ban đầu của Player 1 (4 Kéo, 4 Búa, 4 Bao) nằm dưới đường chéo chính (row > col).
- * Player 2 sẽ nhận các quân đối xứng tuyệt đối qua đường chéo chính: (row, col) -> (col, row)
- * với CÙNG LOẠI QUÂN để đảm bảo sự cân bằng và công bằng tuyệt đối.
- */
-const INITIAL_P1_PIECES = [
-  // Hàng 6 (tiền tuyến - 2 quân)
-  { row: 5, col: 2, type: 'rock' },     // c6: Búa ✊
-  { row: 5, col: 3, type: 'scissors' }, // d6: Kéo ✌️
-
-  // Hàng 7 (4 quân)
-  { row: 6, col: 0, type: 'paper' },    // a7: Bao ✋
-  { row: 6, col: 1, type: 'rock' },     // b7: Búa ✊
-  { row: 6, col: 2, type: 'scissors' }, // c7: Kéo ✌️
-  { row: 6, col: 3, type: 'paper' },    // d7: Bao ✋
-
-  // Hàng 8 (3 quân)
-  { row: 7, col: 0, type: 'scissors' }, // a8: Kéo ✌️
-  { row: 7, col: 1, type: 'paper' },    // b8: Bao ✋
-  { row: 7, col: 2, type: 'rock' },     // c8: Búa ✊
-
-  // Hàng 9 (hậu phương - 3 quân)
-  { row: 8, col: 0, type: 'rock' },     // a9: Búa ✊
-  { row: 8, col: 1, type: 'scissors' }, // b9: Kéo ✌️
-  { row: 8, col: 2, type: 'paper' }     // c9: Bao ✋
-];
-
-/**
- * Quản lý trạng thái trò chơi toàn cục (Game State)
+ * Trạng thái trò chơi toàn cục (Game State)
  */
 const gameState = {
-  board: [],               // Mảng 2 chiều 9x9 lưu thông tin ô cờ ({ player: 1|2, type: 'rock'|'paper'|'scissors', id: string })
-  currentTurn: 1,          // 1: Player 1 (đi trước), 2: Player 2
+  board: [],               // Mảng 2 chiều 9x9 lưu quân cờ
+  currentTurn: 1,          // 1: Player 1, 2: Player 2
   pieceCounts: {
     1: { total: 12, scissors: 4, rock: 4, paper: 4 },
     2: { total: 12, scissors: 4, rock: 4, paper: 4 }
   },
   selectedSquare: null,    // { row, col } đang được chọn
-  validMoves: [],          // Danh sách các ô có thể đi tới: [{ row, col, isCapture, capturedType }]
-  isGameOver: false,       // Trạng thái kết thúc game
+  validMoves: [],          // Danh sách ô có thể đi
+  isGameOver: false,       // Kết thúc ván chưa
   winner: null,            // 1 | 2 | null
   winReason: '',           // Lý do chiến thắng
-  totalMoves: 0,           // Tổng số nước đi
-  lastMove: null           // { from: {row, col}, to: {row, col} }
+  totalMoves: 0,           // Số nước đi
+  lastMove: null,          // Nước đi cuối
+
+  // Cấu hình pool và ô đích
+  currentLayout: null,
+  selectedLayoutOption: 'random', // 'random' hoặc layout id
+  goalMode: 'p1_a9_p2_i1'         // 'p1_a9_p2_i1' hoặc 'p1_i1_p2_a9'
 };
+
+/**
+ * Lấy tọa độ ô đích hiện tại của từng người chơi
+ */
+function getPlayerGoal(player) {
+  if (gameState.goalMode === 'p1_a9_p2_i1') {
+    return player === 1 ? GOAL_A9 : GOAL_I1;
+  } else {
+    return player === 1 ? GOAL_I1 : GOAL_A9;
+  }
+}
+
+function getGoalCoordName(player) {
+  const g = getPlayerGoal(player);
+  return toCoord(g.row, g.col);
+}
 
 /**
  * Hiệu ứng âm thanh bằng Web Audio API
@@ -144,7 +218,7 @@ class SoundEffects {
       osc.start();
       osc.stop(this.ctx.currentTime + duration);
     } catch (e) {
-      // Bỏ qua lỗi audio nếu trình duyệt chặn tự phát âm thanh
+      // Bỏ qua lỗi audio
     }
   }
 
@@ -164,19 +238,22 @@ class SoundEffects {
 const sounds = new SoundEffects();
 
 /**
- * Chuyển đổi tọa độ số (row, col) thành chuỗi cờ như "a1", "i9"
+ * Chuyển đổi tọa độ (row, col) thành chuỗi cờ
  */
 function toCoord(row, col) {
   return `${COLS[col]}${row + 1}`;
 }
 
 /**
- * Khởi tạo bàn cờ 9x9 trong bộ nhớ và trên DOM
+ * Khởi tạo bàn cờ 9x9 rỗng
  */
 function initializeBoard() {
   const boardEl = document.getElementById('board');
   boardEl.innerHTML = '';
   gameState.board = [];
+
+  const p1Goal = getPlayerGoal(1);
+  const p2Goal = getPlayerGoal(2);
 
   for (let r = 0; r < BOARD_SIZE; r++) {
     const rowArray = [];
@@ -189,7 +266,6 @@ function initializeBoard() {
       cellEl.dataset.col = c;
       cellEl.id = `cell-${r}-${c}`;
 
-      // Màu sắc xen kẽ ô cờ
       if ((r + c) % 2 === 0) {
         cellEl.classList.add('light');
       } else {
@@ -201,18 +277,18 @@ function initializeBoard() {
         cellEl.classList.add('on-main-diagonal');
       }
 
-      // Đánh dấu 2 ô đích cố định
-      if (r === GOAL_P1.row && c === GOAL_P1.col) {
-        cellEl.classList.add('goal-a1');
-        cellEl.title = 'Ô đích Player 1 (a1)';
-      } else if (r === GOAL_P2.row && c === GOAL_P2.col) {
-        cellEl.classList.add('goal-i9');
-        cellEl.title = 'Ô đích Player 2 (i9)';
+      // Đánh dấu 2 ô đích cố định a9 và i1
+      if (r === GOAL_A9.row && c === GOAL_A9.col) {
+        cellEl.classList.add('goal-a9');
+        cellEl.classList.add(p1Goal.row === 8 && p1Goal.col === 0 ? 'goal-p1' : 'goal-p2');
+        cellEl.title = `Ô đích a9 (${p1Goal.row === 8 && p1Goal.col === 0 ? 'Player 1' : 'Player 2'})`;
+      } else if (r === GOAL_I1.row && c === GOAL_I1.col) {
+        cellEl.classList.add('goal-i1');
+        cellEl.classList.add(p2Goal.row === 0 && p2Goal.col === 8 ? 'goal-p2' : 'goal-p1');
+        cellEl.title = `Ô đích i1 (${p2Goal.row === 0 && p2Goal.col === 8 ? 'Player 2' : 'Player 1'})`;
       }
 
-      // Sự kiện click vào ô cờ
       cellEl.addEventListener('click', () => handleCellClick(r, c));
-
       boardEl.appendChild(cellEl);
     }
     gameState.board.push(rowArray);
@@ -220,12 +296,30 @@ function initializeBoard() {
 }
 
 /**
- * Tạo 12 quân cờ cho Player 1 và 12 quân đối xứng cho Player 2.
- * Mỗi bên có chính xác: 4 Kéo (✌️), 4 Búa (✊), 4 Bao (✋).
+ * Chọn kiểu bố trí từ POOL và sinh quân cờ
  */
 function createPieces() {
-  // 1. Tạo 12 quân cho Player 1
-  INITIAL_P1_PIECES.forEach((p, idx) => {
+  // Chọn layout từ pool
+  let selectedLayout;
+  if (gameState.selectedLayoutOption === 'random') {
+    // Chọn ngẫu nhiên 1 layout trong pool
+    const randIdx = Math.floor(Math.random() * POOL_LAYOUTS.length);
+    selectedLayout = POOL_LAYOUTS[randIdx];
+  } else {
+    selectedLayout = POOL_LAYOUTS.find(l => l.id === gameState.selectedLayoutOption) || POOL_LAYOUTS[0];
+  }
+
+  gameState.currentLayout = selectedLayout;
+
+  // Cập nhật tên đội hình đang chơi trên giao diện
+  const layoutTag = document.getElementById('active-layout-name');
+  if (layoutTag) {
+    layoutTag.textContent = selectedLayout.name;
+    layoutTag.title = selectedLayout.desc;
+  }
+
+  // 1. Tạo 12 quân cho Player 1 từ layout
+  selectedLayout.pieces.forEach((p, idx) => {
     gameState.board[p.row][p.col] = {
       player: 1,
       type: p.type,
@@ -233,8 +327,8 @@ function createPieces() {
     };
   });
 
-  // 2. Tạo 12 quân cho Player 2 bằng phép đối xứng qua đường chéo chính
-  INITIAL_P1_PIECES.forEach((p, idx) => {
+  // 2. Tạo 12 quân đối xứng hoàn hảo qua đường chéo chính cho Player 2
+  selectedLayout.pieces.forEach((p, idx) => {
     const p2Row = p.col;
     const p2Col = p.row;
     gameState.board[p2Row][p2Col] = {
@@ -252,7 +346,7 @@ function createPieces() {
 }
 
 /**
- * Vẽ lại toàn bộ quân cờ, highlight và cập nhật thống kê lên giao diện
+ * Vẽ lại toàn bộ quân cờ, highlight và cập nhật thông số lên giao diện
  */
 function renderBoard() {
   for (let r = 0; r < BOARD_SIZE; r++) {
@@ -260,10 +354,8 @@ function renderBoard() {
       const cellEl = document.getElementById(`cell-${r}-${c}`);
       if (!cellEl) continue;
 
-      // Xóa các class highlight cũ
       cellEl.classList.remove('selected', 'valid-move', 'valid-capture', 'selectable', 'last-move-from', 'last-move-to');
 
-      // Highlight nước đi gần nhất
       if (gameState.lastMove) {
         if (gameState.lastMove.from.row === r && gameState.lastMove.from.col === c) {
           cellEl.classList.add('last-move-from');
@@ -298,7 +390,6 @@ function renderBoard() {
           existingPiece.title = `Player ${pieceData.player} - ${config.name} (${config.symbol})`;
         }
 
-        // Cho phép hover vào quân của lượt hiện tại
         if (!gameState.isGameOver && pieceData.player === gameState.currentTurn) {
           cellEl.classList.add('selectable');
         }
@@ -328,30 +419,24 @@ function renderBoard() {
     });
   }
 
-  // Cập nhật thông số thống kê quân cờ
   updateStatsUI();
-
-  // Cập nhật thẻ lượt hiện tại
   updateTurnUI();
 }
 
 /**
- * Cập nhật bảng thống kê số lượng từng loại quân
+ * Cập nhật bảng thống kê số lượng quân
  */
 function updateStatsUI() {
-  // Player 1
   const p1 = gameState.pieceCounts[1];
   document.getElementById('p1-count').textContent = p1.total;
   document.getElementById('p1-scissors').textContent = p1.scissors;
   document.getElementById('p1-rock').textContent = p1.rock;
   document.getElementById('p1-paper').textContent = p1.paper;
 
-  // Đổi trạng thái hiển thị nếu hết quân loại đó
   togglePillZero('p1-scissors', p1.scissors);
   togglePillZero('p1-rock', p1.rock);
   togglePillZero('p1-paper', p1.paper);
 
-  // Player 2
   const p2 = gameState.pieceCounts[2];
   document.getElementById('p2-count').textContent = p2.total;
   document.getElementById('p2-scissors').textContent = p2.scissors;
@@ -361,6 +446,22 @@ function updateStatsUI() {
   togglePillZero('p2-scissors', p2.scissors);
   togglePillZero('p2-rock', p2.rock);
   togglePillZero('p2-paper', p2.paper);
+
+  // Cập nhật nhãn ô đích
+  const p1GoalName = getGoalCoordName(1);
+  const p2GoalName = getGoalCoordName(2);
+
+  const p1GoalEl = document.getElementById('p1-goal-text');
+  if (p1GoalEl) p1GoalEl.textContent = p1GoalName;
+
+  const p2GoalEl = document.getElementById('p2-goal-text');
+  if (p2GoalEl) p2GoalEl.textContent = p2GoalName;
+
+  const legP1 = document.getElementById('legend-p1-goal');
+  if (legP1) legP1.textContent = p1GoalName;
+
+  const legP2 = document.getElementById('legend-p2-goal');
+  if (legP2) legP2.textContent = p2GoalName;
 }
 
 function togglePillZero(elementId, count) {
@@ -408,13 +509,6 @@ function setStatusMessage(msg) {
 
 /**
  * Tính toán danh sách các nước đi hợp lệ cho quân cờ tại (r, c)
- * Áp dụng đúng luật:
- * - 8 hướng, đúng 1 ô (King move)
- * - Nằm trong bàn cờ 9x9
- * - Ô trống: Đi được
- * - Ô có quân cùng phe: KHÔNG đi được (chặn đường)
- * - Ô có quân đối phương: CHỈ ĐƯỢC ĐI/ĂN NẾU thắng theo luật Oẳn Tù Tì
- *   (Kéo ăn Bao, Búa ăn Kéo, Bao ăn Búa). Nếu cùng loại hoặc yếu hơn -> BỊ CHẶN!
  */
 function getValidMoves(r, c) {
   const piece = gameState.board[r][c];
@@ -426,14 +520,13 @@ function getValidMoves(r, c) {
     const nr = r + dr;
     const nc = c + dc;
 
-    // 1. Kiểm tra nằm trong phạm vi bàn cờ 9x9
     if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) {
       continue;
     }
 
     const targetPiece = gameState.board[nr][nc];
 
-    // 2. Ô trống: Nước đi hợp lệ
+    // Ô trống: Đi được
     if (!targetPiece) {
       moves.push({
         row: nr,
@@ -444,13 +537,12 @@ function getValidMoves(r, c) {
       continue;
     }
 
-    // 3. Ô có quân cùng phe: Không thể đi vào (chặn đường nhau)
+    // Quân cùng phe: Chặn đường nhau
     if (targetPiece.player === piece.player) {
       continue;
     }
 
-    // 4. Ô có quân đối phương: Áp dụng quy tắc Oẳn Tù Tì
-    // Kéo ăn Bao, Búa ăn Kéo, Bao ăn Búa
+    // Quân đối phương: Chỉ ăn được nếu thắng theo luật Oẳn Tù Tì
     if (canCapture(piece.type, targetPiece.type)) {
       moves.push({
         row: nr,
@@ -459,7 +551,6 @@ function getValidMoves(r, c) {
         capturedType: targetPiece.type
       });
     }
-    // Nếu cùng loại (hòa) hoặc đối phương mạnh hơn: Bị chặn, không thể đi vào!
   }
 
   return moves;
@@ -504,7 +595,7 @@ function clearSelection() {
 }
 
 /**
- * Xử lý việc ăn quân đối phương
+ * Ăn quân đối phương
  */
 function capturePiece(r, c) {
   const targetPiece = gameState.board[r][c];
@@ -513,7 +604,6 @@ function capturePiece(r, c) {
   const capturedPlayer = targetPiece.player;
   const capturedType = targetPiece.type;
 
-  // Giảm số lượng quân của loại bị ăn và tổng số quân
   gameState.pieceCounts[capturedPlayer][capturedType]--;
   gameState.pieceCounts[capturedPlayer].total--;
 
@@ -522,7 +612,7 @@ function capturePiece(r, c) {
 }
 
 /**
- * Di chuyển quân từ (fromR, fromC) sang (toR, toC)
+ * Di chuyển quân cờ
  */
 function movePiece(fromR, fromC, toR, toC) {
   const movingPiece = gameState.board[fromR][fromC];
@@ -537,7 +627,6 @@ function movePiece(fromR, fromC, toR, toC) {
     capturedPiece = capturePiece(toR, toC);
   }
 
-  // Cập nhật vị trí trên bảng cờ
   gameState.board[toR][toC] = movingPiece;
   gameState.board[fromR][fromC] = null;
 
@@ -547,7 +636,6 @@ function movePiece(fromR, fromC, toR, toC) {
   };
   gameState.totalMoves++;
 
-  // Ghi nhật ký nước đi
   addMoveLog({
     turnNum: gameState.totalMoves,
     player: movingPiece.player,
@@ -561,7 +649,6 @@ function movePiece(fromR, fromC, toR, toC) {
 
   sounds.move();
 
-  // Kiểm tra điều kiện thắng
   const winResult = checkWinCondition(movingPiece.player, toR, toC);
 
   if (winResult.gameOver) {
@@ -577,33 +664,21 @@ function movePiece(fromR, fromC, toR, toC) {
 
 /**
  * Kiểm tra các điều kiện thắng:
- * 1. Điều kiện đích cố định:
- *    - Player 1 đưa quân vào a1 -> Player 1 thắng ngay!
- *    - Player 2 đưa quân vào i9 -> Player 2 thắng ngay!
- * 2. Điều kiện ăn hết một loại quân đối phương (Kéo / Búa / Bao) hoặc hết sạch 12 quân:
- *    - Đối phương hết sạch Kéo (scissors = 0) -> Thắng!
- *    - Đối phương hết sạch Búa (rock = 0) -> Thắng!
- *    - Đối phương hết sạch Bao (paper = 0) -> Thắng!
- *    - Đối phương còn 0 quân (total = 0) -> Thắng!
+ * 1. Đưa quân vào ô đích quy định (a9 hoặc i1)
+ * 2. Ăn hết một loại quân đối phương (Kéo/Búa/Bao) hoặc hết sạch 12 quân
  */
 function checkWinCondition(movingPlayer, targetRow, targetCol) {
   const opponent = movingPlayer === 1 ? 2 : 1;
   const oppCounts = gameState.pieceCounts[opponent];
+  const myGoal = getPlayerGoal(movingPlayer);
 
-  // 1. Kiểm tra đưa quân vào ô đích
-  if (movingPlayer === 1 && targetRow === GOAL_P1.row && targetCol === GOAL_P1.col) {
+  // 1. Kiểm tra đưa quân vào đúng ô đích của người chơi
+  if (targetRow === myGoal.row && targetCol === myGoal.col) {
+    const goalName = toCoord(myGoal.row, myGoal.col);
     return {
       gameOver: true,
-      winner: 1,
-      reason: 'Player 1 đã đưa quân vào ô đích a1 thành công!'
-    };
-  }
-
-  if (movingPlayer === 2 && targetRow === GOAL_P2.row && targetCol === GOAL_P2.col) {
-    return {
-      gameOver: true,
-      winner: 2,
-      reason: 'Player 2 đã đưa quân vào ô đích i9 thành công!'
+      winner: movingPlayer,
+      reason: `Player ${movingPlayer} đã đưa quân vào ô đích ${goalName} thành công!`
     };
   }
 
@@ -632,7 +707,6 @@ function checkWinCondition(movingPlayer, targetRow, targetCol) {
     };
   }
 
-  // Kiểm tra ăn hết toàn bộ quân
   if (oppCounts.total <= 0) {
     return {
       gameOver: true,
@@ -645,7 +719,7 @@ function checkWinCondition(movingPlayer, targetRow, targetCol) {
 }
 
 /**
- * Chuyển lượt luân phiên giữa 2 người chơi
+ * Chuyển lượt luân phiên
  */
 function switchTurn() {
   gameState.currentTurn = gameState.currentTurn === 1 ? 2 : 1;
@@ -687,32 +761,27 @@ function handleCellClick(r, c) {
 
   const clickedPiece = gameState.board[r][c];
 
-  // 1. Nếu đang có quân được chọn
   if (gameState.selectedSquare) {
     const fromR = gameState.selectedSquare.row;
     const fromC = gameState.selectedSquare.col;
 
-    // A. Click vào chính quân đang chọn: Hủy chọn
     if (fromR === r && fromC === c) {
       clearSelection();
       setStatusMessage('Đã hủy chọn quân.');
       return;
     }
 
-    // B. Click vào ô trong danh sách nước đi hợp lệ: Thực hiện di chuyển!
     const validMove = gameState.validMoves.find(m => m.row === r && m.col === c);
     if (validMove) {
       movePiece(fromR, fromC, r, c);
       return;
     }
 
-    // C. Click vào một quân khác CỦA CHÍNH MÌNH: Đổi sang chọn quân đó
     if (clickedPiece && clickedPiece.player === gameState.currentTurn) {
       selectPiece(r, c);
       return;
     }
 
-    // D. Click ô có quân đối phương nhưng KHÔNG ĂN ĐƯỢC (cùng loại hoặc yếu hơn)
     if (clickedPiece && clickedPiece.player !== gameState.currentTurn) {
       const selectedPiece = gameState.board[fromR][fromC];
       const selCfg = PIECE_CONFIG[selectedPiece.type];
@@ -726,13 +795,11 @@ function handleCellClick(r, c) {
       return;
     }
 
-    // E. Click ô không hợp lệ
     clearSelection();
     setStatusMessage('Nước đi không hợp lệ. Vui lòng chọn lại quân hoặc ô có thể đi.');
     return;
   }
 
-  // 2. Nếu chưa có quân nào được chọn
   if (clickedPiece) {
     if (clickedPiece.player === gameState.currentTurn) {
       selectPiece(r, c);
@@ -743,7 +810,7 @@ function handleCellClick(r, c) {
 }
 
 /**
- * Ghi nhật ký nước đi kèm biểu tượng Oẳn tù tì
+ * Ghi nhật ký nước đi
  */
 function addMoveLog(data) {
   const logList = document.getElementById('move-log-list');
@@ -776,9 +843,6 @@ function addMoveLog(data) {
   if (countBadge) countBadge.textContent = `${data.turnNum} nước`;
 }
 
-/**
- * Ghi log khi có người chiến thắng
- */
 function addWinLog(winner, reason) {
   const logList = document.getElementById('move-log-list');
   const winEntry = document.createElement('div');
@@ -788,7 +852,7 @@ function addWinLog(winner, reason) {
 }
 
 /**
- * Khởi động lại toàn bộ trạng thái ván chơi (Reset Game)
+ * Khởi động lại ván chơi mới từ POOL (Reset Game)
  */
 function resetGame() {
   gameState.currentTurn = 1;
@@ -814,16 +878,39 @@ function resetGame() {
   logList.innerHTML = '<div class="log-placeholder">Ván đấu mới đã sẵn sàng. Player 1 đi trước.</div>';
   document.getElementById('move-count-badge').textContent = '0 nước';
 
-  setStatusMessage('Ván chơi mới bắt đầu. Player 1 đi trước!');
+  const layoutName = gameState.currentLayout ? gameState.currentLayout.name : '';
+  setStatusMessage(`Ván chơi mới (${layoutName}) bắt đầu! Player 1 đi trước.`);
 }
 
 /**
- * Cài đặt các sự kiện nút bấm và modal
+ * Cài đặt sự kiện nút bấm và bộ lọc
  */
 function setupEventListeners() {
+  // Nút ván mới / Reset
   document.getElementById('btn-reset').addEventListener('click', resetGame);
   document.getElementById('btn-modal-restart').addEventListener('click', resetGame);
 
+  // Bộ chọn Layout từ Pool
+  const selectLayout = document.getElementById('select-layout');
+  if (selectLayout) {
+    selectLayout.addEventListener('change', (e) => {
+      gameState.selectedLayoutOption = e.target.value;
+      resetGame();
+    });
+  }
+
+  // Bộ chọn chế độ phân công ô đích
+  const selectGoalMode = document.getElementById('select-goal-mode');
+  if (selectGoalMode) {
+    selectGoalMode.addEventListener('change', (e) => {
+      gameState.goalMode = e.target.value;
+      initializeBoard();
+      renderBoard();
+      setStatusMessage(`Đã cập nhật ô đích: Player 1 -> ${getGoalCoordName(1)}, Player 2 -> ${getGoalCoordName(2)}`);
+    });
+  }
+
+  // Modal luật chơi
   const rulesModal = document.getElementById('rules-modal');
   const btnRules = document.getElementById('btn-rules');
   const btnCloseRules = document.getElementById('btn-close-rules');
@@ -846,11 +933,12 @@ function setupEventListeners() {
   });
 }
 
-// Khởi chạy khi DOM sẵn sàng
+// Khởi chạy khi DOM tải xong
 document.addEventListener('DOMContentLoaded', () => {
   initializeBoard();
   createPieces();
   renderBoard();
   setupEventListeners();
-  setStatusMessage('Player 1 đi trước. Hãy chọn một quân cờ đỏ!');
+  const layoutName = gameState.currentLayout ? gameState.currentLayout.name : '';
+  setStatusMessage(`Đội hình "${layoutName}". Player 1 đi trước. Hãy chọn một quân cờ đỏ!`);
 });
