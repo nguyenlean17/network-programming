@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server/server.js",
-    "server": "node server/server.js"
+    "server": "node server/server.js",
+    "test": "node tests/rules.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",
