@@ -21,6 +21,15 @@ const roomManager = new RoomManager();
 
 const PORT = process.env.PORT || 3000;
 
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // Serve static frontend files
 app.use(express.static(rootDir));
 
@@ -151,6 +160,34 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'MAKE_MOVE_BROADCAST': {
+          if (!ws.roomId) return;
+          const room = roomManager.rooms.get(ws.roomId);
+          if (!room) return;
+
+          roomManager.broadcast(room, {
+            type: 'STATE_UPDATE',
+            gameState: payload.gameState,
+            lastMove: payload.lastMove,
+            senderRole: ws.role
+          });
+          broadcastRoomsList();
+          break;
+        }
+
+        case 'REACTION': {
+          if (!ws.roomId) return;
+          const room = roomManager.rooms.get(ws.roomId);
+          if (!room) return;
+
+          roomManager.broadcast(room, {
+            type: 'REACTION',
+            emoji: payload.emoji,
+            senderRole: ws.role
+          });
+          break;
+        }
+
         default:
           break;
       }
@@ -165,9 +202,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
-  console.log(`🎮 OTTv2 Server running on http://localhost:${PORT}`);
+  console.log(`🎮 OTTv2 Server running on http://0.0.0.0:${PORT} (Port: ${PORT})`);
   console.log(`🌐 WebSockets listening for multiplayer rooms`);
   console.log(`===============================================`);
 });

@@ -28,6 +28,7 @@ import {
 
 import { BoardRenderer } from './board.js';
 import { OttAi } from './ai.js';
+import { RenderSyncEngine } from './renderSync.js';
 import { SupabaseSyncEngine } from './supabaseSync.js';
 import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 
@@ -59,8 +60,8 @@ class OttApp {
     this.draftSelectedType = PIECE_TYPES.ROCK;
     this.draftPlacedP1 = []; // [{ x, y, type }]
 
-    // Supabase Realtime Serverless Multiplayer sync
-    this.syncEngine = new SupabaseSyncEngine({
+    // Render.com WebSocket Server Multiplayer sync
+    this.syncEngine = new RenderSyncEngine({
       onRemoteUpdate: (data) => this.handleRemoteUpdate(data),
       onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
       onRoomJoined: (roomId, role) => this.handleRoomJoined(roomId, role),
@@ -173,15 +174,14 @@ class OttApp {
       roleSpecBtn: document.getElementById('role-spec'),
       onlineStatusBadge: document.getElementById('online-status-badge'),
 
-      // Supabase Modal & Presence
-      sbStatusText: document.getElementById('sb-status-text'),
-      btnOpenSbConfig: document.getElementById('btn-open-supabase-config'),
-      sbConfigModal: document.getElementById('supabase-config-modal'),
-      closeSbConfigModal: document.getElementById('close-supabase-config'),
-      btnSaveSbConfig: document.getElementById('btn-save-supabase-config'),
-      sbCfgUrl: document.getElementById('sb-cfg-url'),
-      sbCfgKey: document.getElementById('sb-cfg-key'),
-      sbCfgName: document.getElementById('sb-cfg-name'),
+      // Render Server Modal & Status
+      renderStatusText: document.getElementById('render-status-text'),
+      btnOpenRenderConfig: document.getElementById('btn-open-render-config'),
+      renderConfigModal: document.getElementById('render-config-modal'),
+      closeRenderConfigModal: document.getElementById('close-render-config'),
+      btnSaveRenderConfig: document.getElementById('btn-save-render-config'),
+      renderCfgUrl: document.getElementById('render-cfg-url'),
+      renderCfgName: document.getElementById('render-cfg-name'),
       presenceP1: document.getElementById('presence-p1'),
       presenceP2: document.getElementById('presence-p2'),
       presenceSpecs: document.getElementById('presence-specs'),
@@ -350,33 +350,31 @@ class OttApp {
       }
     });
 
-    // Supabase Config Modal events
-    if (this.dom.btnOpenSbConfig) {
-      this.dom.btnOpenSbConfig.addEventListener('click', () => {
-        const cfg = this.syncEngine.getConfig();
-        if (this.dom.sbCfgUrl) this.dom.sbCfgUrl.value = cfg.url || '';
-        if (this.dom.sbCfgKey) this.dom.sbCfgKey.value = cfg.key || '';
-        if (this.dom.sbCfgName) this.dom.sbCfgName.value = cfg.playerName || '';
-        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.add('open');
+    // Render Server Config Modal events
+    if (this.dom.btnOpenRenderConfig) {
+      this.dom.btnOpenRenderConfig.addEventListener('click', () => {
+        const url = this.syncEngine.getServerUrl();
+        if (this.dom.renderCfgUrl) this.dom.renderCfgUrl.value = url || '';
+        if (this.dom.renderCfgName) this.dom.renderCfgName.value = this.syncEngine.playerName || '';
+        if (this.dom.renderConfigModal) this.dom.renderConfigModal.classList.add('open');
       });
     }
 
-    if (this.dom.closeSbConfigModal) {
-      this.dom.closeSbConfigModal.addEventListener('click', () => {
-        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.remove('open');
+    if (this.dom.closeRenderConfigModal) {
+      this.dom.closeRenderConfigModal.addEventListener('click', () => {
+        if (this.dom.renderConfigModal) this.dom.renderConfigModal.classList.remove('open');
       });
     }
 
-    if (this.dom.btnSaveSbConfig) {
-      this.dom.btnSaveSbConfig.addEventListener('click', () => {
-        const url = this.dom.sbCfgUrl ? this.dom.sbCfgUrl.value.trim() : '';
-        const key = this.dom.sbCfgKey ? this.dom.sbCfgKey.value.trim() : '';
-        const name = this.dom.sbCfgName ? this.dom.sbCfgName.value.trim() : '';
-        this.syncEngine.setConfig(url, key, name);
-        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.remove('open');
-        this.showToast('Đã lưu cấu hình Supabase Cloud!', 'success');
-        if (this.dom.sbStatusText) {
-          this.dom.sbStatusText.textContent = url ? '⚡ Supabase Realtime: Sẵn sàng' : '⚡ Supabase Realtime: Chế độ Demo';
+    if (this.dom.btnSaveRenderConfig) {
+      this.dom.btnSaveRenderConfig.addEventListener('click', () => {
+        const url = this.dom.renderCfgUrl ? this.dom.renderCfgUrl.value.trim() : '';
+        const name = this.dom.renderCfgName ? this.dom.renderCfgName.value.trim() : '';
+        this.syncEngine.setServerUrl(url, name);
+        if (this.dom.renderConfigModal) this.dom.renderConfigModal.classList.remove('open');
+        this.showToast('Đã lưu cấu hình máy chủ Render!', 'success');
+        if (this.dom.renderStatusText) {
+          this.dom.renderStatusText.textContent = `🟢 Render Server: ${url || window.location.origin}`;
         }
       });
     }
@@ -1075,10 +1073,16 @@ class OttApp {
   handleConnectionChange(connected, msg) {
     if (connected) {
       this.dom.onlineStatusBadge.className = 'status-badge online';
-      this.dom.onlineStatusBadge.textContent = `● Online: ${this.syncEngine.roomId}`;
+      this.dom.onlineStatusBadge.textContent = `● Online: ${this.syncEngine.roomId || 'Render'}`;
+      if (this.dom.renderStatusText) {
+        this.dom.renderStatusText.textContent = `🟢 Render Server: Đã kết nối`;
+      }
     } else {
       this.dom.onlineStatusBadge.className = 'status-badge offline';
       this.dom.onlineStatusBadge.textContent = `○ Offline`;
+      if (this.dom.renderStatusText) {
+        this.dom.renderStatusText.textContent = `🔴 Render Server: Chưa kết nối`;
+      }
       if (msg) this.showToast(msg, 'warning');
     }
   }

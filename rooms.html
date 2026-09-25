@@ -437,7 +437,11 @@
      */
     async function fetchRooms() {
       try {
-        const res = await fetch('/api/rooms');
+        const savedServer = localStorage.getItem('ottv2_render_server_url');
+        const apiUrl = (savedServer && !window.location.origin.includes('onrender.com'))
+          ? `${savedServer.replace(/\/+$/, '')}/api/rooms`
+          : '/api/rooms';
+        const res = await fetch(apiUrl);
         if (res.ok) {
           const data = await res.json();
           if (data.rooms && data.rooms.length > 0) {

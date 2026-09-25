@@ -44,8 +44,8 @@
       <button id="btn-quick-guide" class="btn btn-gold" title="Xem hướng dẫn nhanh 3 bước">
         💡 Hướng dẫn
       </button>
-      <button id="btn-online-room" class="btn btn-gold" title="Chơi online đám mây qua Supabase Realtime (Không cần host máy)">
-        ⚡ Đấu Online (Supabase)
+      <button id="btn-online-room" class="btn btn-gold" title="Chơi online qua máy chủ Render.com WebSocket Server">
+        🌐 Đấu Online (Render)
       </button>
       <button id="btn-sound" class="btn" title="Bật/Tắt âm thanh">
         🔊 Âm thanh
@@ -367,25 +367,25 @@
   <!-- Toast Notification -->
   <div id="toast-alert" class="toast">Thông báo</div>
 
-  <!-- Modal: Room Manager (Supabase Realtime Multiplayer) -->
+  <!-- Modal: Room Manager (Render.com Server Multiplayer) -->
   <div id="room-modal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title">⚡ Đấu Online (Supabase Realtime)</h2>
+        <h2 class="modal-title">🌐 Đấu Online (Render Server)</h2>
         <button id="close-room-modal" class="close-btn">&times;</button>
       </div>
 
       <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">
-        Thi đấu online đám mây <strong>không cần host server trên máy tính</strong>! Đồng bộ di chuyển tức thì qua <strong>Supabase Realtime Broadcast & Presence</strong>.
+        Thi đấu trực tuyến đồng bộ thời gian thực qua máy chủ <strong>Render.com Node.js WebSocket</strong>.
       </div>
 
-      <!-- Supabase Status & Config Bar -->
+      <!-- Render Status & Config Bar -->
       <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 8px 12px; margin-bottom: 1.25rem;">
-        <div id="sb-status-text" style="font-size: 0.82rem; color: #a7f3d0; font-weight: 500;">
-          ⚡ Supabase Realtime: Sẵn sàng kết nối
+        <div id="render-status-text" style="font-size: 0.82rem; color: #a7f3d0; font-weight: 500;">
+          🟢 Render Server: Đang kết nối...
         </div>
-        <button id="btn-open-supabase-config" class="btn" style="padding: 4px 10px; font-size: 0.78rem;" title="Xem hoặc thay đổi Project URL và Anon Key">
-          ⚙️ Cấu hình API
+        <button id="btn-open-render-config" class="btn" style="padding: 4px 10px; font-size: 0.78rem;" title="Xem hoặc thay đổi URL máy chủ Render">
+          ⚙️ Cấu hình Server
         </button>
       </div>
 
@@ -427,30 +427,26 @@
     </div>
   </div>
 
-  <!-- Modal: Supabase Configuration -->
-  <div id="supabase-config-modal" class="modal-overlay">
+  <!-- Modal: Render Server Configuration -->
+  <div id="render-config-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 520px;">
       <div class="modal-header">
-        <h2 class="modal-title">⚙️ Cấu Hình Supabase Cloud</h2>
-        <button id="close-supabase-config" class="close-btn">&times;</button>
+        <h2 class="modal-title">⚙️ Cấu Hình Máy Chủ Render</h2>
+        <button id="close-render-config" class="close-btn">&times;</button>
       </div>
       <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
-        Chơi online trực tiếp <strong>không cần host máy chủ</strong> nhờ Supabase Realtime (miễn phí). Lấy URL & Key tại <a href="https://supabase.com/dashboard" target="_blank" style="color: var(--gold); text-decoration: underline;">supabase.com</a> &gt; <em>Project Settings &gt; API</em>. Thông tin này được lưu an toàn trong trình duyệt của bạn (localStorage).
+        Máy chủ WebSocket Node.js chạy trên Render.com. Nếu bạn triển khai backend riêng, nhập URL Web Service tại đây (ví dụ: <code>https://your-service.onrender.com</code>). Nếu mở trực tiếp trên tên miền Render, hệ thống tự động kết nối máy chủ mà không cần cấu hình.
       </p>
       <div class="form-group" style="margin-bottom: 0.85rem;">
-        <label class="form-label" for="sb-cfg-url">Supabase Project URL</label>
-        <input id="sb-cfg-url" class="form-input" placeholder="https://your-project-id.supabase.co" style="font-family: monospace;">
-      </div>
-      <div class="form-group" style="margin-bottom: 0.85rem;">
-        <label class="form-label" for="sb-cfg-key">Supabase Anon Public Key</label>
-        <input id="sb-cfg-key" type="password" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsIn..." style="font-family: monospace;">
+        <label class="form-label" for="render-cfg-url">URL Máy Chủ Render</label>
+        <input id="render-cfg-url" class="form-input" placeholder="https://your-service.onrender.com" style="font-family: monospace;">
       </div>
       <div class="form-group" style="margin-bottom: 1.25rem;">
-        <label class="form-label" for="sb-cfg-name">Tên hiển thị của bạn</label>
-        <input id="sb-cfg-name" class="form-input" placeholder="Nhập tên của bạn...">
+        <label class="form-label" for="render-cfg-name">Tên hiển thị của bạn</label>
+        <input id="render-cfg-name" class="form-input" placeholder="Nhập tên của bạn...">
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-        <button id="btn-save-supabase-config" class="btn btn-primary">Lưu Cấu Hình</button>
+        <button id="btn-save-render-config" class="btn btn-primary">Lưu Cấu Hình</button>
       </div>
     </div>
   </div>
