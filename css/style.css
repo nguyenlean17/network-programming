@@ -30,6 +30,270 @@
   --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* ==========================================================================
+   MAIN MENU SCREEN
+   ========================================================================== */
+.main-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, #1a1f3a 0%, #090d16 60%, #050810 100%);
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.main-menu.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Animated background particles */
+.menu-bg-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.menu-bg-particles::before,
+.menu-bg-particles::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  animation: float-particle 8s ease-in-out infinite;
+}
+
+.menu-bg-particles::before {
+  width: 400px;
+  height: 400px;
+  background: var(--p1-color);
+  top: -100px;
+  left: -100px;
+  animation-delay: 0s;
+}
+
+.menu-bg-particles::after {
+  width: 350px;
+  height: 350px;
+  background: var(--p2-color);
+  bottom: -80px;
+  right: -80px;
+  animation-delay: -4s;
+}
+
+@keyframes float-particle {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -20px) scale(1.05); }
+  50% { transform: translate(-10px, 25px) scale(0.95); }
+  75% { transform: translate(20px, 10px) scale(1.02); }
+}
+
+.menu-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  padding: 2rem;
+  max-width: 480px;
+  width: 90%;
+}
+
+/* Logo Section */
+.menu-logo-section {
+  text-align: center;
+}
+
+.menu-logo-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.75rem;
+  animation: menu-logo-bounce 2.5s ease-in-out infinite;
+  filter: drop-shadow(0 4px 20px rgba(99, 102, 241, 0.5));
+}
+
+@keyframes menu-logo-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.menu-title {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #ffffff 30%, var(--p2-light) 60%, var(--p1-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.35rem;
+}
+
+.menu-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* Menu Buttons */
+.menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1.1rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(18, 24, 38, 0.7);
+  backdrop-filter: blur(12px);
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, transparent, rgba(255,255,255,0.03));
+  transition: opacity 0.25s;
+  opacity: 0;
+}
+
+.menu-btn:hover::before {
+  opacity: 1;
+}
+
+.menu-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.menu-btn:active {
+  transform: translateY(0);
+}
+
+.menu-btn-icon {
+  font-size: 1.75rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.menu-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.menu-btn-text strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.menu-btn-text small {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Button color variants */
+.menu-btn-local {
+  border-color: rgba(139, 92, 246, 0.25);
+}
+.menu-btn-local:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.2);
+}
+.menu-btn-local .menu-btn-icon {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.menu-btn-bot {
+  border-color: rgba(245, 158, 11, 0.25);
+}
+.menu-btn-bot:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 8px 30px rgba(245, 158, 11, 0.2);
+}
+.menu-btn-bot .menu-btn-icon {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.menu-btn-online {
+  border-color: rgba(6, 182, 212, 0.25);
+}
+.menu-btn-online:hover {
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 8px 30px rgba(6, 182, 212, 0.2);
+}
+.menu-btn-online .menu-btn-icon {
+  background: rgba(6, 182, 212, 0.15);
+}
+
+/* Secondary links */
+.menu-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.menu-link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.menu-link-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-divider {
+  color: var(--text-dim);
+  font-size: 1rem;
+}
+
+.menu-version {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

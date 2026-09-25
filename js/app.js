@@ -51,6 +51,7 @@ class OttApp {
     this.cacheDomElements();
     this.initBoardRenderer();
     this.bindEvents();
+    this.bindMainMenuEvents();
 
     // Check URL for room parameter (?room=...)
     const urlRoom = this.syncEngine.getRoomFromUrl();
@@ -58,6 +59,7 @@ class OttApp {
       this.gameMode = 'MULTIPLAYER';
       this.dom.gameModeSelect.value = 'MULTIPLAYER';
       this.syncEngine.joinRoom(urlRoom, 'P2', this.getSerializableState());
+      this.hideMainMenu(); // Skip menu when joining via link
     }
 
     this.startNewGame();
@@ -116,7 +118,12 @@ class OttApp {
       victoryModal: document.getElementById('victory-modal'),
       victoryTitle: document.getElementById('victory-title'),
       victoryDesc: document.getElementById('victory-desc'),
-      btnVictoryRestart: document.getElementById('btn-victory-restart')
+      btnVictoryRestart: document.getElementById('btn-victory-restart'),
+
+      // Main Menu
+      mainMenu: document.getElementById('main-menu'),
+      menuBtnRules: document.getElementById('menu-btn-rules'),
+      menuBtns: document.querySelectorAll('.menu-btn[data-mode]')
     };
   }
 
@@ -462,6 +469,43 @@ class OttApp {
       lastMove: this.lastMove,
       winnerInfo: this.winnerInfo
     };
+  }
+
+  // ===== Main Menu =====
+  bindMainMenuEvents() {
+    // Mode buttons
+    this.dom.menuBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        this.gameMode = mode;
+        this.dom.gameModeSelect.value = mode;
+        this.hideMainMenu();
+        this.startNewGame();
+
+        if (mode === 'MULTIPLAYER') {
+          this.openRoomModal();
+        }
+      });
+    });
+
+    // Rules button on main menu
+    if (this.dom.menuBtnRules) {
+      this.dom.menuBtnRules.addEventListener('click', () => {
+        this.dom.rulesModal.classList.add('open');
+      });
+    }
+  }
+
+  hideMainMenu() {
+    if (this.dom.mainMenu) {
+      this.dom.mainMenu.classList.add('hidden');
+    }
+  }
+
+  showMainMenu() {
+    if (this.dom.mainMenu) {
+      this.dom.mainMenu.classList.remove('hidden');
+    }
   }
 }
 
