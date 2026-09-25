@@ -1,0 +1,16 @@
+{
+  "name": "ottv2-multiplayer-server",
+  "version": "1.0.0",
+  "description": "Standalone WebSocket/HTTP Game Server for Oẳn Tù Tì v2 (OTTv2)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  },
+  "keywords": ["ottv2", "game-server", "websocket", "network-programming"]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "ottv2-game",
+  "version": "1.0.0",
+  "description": "Oẳn Tù Tì v2 (OTTv2) - Board Game 9x9 với playhtml.fun & Node.js Server",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "node server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  },
+  "keywords": [
+    "board-game",
+    "playhtml",
+    "rock-paper-scissors",
+    "chess",
+    "multiplayer",
+    "vercel"
+  ],
+  "author": "nguyenlean17",
+  "license": "MIT"
+}
