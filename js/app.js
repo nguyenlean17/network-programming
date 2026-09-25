@@ -26,6 +26,7 @@ import {
 
 import { BoardRenderer } from './board.js';
 import { OttAi } from './ai.js';
+import { SupabaseSyncEngine } from './supabaseSync.js';
 import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 
 class OttApp {
@@ -56,11 +57,12 @@ class OttApp {
     this.draftSelectedType = PIECE_TYPES.ROCK;
     this.draftPlacedP1 = []; // [{ x, y, type }]
 
-    // Multiplayer sync
-    this.syncEngine = new PlayhtmlSyncEngine({
+    // Supabase Realtime Serverless Multiplayer sync
+    this.syncEngine = new SupabaseSyncEngine({
       onRemoteUpdate: (data) => this.handleRemoteUpdate(data),
       onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
-      onRoomJoined: (roomId, role) => this.handleRoomJoined(roomId, role)
+      onRoomJoined: (roomId, role) => this.handleRoomJoined(roomId, role),
+      onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence)
     });
 
     // Elements
@@ -77,8 +79,11 @@ class OttApp {
     const urlRoom = this.syncEngine.getRoomFromUrl();
     if (urlRoom) {
       this.gameMode = 'MULTIPLAYER';
-      this.dom.gameModeSelect.value = 'MULTIPLAYER';
-      this.syncEngine.joinRoom(urlRoom, 'P2', this.getSerializableState());
+      if (this.dom.gameModeSelect) this.dom.gameModeSelect.value = 'MULTIPLAYER';
+      const params = new URLSearchParams(window.location.search);
+      const roleParam = params.get('role');
+      const role = (roleParam === 'SPECTATOR' || roleParam === 'P1' || roleParam === 'P2') ? roleParam : 'P2';
+      this.syncEngine.joinRoom(urlRoom, role, this.getSerializableState());
     }
 
     this.startNewGame();
@@ -140,7 +145,7 @@ class OttApp {
       btnDraftClear: document.getElementById('btn-draft-clear'),
       btnDraftConfirm: document.getElementById('btn-draft-confirm'),
 
-      // Room Modal
+      // Room Modal & Supabase Cloud
       roomModal: document.getElementById('room-modal'),
       closeRoomModal: document.getElementById('close-room-modal'),
       roomCodeInput: document.getElementById('room-code-input'),
@@ -153,6 +158,19 @@ class OttApp {
       roleP2Btn: document.getElementById('role-p2'),
       roleSpecBtn: document.getElementById('role-spec'),
       onlineStatusBadge: document.getElementById('online-status-badge'),
+
+      // Supabase Modal & Presence
+      sbStatusText: document.getElementById('sb-status-text'),
+      btnOpenSbConfig: document.getElementById('btn-open-supabase-config'),
+      sbConfigModal: document.getElementById('supabase-config-modal'),
+      closeSbConfigModal: document.getElementById('close-supabase-config'),
+      btnSaveSbConfig: document.getElementById('btn-save-supabase-config'),
+      sbCfgUrl: document.getElementById('sb-cfg-url'),
+      sbCfgKey: document.getElementById('sb-cfg-key'),
+      sbCfgName: document.getElementById('sb-cfg-name'),
+      presenceP1: document.getElementById('presence-p1'),
+      presenceP2: document.getElementById('presence-p2'),
+      presenceSpecs: document.getElementById('presence-specs'),
 
       // Rules Modal
       rulesModal: document.getElementById('rules-modal'),
@@ -267,6 +285,8 @@ class OttApp {
     });
 
     this.dom.btnCreateRoom.addEventListener('click', () => {
+      this.gameMode = 'MULTIPLAYER';
+      if (this.dom.gameModeSelect) this.dom.gameModeSelect.value = 'MULTIPLAYER';
       const newRoom = this.syncEngine.generateRoomId();
       this.syncEngine.joinRoom(newRoom, 'P1', this.getSerializableState());
     });
@@ -277,7 +297,9 @@ class OttApp {
         this.showToast('Vui lòng nhập mã phòng!', 'warning');
         return;
       }
-      const fullRoom = code.startsWith('OTTV2-') ? code.toLowerCase() : `ottv2-${code.toLowerCase()}`;
+      this.gameMode = 'MULTIPLAYER';
+      if (this.dom.gameModeSelect) this.dom.gameModeSelect.value = 'MULTIPLAYER';
+      const fullRoom = code.startsWith('OTT-') ? code : `OTT-${code}`;
       this.syncEngine.joinRoom(fullRoom, 'P2', this.getSerializableState());
     });
 
@@ -290,13 +312,44 @@ class OttApp {
       }
     });
 
+    // Supabase Config Modal events
+    if (this.dom.btnOpenSbConfig) {
+      this.dom.btnOpenSbConfig.addEventListener('click', () => {
+        const cfg = this.syncEngine.getConfig();
+        if (this.dom.sbCfgUrl) this.dom.sbCfgUrl.value = cfg.url || '';
+        if (this.dom.sbCfgKey) this.dom.sbCfgKey.value = cfg.key || '';
+        if (this.dom.sbCfgName) this.dom.sbCfgName.value = cfg.playerName || '';
+        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.add('open');
+      });
+    }
+
+    if (this.dom.closeSbConfigModal) {
+      this.dom.closeSbConfigModal.addEventListener('click', () => {
+        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.remove('open');
+      });
+    }
+
+    if (this.dom.btnSaveSbConfig) {
+      this.dom.btnSaveSbConfig.addEventListener('click', () => {
+        const url = this.dom.sbCfgUrl ? this.dom.sbCfgUrl.value.trim() : '';
+        const key = this.dom.sbCfgKey ? this.dom.sbCfgKey.value.trim() : '';
+        const name = this.dom.sbCfgName ? this.dom.sbCfgName.value.trim() : '';
+        this.syncEngine.setConfig(url, key, name);
+        if (this.dom.sbConfigModal) this.dom.sbConfigModal.classList.remove('open');
+        this.showToast('Đã lưu cấu hình Supabase Cloud!', 'success');
+        if (this.dom.sbStatusText) {
+          this.dom.sbStatusText.textContent = url ? '⚡ Supabase Realtime: Sẵn sàng' : '⚡ Supabase Realtime: Chế độ Demo';
+        }
+      });
+    }
+
     // Quick Emoji Reactions
     document.querySelectorAll('.btn-reaction').forEach(btn => {
       btn.addEventListener('click', () => {
         const emoji = btn.dataset.emoji;
         this.triggerFloatingReaction(emoji);
         if (this.gameMode === 'MULTIPLAYER') {
-          this.syncEngine.broadcastGameState(this.getSerializableState(), { reaction: emoji });
+          this.syncEngine.broadcastReaction(emoji);
         }
       });
     });
@@ -866,6 +919,24 @@ class OttApp {
 
     if (gameStatus === GAME_STATUS.ENDED && winnerInfo) {
       this.handleVictory(winnerInfo);
+    }
+  }
+
+  handlePresenceUpdate(presence) {
+    if (!presence) return;
+    if (this.dom.presenceP1) {
+      const p1Name = presence.p1?.name ? `🔴 P1: ${presence.p1.name}` : '🔴 P1: Đang chờ...';
+      this.dom.presenceP1.textContent = p1Name;
+      this.dom.presenceP1.style.color = presence.p1 ? 'var(--p1-light)' : 'var(--text-muted)';
+    }
+    if (this.dom.presenceP2) {
+      const p2Name = presence.p2?.name ? `🔵 P2: ${presence.p2.name}` : '🔵 P2: Đang chờ...';
+      this.dom.presenceP2.textContent = p2Name;
+      this.dom.presenceP2.style.color = presence.p2 ? 'var(--p2-light)' : 'var(--text-muted)';
+    }
+    if (this.dom.presenceSpecs) {
+      const count = presence.spectators ? presence.spectators.length : 0;
+      this.dom.presenceSpecs.textContent = `👁️ Khán giả: ${count}`;
     }
   }
 
