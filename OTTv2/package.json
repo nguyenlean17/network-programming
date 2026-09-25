@@ -1,0 +1,22 @@
+{
+  "name": "ottv2-online",
+  "version": "2.0.0",
+  "description": "Game Oẳn Tù Tì v2 (OTTv2) - Online 2 người chơi qua WebSockets / Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "game",
+    "ottv2",
+    "multiplayer",
+    "socket.io",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
