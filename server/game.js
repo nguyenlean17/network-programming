@@ -15,7 +15,7 @@ import {
 export class ServerGameSession {
   constructor(roomId, options = {}) {
     this.roomId = roomId;
-    this.preset = options.preset || 'FRONTLINE';
+    this.preset = options.preset || 'CHESS_9';
     this.goalMode = options.goalMode || 'ANY';
 
     this.board = createInitialBoard(this.preset);

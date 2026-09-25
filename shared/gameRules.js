@@ -257,13 +257,51 @@ export function createEmptyBoard() {
 }
 
 /**
- * Standard Setup (Frontlines):
- * Each player has 15 pieces (5 ✊, 5 ✋, 5 ✌️).
- * Player 2 at Rows 1-2 (Row 1 has 7, Row 2 has 8, A1 is kept free).
- * Player 1 at Rows 8-9 (Row 8 has 8, Row 9 has 7, I9 is kept free).
+/**
+ * Creates Initial Board configuration.
+ * Default: CHESS_9 (9 pieces per player, equally divided: 3 Rock, 3 Paper, 3 Scissors).
+ * Also supports: FRONTLINE (15 pieces), DIAGONAL (15 pieces).
  */
-export function createInitialBoard(preset = 'FRONTLINE') {
+export function createInitialBoard(preset = 'CHESS_9') {
   const board = createEmptyBoard();
+
+  if (preset === 'CHESS_9') {
+    // Chuẩn Cờ Vua: Đúng 9 quân chia đều cho mỗi bên (3 Đấm, 3 Lá, 3 Kéo)
+    // Player 2 dàn quân hàng ngang Rank 2 (y = 1): A2 -> I2
+    const p2Pieces9 = [
+      { x: 0, type: PIECE_TYPES.ROCK },      // A2
+      { x: 1, type: PIECE_TYPES.PAPER },     // B2
+      { x: 2, type: PIECE_TYPES.SCISSORS },  // C2
+      { x: 3, type: PIECE_TYPES.ROCK },      // D2
+      { x: 4, type: PIECE_TYPES.PAPER },     // E2
+      { x: 5, type: PIECE_TYPES.SCISSORS },  // F2
+      { x: 6, type: PIECE_TYPES.ROCK },      // G2
+      { x: 7, type: PIECE_TYPES.PAPER },     // H2
+      { x: 8, type: PIECE_TYPES.SCISSORS }   // I2
+    ];
+
+    // Player 1 dàn quân hàng ngang Rank 8 (y = 7): A8 -> I8
+    const p1Pieces9 = [
+      { x: 0, type: PIECE_TYPES.SCISSORS },  // A8
+      { x: 1, type: PIECE_TYPES.PAPER },     // B8
+      { x: 2, type: PIECE_TYPES.ROCK },      // C8
+      { x: 3, type: PIECE_TYPES.SCISSORS },  // D8
+      { x: 4, type: PIECE_TYPES.PAPER },     // E8
+      { x: 5, type: PIECE_TYPES.ROCK },      // F8
+      { x: 6, type: PIECE_TYPES.SCISSORS },  // G8
+      { x: 7, type: PIECE_TYPES.PAPER },     // H8
+      { x: 8, type: PIECE_TYPES.ROCK }       // I8
+    ];
+
+    for (const p of p2Pieces9) {
+      board[1][p.x] = { player: PLAYERS.PLAYER_2, type: p.type };
+    }
+    for (const p of p1Pieces9) {
+      board[7][p.x] = { player: PLAYERS.PLAYER_1, type: p.type };
+    }
+
+    return board;
+  }
 
   if (preset === 'DIAGONAL') {
     // Diagonal Camps:

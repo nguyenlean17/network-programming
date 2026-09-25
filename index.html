@@ -39,8 +39,11 @@
         ⚡ playfun.html
       </a>
       <a href="rooms.html" class="btn btn-primary" style="text-decoration: none;" title="Xem tất cả các phòng multiplayer đang thi đấu">
-        📺 Sảnh Xem Phòng
+        📺 Sảnh Phòng
       </a>
+      <button id="btn-multi-board" class="btn btn-primary" title="Xem trực tiếp 4 bàn cờ đang đấu theo thời gian thực (Multi-Board Live)">
+        📺 Khán Đài 4 Bàn
+      </button>
       <button id="btn-quick-guide" class="btn btn-gold" title="Xem hướng dẫn nhanh 3 bước">
         💡 Hướng dẫn
       </button>
@@ -212,22 +215,76 @@
         <span id="move-hint-text">Chọn một quân cờ của bạn để xem 8 hướng di chuyển & quy tắc ăn quân.</span>
       </div>
 
+      <!-- Player 2 Chess Strip (Top Clock, Captured Pieces & Material Adv) -->
+      <div id="chess-strip-p2" class="chess-player-strip">
+        <div class="strip-player-meta">
+          <span class="strip-avatar">🔵</span>
+          <div>
+            <span class="strip-name">Player 2 (Xanh)</span>
+            <span id="p2-mini-role" style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.35rem;">· Sapphire Order</span>
+          </div>
+          <div id="captured-by-p2" class="captured-tray" title="Quân Đỏ bị P2 bắt"></div>
+          <span id="material-adv-p2" class="material-diff-badge" style="display: none;">+1</span>
+        </div>
+        <div id="clock-display-p2" class="chess-digital-clock" title="Đồng hồ thi đấu Player 2">05:00</div>
+      </div>
+
       <!-- 9x9 Chess Board Container with Ranks (1-9) & Files (A-I) -->
-      <div class="board-wrapper">
-        <div class="board-files-header">
-          <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
-        </div>
-        <div class="board-middle-row">
-          <div class="board-ranks-side">
-            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+      <div id="board-theme-wrapper" class="theme-emerald">
+        <div class="board-wrapper">
+          <div class="board-files-header">
+            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
           </div>
-          <div id="board-container" class="board-grid"></div>
-          <div class="board-ranks-side">
-            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+          <div class="board-middle-row">
+            <div class="board-ranks-side">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+            <div id="board-container" class="board-grid"></div>
+            <div class="board-ranks-side">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+          </div>
+          <div class="board-files-header">
+            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
           </div>
         </div>
-        <div class="board-files-header">
-          <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
+      </div>
+
+      <!-- Player 1 Chess Strip (Bottom Clock, Captured Pieces & Material Adv) -->
+      <div id="chess-strip-p1" class="chess-player-strip clock-active">
+        <div class="strip-player-meta">
+          <span class="strip-avatar">🔴</span>
+          <div>
+            <span class="strip-name">Player 1 (Đỏ)</span>
+            <span id="p1-mini-role" style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.35rem;">· Ruby Legion</span>
+          </div>
+          <div id="captured-by-p1" class="captured-tray" title="Quân Xanh bị P1 bắt"></div>
+          <span id="material-adv-p1" class="material-diff-badge" style="display: none;">+1</span>
+        </div>
+        <div id="clock-display-p1" class="chess-digital-clock" title="Đồng hồ thi đấu Player 1">05:00</div>
+      </div>
+
+      <!-- Chess Action Toolbar -->
+      <div class="chess-action-bar">
+        <button id="btn-flip-board" class="btn-chess-tool" title="Xoay ngược bàn cờ 180 độ theo góc nhìn đối phương">
+          🔄 Lật bàn cờ
+        </button>
+        <button id="btn-resign" class="btn-chess-tool" style="color: #f87171;" title="Đầu hàng ván cờ">
+          🏳️ Đầu hàng
+        </button>
+        <button id="btn-draw" class="btn-chess-tool" title="Đề nghị hòa ván cờ">
+          🤝 Cầu hòa
+        </button>
+        <button id="btn-open-multi-board" class="btn-chess-tool" style="color: var(--gold); border-color: rgba(245, 158, 11, 0.4);" title="Mở khán đài xem 4 bàn thi đấu trực tiếp có phân trang">
+          📺 Khán Đài 4 Bàn
+        </button>
+        <div style="display: flex; align-items: center; gap: 0.35rem; margin-left: auto;">
+          <label style="font-size: 0.78rem; color: var(--text-muted);" for="board-theme-select">Giao diện cờ:</label>
+          <select id="board-theme-select" class="form-select" style="padding: 0.3rem 0.55rem; font-size: 0.78rem; width: auto;">
+            <option value="theme-emerald" selected>🌿 Xanh Giải Đấu (Chess.com)</option>
+            <option value="theme-wood">🪵 Gỗ Cổ Điển (Lichess)</option>
+            <option value="theme-cyber">🌌 Đêm Cyber (Onyx)</option>
+          </select>
         </div>
       </div>
     </section>
@@ -306,9 +363,10 @@
         <div class="form-group">
           <label class="form-label" for="board-preset-select">Bố cục quân ban đầu</label>
           <select id="board-preset-select" class="form-select">
-            <option value="FRONTLINE">Chiến tuyến đối đầu (15 quân)</option>
-            <option value="DIAGONAL">Đối xứng đường chéo (15 quân)</option>
-            <option value="CUSTOM_DRAFT">🛡️ Tự chọn & Dàn trận (Tối đa 9 quân)</option>
+            <option value="CHESS_9" selected>⚔️ Chuẩn Cờ Vua (9 quân chia đều: 3 Đấm, 3 Lá, 3 Kéo)</option>
+            <option value="FRONTLINE">🛡️ Chiến tuyến đối đầu (15 quân)</option>
+            <option value="DIAGONAL">📐 Đối xứng đường chéo (15 quân)</option>
+            <option value="CUSTOM_DRAFT">🎨 Tự chọn & Dàn trận (Tối đa 9 quân)</option>
           </select>
         </div>
       </div>
@@ -343,10 +401,23 @@
         </div>
       </div>
 
+      <!-- Chess Move Notation Sheet -->
+      <div class="chess-notation-panel" style="margin-bottom: 1rem;">
+        <div class="chess-notation-header">
+          <span>📜 BIÊN BẢN CỜ VUA</span>
+          <span id="notation-total-moves">0 nước đi</span>
+        </div>
+        <div id="chess-notation-list" class="chess-notation-list">
+          <div class="notation-row" style="color: var(--text-muted); font-style: italic; display: block; text-align: center; padding: 0.5rem;">
+            Chưa có nước cờ nào...
+          </div>
+        </div>
+      </div>
+
       <!-- Live Battle Log -->
       <div class="glass-card log-card">
         <div class="log-header">
-          <span>📜 Nhật ký chiến đấu</span>
+          <span>⚔️ Nhật ký chiến đấu</span>
         </div>
         <div id="battle-log" class="battle-log-scroll">
           <div class="log-entry info">Chào mừng đến với OTTv2! Chọn một quân để bắt đầu.</div>
@@ -535,6 +606,43 @@
           </ol>
         </li>
       </ul>
+    </div>
+  </div>
+
+  <!-- Modal: 2x2 Multi-Board Live Spectator (Khán Đài 4 Bàn Trực Tiếp) -->
+  <div id="multi-board-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 960px; max-height: 92vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h2 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          📺 Khán Đài 4 Bàn Trực Tiếp (Live Multi-Board TV)
+        </h2>
+        <button id="close-multi-board-modal" class="close-btn">&times;</button>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Theo dõi đồng thời <strong>tối đa 4 bàn cờ đang diễn ra trực tiếp</strong> như trên Lichess TV / Chess.com. Bấm vào bất kỳ bàn cờ nào để phóng to hoặc vào thi đấu!
+      </p>
+
+      <!-- Multi-Board Controls & Filters -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+        <div class="filter-tabs" id="modal-filter-tabs">
+          <button class="filter-tab active" data-filter="ALL">Tất cả bàn</button>
+          <button class="filter-tab" data-filter="PLAYING">🟢 Đang đấu</button>
+          <button class="filter-tab" data-filter="WAITING">🟡 Chờ người</button>
+        </div>
+        <div id="multi-board-status-tag" style="font-size: 0.82rem; color: var(--gold); font-weight: 700;">
+          ⚡ Đang cập nhật trực tiếp theo thời gian thực
+        </div>
+      </div>
+
+      <!-- 2x2 Grid of Live Chessboards -->
+      <div id="modal-multi-board-grid" class="multi-board-grid-2x2">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+
+      <!-- Pagination Navigation Bar -->
+      <div id="modal-pagination-bar" class="pagination-container">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
     </div>
   </div>
 

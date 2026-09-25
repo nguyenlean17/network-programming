@@ -65,3 +65,10 @@ export const WIN_REASONS = {
   ELIMINATION: 'ELIMINATION',   // Ăn sạch hoàn toàn 1 loại quân
   GOAL_REACHED: 'GOAL_REACHED'  // Đưa quân vào ô đích (A1 hoặc I9)
 };
+
+export const BOARD_PRESETS = {
+  CHESS_9: 'CHESS_9',            // Chuẩn Cờ Vua: 9 quân chia đều (3 Đấm, 3 Lá, 3 Kéo)
+  FRONTLINE: 'FRONTLINE',        // Tiền tuyến đối đầu (15 quân)
+  DIAGONAL: 'DIAGONAL',          // Doanh trại đường chéo (15 quân)
+  CUSTOM_DRAFT: 'CUSTOM_DRAFT'   // Tự chọn & Dàn trận (Tối đa 9 quân)
+};

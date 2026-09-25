@@ -298,6 +298,27 @@ assert.strictEqual(aiPaper, 3, 'AI phải dàn trận 3 quân Lá');
 assert.strictEqual(aiScissors, 3, 'AI phải dàn trận 3 quân Kéo');
 console.log('  ✓ Đội hình AI sinh ngẫu nhiên đủ 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân không trùng lặp và không chặn A1\n');
 
+// -------------------------------------------------------------
+// Test 13: Bố Cục Chuẩn Cờ Vua CHESS_9 (9 quân chia đều: 3 Đấm, 3 Lá, 3 Kéo)
+// -------------------------------------------------------------
+console.log('13. Kiểm tra bố cục chuẩn Cờ Vua CHESS_9 (9 quân chia đều mỗi bên)...');
+const chessBoard = createInitialBoard('CHESS_9');
+const chessCounts = countPlayerPieces(chessBoard);
+
+assert.strictEqual(chessCounts.P1.total, 9, 'P1 phải có đúng 9 quân');
+assert.strictEqual(chessCounts.P2.total, 9, 'P2 phải có đúng 9 quân');
+assert.strictEqual(chessCounts.P1.ROCK, 3, 'P1 có đúng 3 Đấm');
+assert.strictEqual(chessCounts.P1.PAPER, 3, 'P1 có đúng 3 Lá');
+assert.strictEqual(chessCounts.P1.SCISSORS, 3, 'P1 có đúng 3 Kéo');
+assert.strictEqual(chessCounts.P2.ROCK, 3, 'P2 có đúng 3 Đấm');
+assert.strictEqual(chessCounts.P2.PAPER, 3, 'P2 có đúng 3 Lá');
+assert.strictEqual(chessCounts.P2.SCISSORS, 3, 'P2 có đúng 3 Kéo');
+
+// Cứ điểm A1 (0, 0) và I9 (8, 8) không bị quân cờ nào án ngữ ban đầu
+assert.strictEqual(chessBoard[0][0], null, 'Cứ điểm A1 (0, 0) phải thông thoáng cho mục tiêu đột kích');
+assert.strictEqual(chessBoard[8][8], null, 'Cứ điểm I9 (8, 8) phải thông thoáng cho mục tiêu đột kích');
+console.log('  ✓ Bố cục CHESS_9 đạt chuẩn cờ vua: 9 quân chia đều (3 Đấm, 3 Lá, 3 Kéo), 2 cứ điểm thông thoáng 100%\n');
+
 console.log('================================================================');
-console.log('🎉 TẤT CẢ 12/12 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
+console.log('🎉 TẤT CẢ 13/13 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');
 console.log('================================================================\n');

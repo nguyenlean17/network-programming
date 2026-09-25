@@ -23,7 +23,8 @@ import {
   countPlayerPieces,
   checkWinCondition,
   validateMove,
-  posToCoord
+  posToCoord,
+  getValidMovesForPiece
 } from './gameRules.js';
 
 import { BoardRenderer } from './board.js';
@@ -34,7 +35,7 @@ import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 class OttApp {
   constructor() {
     this.gameMode = 'LOCAL'; // 'LOCAL', 'BOT', 'MULTIPLAYER'
-    this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' | 'DIAGONAL' | 'CUSTOM_DRAFT'
+    this.boardPreset = 'CHESS_9'; // 'CHESS_9' (Chuẩn cờ vua 9 quân) | 'FRONTLINE' | 'DIAGONAL' | 'CUSTOM_DRAFT'
     this.goalMode = 'OPPOSITE'; // P1 (row 9) -> A1 (row 1) | P2 (row 1) -> I9 (row 9)
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
@@ -45,6 +46,18 @@ class OttApp {
 
     // AI engine with 3 levels & RAM Transposition Table
     this.ai = new OttAi('hard');
+
+    // Dual Chess Clocks (300s = 5 phút mỗi bên)
+    this.clockP1Seconds = 300;
+    this.clockP2Seconds = 300;
+    this.capturedPiecesP1 = []; // Quân bị P1 ăn
+    this.capturedPiecesP2 = []; // Quân bị P2 ăn
+
+    // Multi-board Live Spectator State (2x2 Grid)
+    this.multiBoardPage = 1;
+    this.multiBoardFilter = 'ALL';
+    this.multiBoardRooms = [];
+    this.multiBoardSimInterval = null;
 
     // Turn Timer (30s countdown)
     this.turnDuration = 30;
@@ -199,7 +212,36 @@ class OttApp {
       victoryModal: document.getElementById('victory-modal'),
       victoryTitle: document.getElementById('victory-title'),
       victoryDesc: document.getElementById('victory-desc'),
-      btnVictoryRestart: document.getElementById('btn-victory-restart')
+      btnVictoryRestart: document.getElementById('btn-victory-restart'),
+
+      // Chess Dual Clocks & Strips
+      chessStripP1: document.getElementById('chess-strip-p1'),
+      chessStripP2: document.getElementById('chess-strip-p2'),
+      clockDisplayP1: document.getElementById('clock-display-p1'),
+      clockDisplayP2: document.getElementById('clock-display-p2'),
+      capturedByP1: document.getElementById('captured-by-p1'),
+      capturedByP2: document.getElementById('captured-by-p2'),
+      materialAdvP1: document.getElementById('material-adv-p1'),
+      materialAdvP2: document.getElementById('material-adv-p2'),
+
+      // Chess Action Toolbar
+      btnFlipBoard: document.getElementById('btn-flip-board'),
+      btnResign: document.getElementById('btn-resign'),
+      btnDraw: document.getElementById('btn-draw'),
+      boardThemeSelect: document.getElementById('board-theme-select'),
+
+      // Chess Move Notation Panel
+      chessNotationList: document.getElementById('chess-notation-list'),
+      notationTotalMoves: document.getElementById('notation-total-moves'),
+
+      // 2x2 Multi-Board Live Spectator Modal
+      btnMultiBoard: document.getElementById('btn-multi-board'),
+      btnOpenMultiBoard: document.getElementById('btn-open-multi-board'),
+      multiBoardModal: document.getElementById('multi-board-modal'),
+      closeMultiBoardModal: document.getElementById('close-multi-board-modal'),
+      modalMultiBoardGrid: document.getElementById('modal-multi-board-grid'),
+      modalPaginationBar: document.getElementById('modal-pagination-bar'),
+      modalFilterTabs: document.getElementById('modal-filter-tabs')
     };
   }
 
@@ -415,6 +457,95 @@ class OttApp {
         this.syncEngine.broadcastGameState(this.getSerializableState(), null);
       }
     });
+
+    // Chess Flip Board
+    if (this.dom.btnFlipBoard) {
+      this.dom.btnFlipBoard.addEventListener('click', () => {
+        const flipped = this.renderer.flipBoard();
+        this.showToast(flipped ? '🔄 Đã xoay góc nhìn sang Player 2 (Xanh)!' : '🔄 Đã xoay góc nhìn sang Player 1 (Đỏ)!', 'info');
+      });
+    }
+
+    // Chess Resign
+    if (this.dom.btnResign) {
+      this.dom.btnResign.addEventListener('click', () => {
+        if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
+        const winner = this.currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
+        const winnerName = winner === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)';
+        if (confirm(`Bạn có chắc chắn muốn ĐẦU HÀNG ván cờ này? ${winnerName} sẽ giành chiến thắng!`)) {
+          this.stopTurnTimer();
+          this.gameStatus = GAME_STATUS.ENDED;
+          this.winnerInfo = { winner, reason: 'RESIGN' };
+          this.renderer.setInteractive(false);
+          this.addLog(`🏳️ <strong>${this.currentTurn === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2'} đã xin đầu hàng!</strong> ${winnerName} giành chiến thắng!`, 'win');
+          this.handleVictory(this.winnerInfo);
+          if (this.gameMode === 'MULTIPLAYER') {
+            this.syncEngine.broadcastGameState(this.getSerializableState(), null);
+          }
+        }
+      });
+    }
+
+    // Chess Offer Draw
+    if (this.dom.btnDraw) {
+      this.dom.btnDraw.addEventListener('click', () => {
+        if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) return;
+        if (this.gameMode === 'BOT') {
+          const p1Count = this.countPieces(PLAYERS.PLAYER_1);
+          const p2Count = this.countPieces(PLAYERS.PLAYER_2);
+          if (Math.abs(p1Count - p2Count) <= 1) {
+            this.stopTurnTimer();
+            this.gameStatus = GAME_STATUS.ENDED;
+            this.winnerInfo = { winner: 'DRAW', reason: 'AGREEMENT' };
+            this.renderer.setInteractive(false);
+            this.addLog(`🤝 <strong>AI Bot chấp thuận hòa cờ!</strong> Hai bên chia điểm cân bằng.`, 'info');
+            this.handleVictory(this.winnerInfo);
+          } else {
+            this.showToast('🤖 AI Bot từ chối hòa vì đang có ưu thế trên bàn cờ!', 'warning');
+          }
+        } else {
+          if (confirm('Đối thủ có đồng ý HÒA CỜ không?')) {
+            this.stopTurnTimer();
+            this.gameStatus = GAME_STATUS.ENDED;
+            this.winnerInfo = { winner: 'DRAW', reason: 'AGREEMENT' };
+            this.renderer.setInteractive(false);
+            this.addLog(`🤝 <strong>Hai đấu thủ đã đồng ý hòa cờ!</strong> Trận đấu kết thúc bất phân thắng bại.`, 'info');
+            this.handleVictory(this.winnerInfo);
+            if (this.gameMode === 'MULTIPLAYER') {
+              this.syncEngine.broadcastGameState(this.getSerializableState(), null);
+            }
+          }
+        }
+      });
+    }
+
+    // Board Theme Selector
+    if (this.dom.boardThemeSelect) {
+      this.dom.boardThemeSelect.addEventListener('change', (e) => {
+        this.renderer.setTheme(e.target.value);
+        this.showToast(`Đã áp dụng giao diện: ${e.target.options[e.target.selectedIndex].text}`, 'success');
+      });
+    }
+
+    // 2x2 Multi-Board Live Spectator Modal
+    const openMultiBoardModal = () => this.openMultiBoardModal();
+    if (this.dom.btnMultiBoard) this.dom.btnMultiBoard.addEventListener('click', openMultiBoardModal);
+    if (this.dom.btnOpenMultiBoard) this.dom.btnOpenMultiBoard.addEventListener('click', openMultiBoardModal);
+    if (this.dom.closeMultiBoardModal) {
+      this.dom.closeMultiBoardModal.addEventListener('click', () => this.closeMultiBoardModal());
+    }
+
+    if (this.dom.modalFilterTabs) {
+      this.dom.modalFilterTabs.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          this.dom.modalFilterTabs.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          this.multiBoardFilter = tab.dataset.filter;
+          this.multiBoardPage = 1;
+          this.renderModalMultiBoard();
+        });
+      });
+    }
   }
 
   // -------------------------------------------------------------
@@ -618,6 +749,24 @@ class OttApp {
     this.moveHistory = [];
     this.winnerInfo = null;
 
+    // Reset Chess Clocks (300s = 5m each)
+    this.clockP1Seconds = 300;
+    this.clockP2Seconds = 300;
+    this.capturedPiecesP1 = [];
+    this.capturedPiecesP2 = [];
+    this.updateCapturedTrays();
+    this.updateClockDisplays();
+
+    // Reset Chess Move Notation Sheet
+    if (this.dom.chessNotationList) {
+      this.dom.chessNotationList.innerHTML = `
+        <div class="notation-row" style="color: var(--text-muted); font-style: italic; display: block; text-align: center; padding: 0.5rem;">
+          Chưa có nước cờ nào...
+        </div>
+      `;
+    }
+    if (this.dom.notationTotalMoves) this.dom.notationTotalMoves.textContent = '0 nước đi';
+
     this.renderer.clearSelection();
     this.renderer.setInteractive(true);
     this.renderer.render(this.board, this.currentTurn, this.lastMove);
@@ -634,6 +783,7 @@ class OttApp {
     this.stopTurnTimer();
     this.timerRemaining = this.turnDuration;
     this.updateTimerDisplay();
+    this.updateClockDisplays();
 
     this.timerInterval = setInterval(() => {
       if (this.gameStatus === GAME_STATUS.ENDED || this.isDraftPhase) {
@@ -642,7 +792,26 @@ class OttApp {
       }
 
       this.timerRemaining--;
+
+      // Decrement player clock
+      if (this.currentTurn === PLAYERS.PLAYER_1) {
+        this.clockP1Seconds = Math.max(0, this.clockP1Seconds - 1);
+        if (this.clockP1Seconds === 0) {
+          this.stopTurnTimer();
+          this.handleFlagFall(PLAYERS.PLAYER_1);
+          return;
+        }
+      } else {
+        this.clockP2Seconds = Math.max(0, this.clockP2Seconds - 1);
+        if (this.clockP2Seconds === 0) {
+          this.stopTurnTimer();
+          this.handleFlagFall(PLAYERS.PLAYER_2);
+          return;
+        }
+      }
+
       this.updateTimerDisplay();
+      this.updateClockDisplays();
 
       if (this.timerRemaining <= 5 && this.timerRemaining > 0) {
         sounds.select(); // Beep warning
@@ -653,6 +822,22 @@ class OttApp {
         this.handleTurnTimeout();
       }
     }, 1000);
+  }
+
+  handleFlagFall(playerWhoRanOutOfTime) {
+    const winner = playerWhoRanOutOfTime === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
+    const winnerName = winner === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)';
+    const loserName = playerWhoRanOutOfTime === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2';
+
+    this.gameStatus = GAME_STATUS.ENDED;
+    this.winnerInfo = { winner, reason: 'TIMEOUT' };
+    this.renderer.setInteractive(false);
+    this.addLog(`⏱️ <strong>${loserName} đã hết thời gian ván cờ (Flag fall)!</strong> ${winnerName} chiến thắng!`, 'win');
+    this.showToast(`${loserName} hết giờ! ${winnerName} thắng!`, 'danger');
+    this.handleVictory(this.winnerInfo);
+    if (this.gameMode === 'MULTIPLAYER') {
+      this.syncEngine.broadcastGameState(this.getSerializableState(), null);
+    }
   }
 
   stopTurnTimer() {
@@ -684,7 +869,7 @@ class OttApp {
   }
 
   handleTurnTimeout() {
-    this.addLog(`⏱️ Hết thời gian 30s! Tự động đổi lượt thi đấu.`, 'warning');
+    this.addLog(`⏱️ Hết thời gian lượt đi 30s! Tự động đổi lượt thi đấu.`, 'warning');
     this.showToast('Hết thời gian lượt đi (30s)!', 'warning');
     sounds.block();
 
@@ -692,6 +877,7 @@ class OttApp {
     this.renderer.clearSelection();
     this.renderer.render(this.board, this.currentTurn, this.lastMove);
     this.updateTurnDisplay();
+    this.updateClockDisplays();
     this.startTurnTimer();
 
     if (this.gameMode === 'BOT' && this.currentTurn === PLAYERS.PLAYER_2) {
@@ -709,6 +895,19 @@ class OttApp {
 
     this.lastMove = { from, to, player: piece.player, pieceType: piece.type };
     this.moveHistory.push(this.lastMove);
+
+    // Track captured pieces for Chess cemetery tray
+    if (isCapture && capturedPiece) {
+      if (piece.player === PLAYERS.PLAYER_1) {
+        this.capturedPiecesP1.push(capturedPiece);
+      } else {
+        this.capturedPiecesP2.push(capturedPiece);
+      }
+      this.updateCapturedTrays();
+    }
+
+    // Append to Algebraic Chess Notation sheet
+    this.appendMoveNotation(moveData, this.moveHistory.length);
 
     // Add battle log
     const playerText = piece.player === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2';
@@ -853,7 +1052,7 @@ class OttApp {
     this.dom.p1ScissorsCount.textContent = p1[PIECE_TYPES.SCISSORS];
     this.dom.p1TotalCount.textContent = p1.total;
 
-    const p1Max = this.boardPreset === 'CUSTOM_DRAFT' ? 9 : 15;
+    const p1Max = (this.boardPreset === 'CHESS_9' || this.boardPreset === 'CUSTOM_DRAFT') ? 9 : 15;
     const p1Pct = Math.min(100, Math.round((p1.total / p1Max) * 100));
     if (this.dom.p1ArmyBar) this.dom.p1ArmyBar.style.width = `${p1Pct}%`;
     if (this.dom.p1MeterLabel) this.dom.p1MeterLabel.innerHTML = `<strong>${p1.total}</strong> / ${p1Max} quân (${p1Pct}%)`;
@@ -881,7 +1080,7 @@ class OttApp {
     this.dom.p2ScissorsCount.textContent = p2[PIECE_TYPES.SCISSORS];
     this.dom.p2TotalCount.textContent = p2.total;
 
-    const p2Max = this.boardPreset === 'CUSTOM_DRAFT' ? 9 : 15;
+    const p2Max = (this.boardPreset === 'CHESS_9' || this.boardPreset === 'CUSTOM_DRAFT') ? 9 : 15;
     const p2Pct = Math.min(100, Math.round((p2.total / p2Max) * 100));
     if (this.dom.p2ArmyBar) this.dom.p2ArmyBar.style.width = `${p2Pct}%`;
     if (this.dom.p2MeterLabel) this.dom.p2MeterLabel.innerHTML = `<strong>${p2.total}</strong> / ${p2Max} quân (${p2Pct}%)`;
@@ -1139,6 +1338,494 @@ class OttApp {
     if (this.dom.presenceSpecs) {
       const count = presence.spectators ? presence.spectators.length : 0;
       this.dom.presenceSpecs.textContent = `👁️ Khán giả: ${count}`;
+    }
+  }
+
+  countPieces(player) {
+    if (!this.board) return 0;
+    const counts = countPlayerPieces(this.board);
+    return counts[player]?.total || 0;
+  }
+
+  formatClockTime(totalSeconds) {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  updateClockDisplays() {
+    const p1Str = this.formatClockTime(this.clockP1Seconds);
+    const p2Str = this.formatClockTime(this.clockP2Seconds);
+
+    if (this.dom.clockDisplayP1) {
+      this.dom.clockDisplayP1.textContent = p1Str;
+      this.dom.clockDisplayP1.classList.toggle('clock-warning', this.clockP1Seconds <= 60 && this.clockP1Seconds > 20);
+      this.dom.clockDisplayP1.classList.toggle('clock-danger', this.clockP1Seconds <= 20);
+    }
+    if (this.dom.clockDisplayP2) {
+      this.dom.clockDisplayP2.textContent = p2Str;
+      this.dom.clockDisplayP2.classList.toggle('clock-warning', this.clockP2Seconds <= 60 && this.clockP2Seconds > 20);
+      this.dom.clockDisplayP2.classList.toggle('clock-danger', this.clockP2Seconds <= 20);
+    }
+
+    if (this.dom.chessStripP1 && this.dom.chessStripP2) {
+      if (this.gameStatus === GAME_STATUS.PLAYING) {
+        this.dom.chessStripP1.classList.toggle('clock-active', this.currentTurn === PLAYERS.PLAYER_1);
+        this.dom.chessStripP2.classList.toggle('clock-active', this.currentTurn === PLAYERS.PLAYER_2);
+      } else {
+        this.dom.chessStripP1.classList.remove('clock-active');
+        this.dom.chessStripP2.classList.remove('clock-active');
+      }
+    }
+  }
+
+  updateCapturedTrays() {
+    if (this.dom.capturedByP1) {
+      this.dom.capturedByP1.innerHTML = this.capturedPiecesP1
+        .map(p => `<span class="captured-icon" title="${PIECE_NAMES_VI[p.type] || p.type}">${PIECE_SYMBOLS[p.type] || ''}</span>`)
+        .join('');
+    }
+    if (this.dom.capturedByP2) {
+      this.dom.capturedByP2.innerHTML = this.capturedPiecesP2
+        .map(p => `<span class="captured-icon" title="${PIECE_NAMES_VI[p.type] || p.type}">${PIECE_SYMBOLS[p.type] || ''}</span>`)
+        .join('');
+    }
+
+    const diff = (this.capturedPiecesP1?.length || 0) - (this.capturedPiecesP2?.length || 0);
+    if (this.dom.materialAdvP1) {
+      if (diff > 0) {
+        this.dom.materialAdvP1.textContent = `+${diff}`;
+        this.dom.materialAdvP1.style.display = 'inline-block';
+      } else {
+        this.dom.materialAdvP1.style.display = 'none';
+      }
+    }
+    if (this.dom.materialAdvP2) {
+      if (diff < 0) {
+        this.dom.materialAdvP2.textContent = `+${Math.abs(diff)}`;
+        this.dom.materialAdvP2.style.display = 'inline-block';
+      } else {
+        this.dom.materialAdvP2.style.display = 'none';
+      }
+    }
+  }
+
+  appendMoveNotation(moveData, totalMoves) {
+    if (!this.dom.chessNotationList) return;
+    const { piece, from, to, isCapture } = moveData;
+    const pieceIcon = PIECE_SYMBOLS[piece.type] || '';
+    const captureMark = isCapture ? ' ⚔️' : '';
+    const moveStr = `${pieceIcon} ${from}→${to}${captureMark}`;
+
+    if (this.dom.notationTotalMoves) {
+      this.dom.notationTotalMoves.textContent = `${totalMoves} nước`;
+    }
+
+    // Remove previous last-move highlight
+    const prevHighlight = this.dom.chessNotationList.querySelector('.last-move-row');
+    if (prevHighlight) prevHighlight.classList.remove('last-move-row');
+
+    const turnNum = Math.ceil(totalMoves / 2) || 1;
+    if (piece.player === PLAYERS.PLAYER_1) {
+      const row = document.createElement('div');
+      row.className = 'notation-row last-move-row';
+      row.id = `notation-row-${turnNum}`;
+      row.innerHTML = `
+        <span class="notation-turn-num">${turnNum}.</span>
+        <span class="notation-move-p1">${moveStr}</span>
+        <span class="notation-move-p2">-</span>
+      `;
+      this.dom.chessNotationList.appendChild(row);
+    } else {
+      let row = document.getElementById(`notation-row-${turnNum}`);
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'notation-row last-move-row';
+        row.id = `notation-row-${turnNum}`;
+        row.innerHTML = `
+          <span class="notation-turn-num">${turnNum}.</span>
+          <span class="notation-move-p1">-</span>
+          <span class="notation-move-p2">${moveStr}</span>
+        `;
+        this.dom.chessNotationList.appendChild(row);
+      } else {
+        row.classList.add('last-move-row');
+        const p2Col = row.querySelector('.notation-move-p2');
+        if (p2Col) p2Col.textContent = moveStr;
+      }
+    }
+    this.dom.chessNotationList.scrollTop = this.dom.chessNotationList.scrollHeight;
+  }
+
+  initMultiBoardData() {
+    this.multiBoardRooms = [
+      {
+        id: 'OTT-GRAND-MASTER',
+        title: 'Đại Chiến Cao Thủ OTT 🏆',
+        status: 'PLAYING',
+        p1Name: 'Nguyễn Văn A (Elo 1850)',
+        p2Name: 'Trần Thị B (Elo 1820)',
+        hasP1: true,
+        hasP2: true,
+        spectators: 14,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 18,
+        clockP1: '03:45',
+        clockP2: '04:12',
+        lastMove: { from: 'E8', to: 'E7' },
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-SPEED-CHESS',
+        title: 'Siêu Tốc Blitz 3m ⚡',
+        status: 'PLAYING',
+        p1Name: 'SpeedDemon',
+        p2Name: 'Vua Co Tuong',
+        hasP1: true,
+        hasP2: true,
+        spectators: 8,
+        turn: PLAYERS.PLAYER_2,
+        moveCount: 12,
+        clockP1: '01:50',
+        clockP2: '02:15',
+        lastMove: { from: 'C2', to: 'D3' },
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-BLITZ-ARENA',
+        title: 'Đấu Trường Sinh Tử ⚔️',
+        status: 'PLAYING',
+        p1Name: 'KnightRider',
+        p2Name: 'AlphaBot Hard 🤖',
+        hasP1: true,
+        hasP2: true,
+        spectators: 21,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 9,
+        clockP1: '04:10',
+        clockP2: '04:35',
+        lastMove: { from: 'B8', to: 'B7' },
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-ROOKIE-CUP',
+        title: 'Giải Đấu Tập Sự Mở Rộng 🎓',
+        status: 'WAITING',
+        p1Name: 'Tập Chơi OTT',
+        p2Name: 'Đang đợi...',
+        hasP1: true,
+        hasP2: false,
+        spectators: 3,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 0,
+        clockP1: '05:00',
+        clockP2: '05:00',
+        lastMove: null,
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-CHAMPION-LEAGUE',
+        title: 'Chung Kết Cúp Hoàng Gia 👑',
+        status: 'PLAYING',
+        p1Name: 'DragonSlayer',
+        p2Name: 'QueenGambit',
+        hasP1: true,
+        hasP2: true,
+        spectators: 37,
+        turn: PLAYERS.PLAYER_2,
+        moveCount: 31,
+        clockP1: '00:55',
+        clockP2: '01:20',
+        lastMove: { from: 'F2', to: 'F3' },
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-TACTICS-ZONE',
+        title: 'CLB Cờ Đột Kích Cứ Điểm 🎯',
+        status: 'PLAYING',
+        p1Name: 'StealthMaster',
+        p2Name: 'FortressGuard',
+        hasP1: true,
+        hasP2: true,
+        spectators: 11,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 15,
+        clockP1: '03:10',
+        clockP2: '02:50',
+        lastMove: { from: 'A8', to: 'A7' },
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-LOBBY-VIP',
+        title: 'Phòng VIP Giao Lưu Quốc Tế 🌐',
+        status: 'WAITING',
+        p1Name: 'Alex_Master',
+        p2Name: 'Đang đợi...',
+        hasP1: true,
+        hasP2: false,
+        spectators: 1,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 0,
+        clockP1: '05:00',
+        clockP2: '05:00',
+        lastMove: null,
+        board: createInitialBoard('CHESS_9')
+      },
+      {
+        id: 'OTT-ENDGAME-MASTER',
+        title: 'Thế Cờ Tàn Cuộc Đỉnh Cao 🔥',
+        status: 'PLAYING',
+        p1Name: 'Grandmaster_X',
+        p2Name: 'AlphaBot Hard 🤖',
+        hasP1: true,
+        hasP2: true,
+        spectators: 9,
+        turn: PLAYERS.PLAYER_1,
+        moveCount: 26,
+        clockP1: '02:05',
+        clockP2: '02:30',
+        lastMove: { from: 'G2', to: 'G3' },
+        board: createInitialBoard('CHESS_9')
+      }
+    ];
+  }
+
+  openMultiBoardModal() {
+    if (!this.dom.multiBoardModal) return;
+    if (this.multiBoardRooms.length === 0) {
+      this.initMultiBoardData();
+    }
+    this.dom.multiBoardModal.classList.add('open');
+    this.renderModalMultiBoard();
+    this.startMultiBoardSimulation();
+  }
+
+  closeMultiBoardModal() {
+    if (!this.dom.multiBoardModal) return;
+    this.dom.multiBoardModal.classList.remove('open');
+    this.stopMultiBoardSimulation();
+  }
+
+  renderModalMultiBoard() {
+    if (!this.dom.modalMultiBoardGrid) return;
+    const PAGE_SIZE = 4;
+
+    const filtered = this.multiBoardRooms.filter(room => {
+      if (this.multiBoardFilter === 'PLAYING') return room.status === 'PLAYING';
+      if (this.multiBoardFilter === 'WAITING') return room.status === 'WAITING' || !room.hasP2;
+      return true;
+    });
+
+    const totalRooms = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalRooms / PAGE_SIZE));
+    if (this.multiBoardPage > totalPages) this.multiBoardPage = totalPages;
+
+    if (totalRooms === 0) {
+      this.dom.modalMultiBoardGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
+          <p>Không có bàn cờ nào phù hợp bộ lọc hiện tại.</p>
+        </div>
+      `;
+      if (this.dom.modalPaginationBar) this.dom.modalPaginationBar.innerHTML = '';
+      return;
+    }
+
+    const startIndex = (this.multiBoardPage - 1) * PAGE_SIZE;
+    const currentRooms = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+
+    this.dom.modalMultiBoardGrid.innerHTML = '';
+
+    currentRooms.forEach(room => {
+      const card = document.createElement('div');
+      card.className = 'mini-board-card';
+      card.id = `modal-card-${room.id}`;
+
+      const isPlaying = room.status === 'PLAYING';
+      const statusBadgeClass = isPlaying ? 'status-playing' : (room.status === 'ENDED' ? 'status-ended' : 'status-waiting');
+      const statusText = isPlaying ? '🟢 ĐANG ĐẤU' : (room.status === 'ENDED' ? '⚪ KẾT THÚC' : '🟡 CHỜ ĐỐI THỦ');
+
+      const turnText = room.turn === PLAYERS.PLAYER_1
+        ? '<span style="color: #f87171; font-weight:700;">🔴 Lượt P1</span>'
+        : '<span style="color: #60a5fa; font-weight:700;">🔵 Lượt P2</span>';
+
+      card.innerHTML = `
+        <div class="mini-board-header">
+          <span class="mini-room-code">🎲 ${room.id}</span>
+          <span class="room-status-badge ${statusBadgeClass}">${statusText}</span>
+        </div>
+        <div style="font-size: 0.85rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${room.title || 'Ván đấu OTTv2'}
+        </div>
+        <div class="mini-matchup-row">
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <span>🔴</span>
+            <strong style="color: #fca5a5;">${room.p1Name || 'P1'}</strong>
+            <small style="color: var(--text-muted); font-family: monospace;">(${room.clockP1 || '05:00'})</small>
+          </div>
+          <span style="font-weight: 900; color: var(--gold); font-size: 0.75rem;">VS</span>
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <small style="color: var(--text-muted); font-family: monospace;">(${room.clockP2 || '05:00'})</small>
+            <strong style="color: #93c5fd;">${room.p2Name || 'P2'}</strong>
+            <span>🔵</span>
+          </div>
+        </div>
+        <div class="mini-board-wrapper" id="modal-mini-container-${room.id}"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); padding: 0 0.2rem;">
+          <div>${turnText}</div>
+          <div>Nước: <strong style="color: #fff;">${room.moveCount || 0}</strong> · 👁️ ${room.spectators || 0}</div>
+        </div>
+        <div class="mini-footer-actions">
+          <a href="index.html?room=${room.id}&role=SPECTATOR" class="btn-chess-tool" style="flex:1; justify-content:center; text-decoration:none;" title="Xem toàn màn hình">
+            👁️ Xem Bàn Này
+          </a>
+          ${!room.hasP2 ? `
+            <a href="index.html?room=${room.id}&role=P2" class="btn-chess-tool" style="flex:1; justify-content:center; text-decoration:none; border-color: rgba(239, 68, 68, 0.5); color: #fca5a5;" title="Vào thi đấu P2">
+              ⚔️ Vào Đấu (P2)
+            </a>
+          ` : `
+            <a href="rooms.html" class="btn-chess-tool" style="flex:1; justify-content:center; text-decoration:none; border-color: rgba(16, 185, 129, 0.5); color: #34d399;" title="Mở sảnh đấu lớn">
+              🏛️ Sảnh Lớn
+            </a>
+          `}
+        </div>
+      `;
+
+      this.dom.modalMultiBoardGrid.appendChild(card);
+
+      const target = document.getElementById(`modal-mini-container-${room.id}`);
+      if (target) {
+        BoardRenderer.renderMiniBoard(target, room.board, {
+          turn: room.turn,
+          lastMove: room.lastMove
+        });
+      }
+    });
+
+    this.renderModalPagination(totalPages, totalRooms, startIndex, currentRooms.length);
+  }
+
+  renderModalPagination(totalPages, totalRooms, startIndex, currentCount) {
+    if (!this.dom.modalPaginationBar) return;
+    if (totalPages <= 1 && totalRooms <= 4) {
+      this.dom.modalPaginationBar.innerHTML = `
+        <span class="page-info-text">Hiển thị <strong>${totalRooms}</strong> bàn cờ</span>
+      `;
+      return;
+    }
+
+    this.dom.modalPaginationBar.innerHTML = '';
+
+    const btnFirst = document.createElement('button');
+    btnFirst.className = 'page-btn';
+    btnFirst.innerHTML = '⏮️ Đầu';
+    btnFirst.disabled = (this.multiBoardPage === 1);
+    btnFirst.onclick = () => { this.multiBoardPage = 1; this.renderModalMultiBoard(); };
+    this.dom.modalPaginationBar.appendChild(btnFirst);
+
+    const btnPrev = document.createElement('button');
+    btnPrev.className = 'page-btn';
+    btnPrev.innerHTML = '◀️ Trước';
+    btnPrev.disabled = (this.multiBoardPage === 1);
+    btnPrev.onclick = () => { if (this.multiBoardPage > 1) { this.multiBoardPage--; this.renderModalMultiBoard(); } };
+    this.dom.modalPaginationBar.appendChild(btnPrev);
+
+    for (let p = 1; p <= totalPages; p++) {
+      const btnPage = document.createElement('button');
+      btnPage.className = `page-btn ${p === this.multiBoardPage ? 'active' : ''}`;
+      btnPage.textContent = p;
+      btnPage.onclick = () => { this.multiBoardPage = p; this.renderModalMultiBoard(); };
+      this.dom.modalPaginationBar.appendChild(btnPage);
+    }
+
+    const btnNext = document.createElement('button');
+    btnNext.className = 'page-btn';
+    btnNext.innerHTML = 'Sau ▶️';
+    btnNext.disabled = (this.multiBoardPage === totalPages);
+    btnNext.onclick = () => { if (this.multiBoardPage < totalPages) { this.multiBoardPage++; this.renderModalMultiBoard(); } };
+    this.dom.modalPaginationBar.appendChild(btnNext);
+
+    const btnLast = document.createElement('button');
+    btnLast.className = 'page-btn';
+    btnLast.innerHTML = 'Cuối ⏭️';
+    btnLast.disabled = (this.multiBoardPage === totalPages);
+    btnLast.onclick = () => { this.multiBoardPage = totalPages; this.renderModalMultiBoard(); };
+    this.dom.modalPaginationBar.appendChild(btnLast);
+
+    const infoSpan = document.createElement('span');
+    infoSpan.className = 'page-info-text';
+    infoSpan.innerHTML = `Bàn ${startIndex + 1} - ${startIndex + currentCount} / Tổng ${totalRooms} (Trang ${this.multiBoardPage}/${totalPages})`;
+    this.dom.modalPaginationBar.appendChild(infoSpan);
+  }
+
+  startMultiBoardSimulation() {
+    this.stopMultiBoardSimulation();
+    this.multiBoardSimInterval = setInterval(() => {
+      if (!this.dom.multiBoardModal?.classList.contains('open')) return;
+
+      const playingRooms = this.multiBoardRooms.filter(r => r.status === 'PLAYING');
+      if (playingRooms.length === 0) return;
+
+      const room = playingRooms[Math.floor(Math.random() * playingRooms.length)];
+      if (!room.board) return;
+
+      const currentTurn = room.turn;
+      const candidatePieces = [];
+
+      for (let y = 0; y < 9; y++) {
+        for (let x = 0; x < 9; x++) {
+          const piece = room.board[y][x];
+          if (piece && piece.player === currentTurn) {
+            const validMoves = getValidMovesForPiece(room.board, x, y, currentTurn, 'OPPOSITE');
+            if (validMoves.length > 0) {
+              candidatePieces.push({ x, y, piece, validMoves });
+            }
+          }
+        }
+      }
+
+      if (candidatePieces.length > 0) {
+        const chosen = candidatePieces[Math.floor(Math.random() * candidatePieces.length)];
+        const move = chosen.validMoves[Math.floor(Math.random() * chosen.validMoves.length)];
+
+        // Move piece
+        room.board[chosen.y][chosen.x] = null;
+        room.board[move.y][move.x] = chosen.piece;
+        room.lastMove = { from: move.from, to: move.to };
+        room.moveCount = (room.moveCount || 0) + 1;
+        room.turn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
+
+        const win = checkWinCondition(room.board, room.lastMove, 'OPPOSITE');
+        if (win.hasWinner) {
+          room.status = 'ENDED';
+          room.title += ` 🏆 ${win.winner === 'P1' ? 'P1 Thắng!' : 'P2 Thắng!'}`;
+          setTimeout(() => {
+            room.board = createInitialBoard('CHESS_9');
+            room.status = 'PLAYING';
+            room.moveCount = 0;
+            room.title = room.title.replace(/ 🏆.*/, '');
+            if (this.dom.multiBoardModal?.classList.contains('open')) {
+              this.renderModalMultiBoard();
+            }
+          }, 8000);
+        }
+
+        const target = document.getElementById(`modal-mini-container-${room.id}`);
+        if (target) {
+          BoardRenderer.renderMiniBoard(target, room.board, {
+            turn: room.turn,
+            lastMove: room.lastMove
+          });
+        }
+      }
+    }, 2400);
+  }
+
+  stopMultiBoardSimulation() {
+    if (this.multiBoardSimInterval) {
+      clearInterval(this.multiBoardSimInterval);
+      this.multiBoardSimInterval = null;
     }
   }
 

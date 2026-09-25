@@ -1458,8 +1458,474 @@ body {
   margin-bottom: 0.25rem;
 }
 
-.guide-step-content p {
   font-size: 0.82rem;
   color: var(--text-muted);
   line-height: 1.45;
+}
+
+/* =============================================================
+   CHESS THEMES (Chess.com Emerald / Lichess Wood / Cyber Onyx)
+   ============================================================= */
+.theme-emerald .board-grid {
+  background: #272522;
+  border: 8px solid #312e2b;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.65), 0 0 0 1px #45413c;
+  gap: 0;
+  padding: 0;
+  border-radius: 6px;
+}
+.theme-emerald .board-cell {
+  border-radius: 0;
+}
+.theme-emerald .cell-light {
+  background: #eeeed2;
+}
+.theme-emerald .cell-dark {
+  background: #769656;
+}
+.theme-emerald .coord-rank,
+.theme-emerald .coord-file {
+  font-weight: 800;
+  font-size: 0.62rem;
+}
+.theme-emerald .cell-light .coord-rank,
+.theme-emerald .cell-light .coord-file {
+  color: #769656;
+}
+.theme-emerald .cell-dark .coord-rank,
+.theme-emerald .cell-dark .coord-file {
+  color: #eeeed2;
+}
+
+.theme-wood .board-grid {
+  background: #3e2714;
+  border: 8px solid #503118;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 0, 0, 0.5);
+  gap: 0;
+  padding: 0;
+  border-radius: 6px;
+}
+.theme-wood .board-cell {
+  border-radius: 0;
+}
+.theme-wood .cell-light {
+  background: #f0d9b5;
+}
+.theme-wood .cell-dark {
+  background: #b58863;
+}
+.theme-wood .cell-light .coord-rank,
+.theme-wood .cell-light .coord-file {
+  color: #b58863;
+}
+.theme-wood .cell-dark .coord-rank,
+.theme-wood .cell-dark .coord-file {
+  color: #f0d9b5;
+}
+
+.theme-cyber .board-grid {
+  background: rgba(10, 15, 26, 0.95);
+  border: 4px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(59, 130, 246, 0.25);
+  gap: 3px;
+  padding: 4px;
+  border-radius: 12px;
+}
+.theme-cyber .cell-light {
+  background: rgba(30, 41, 65, 0.5);
+}
+.theme-cyber .cell-dark {
+  background: rgba(18, 25, 42, 0.75);
+}
+.theme-cyber .coord-rank,
+.theme-cyber .coord-file {
+  color: rgba(148, 163, 184, 0.6);
+}
+
+/* Rank & File Coordinates Inside Corner Cells */
+.coord-rank {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.coord-file {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* =============================================================
+   CHESS DUAL DIGITAL CLOCKS & PLAYER STRIPS
+   ============================================================= */
+.chess-player-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  margin: 0.4rem 0;
+  transition: all 0.25s ease;
+}
+
+.chess-player-strip.clock-active {
+  border-color: rgba(52, 211, 153, 0.7);
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.25);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.strip-player-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.strip-avatar {
+  font-size: 1.3rem;
+}
+
+.strip-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.captured-tray {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.5rem;
+  min-height: 22px;
+}
+
+.captured-icon {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.material-diff-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(245, 158, 11, 0.2);
+  color: #facc15;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  margin-left: 0.3rem;
+}
+
+.chess-digital-clock {
+  font-family: 'Courier New', Courier, monospace, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  background: #000;
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.chess-player-strip.clock-active .chess-digital-clock {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow: inset 0 0 8px rgba(52, 211, 153, 0.3);
+}
+
+.chess-digital-clock.clock-warning {
+  color: #facc15 !important;
+  border-color: #facc15 !important;
+}
+
+.chess-digital-clock.clock-danger {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  animation: clock-pulse 1s infinite alternate;
+}
+
+@keyframes clock-pulse {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0.65; transform: scale(1.05); }
+}
+
+/* Chess Action Toolbar */
+.chess-action-bar {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0;
+  justify-content: flex-start;
+}
+
+.btn-chess-tool {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-chess-tool:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Algebraic Move Notation Sheet */
+.chess-notation-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.chess-notation-header {
+  padding: 0.5rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.chess-notation-list {
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 0.82rem;
+  font-family: monospace;
+}
+
+.notation-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  align-items: center;
+}
+
+.notation-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notation-row.last-move-row {
+  background: rgba(59, 130, 246, 0.15);
+  border-left: 3px solid #60a5fa;
+}
+
+.notation-turn-num {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.notation-move-p1 {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.notation-move-p2 {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+/* =============================================================
+   2x2 MULTI-BOARD LIVE SPECTATOR GRID & PAGINATION
+   ============================================================= */
+.multi-board-grid-2x2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 900px) {
+  .multi-board-grid-2x2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mini-board-card {
+  background: rgba(24, 32, 47, 0.85);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.mini-board-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.mini-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mini-room-code {
+  font-family: monospace;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mini-matchup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+}
+
+.mini-board-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.35rem 0;
+}
+
+.mini-board-9x9 {
+  display: grid;
+  grid-template-columns: repeat(9, 26px);
+  grid-template-rows: repeat(9, 26px);
+  gap: 1px;
+  background: #272522;
+  border: 3px solid #3b3733;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.mini-cell {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  position: relative;
+  user-select: none;
+}
+
+.mini-cell.mini-light {
+  background: #eeeed2;
+}
+
+.mini-cell.mini-dark {
+  background: #769656;
+}
+
+.mini-cell.mini-goal {
+  outline: 1.5px dashed var(--gold);
+}
+
+.mini-cell.mini-last-move {
+  background: rgba(99, 102, 241, 0.75) !important;
+}
+
+.mini-piece {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.mini-piece-p1 {
+  filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.8));
+}
+
+.mini-piece-p2 {
+  filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.8));
+}
+
+.mini-footer-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Pagination Controls */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
+}
+
+.page-btn {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.page-btn.active {
+  background: var(--p1-gradient);
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-info-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0.5rem;
 }

@@ -36,6 +36,8 @@ export class BoardRenderer {
     this.currentTurn = PLAYERS.PLAYER_1;
     this.interactive = true;
     this.localPlayerRole = null; // null = can move both, 'P1' or 'P2' = locked role
+    this.isFlipped = false;
+    this.theme = 'theme-emerald'; // 'theme-emerald' | 'theme-wood' | 'theme-cyber'
   }
 
   setInteractive(flag) {
@@ -44,6 +46,25 @@ export class BoardRenderer {
 
   setLocalRole(role) {
     this.localPlayerRole = role;
+  }
+
+  setTheme(theme) {
+    this.theme = theme;
+    const parent = this.container.parentElement || this.container;
+    parent.classList.remove('theme-emerald', 'theme-wood', 'theme-cyber');
+    parent.classList.add(theme);
+    try {
+      localStorage.setItem('ott_chess_theme', theme);
+    } catch (_) {}
+  }
+
+  flipBoard() {
+    this.isFlipped = !this.isFlipped;
+    this.initBoard();
+    if (this.currentBoard) {
+      this.render(this.currentBoard, this.currentTurn, this.lastMove);
+    }
+    return this.isFlipped;
   }
 
   setPlacementMode(active, callback = null, validMinY = 5, validMaxY = 8) {
@@ -66,14 +87,29 @@ export class BoardRenderer {
   }
 
   /**
-   * Initializes the 9x9 board DOM structure with coordinate headers
+   * Initializes the 9x9 board DOM structure with chess rank & file coordinate headers
    */
   initBoard() {
     this.container.innerHTML = '';
     this.container.className = 'board-grid';
 
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      for (let c = 0; c < BOARD_SIZE; c++) {
+    // Apply theme to wrapper
+    const parent = this.container.parentElement || this.container;
+    parent.classList.remove('theme-emerald', 'theme-wood', 'theme-cyber');
+    parent.classList.add(this.theme);
+
+    const rowIndices = this.isFlipped
+      ? Array.from({ length: BOARD_SIZE }, (_, i) => BOARD_SIZE - 1 - i)
+      : Array.from({ length: BOARD_SIZE }, (_, i) => i);
+
+    const colIndices = this.isFlipped
+      ? Array.from({ length: BOARD_SIZE }, (_, i) => BOARD_SIZE - 1 - i)
+      : Array.from({ length: BOARD_SIZE }, (_, i) => i);
+
+    for (let rIdx = 0; rIdx < BOARD_SIZE; rIdx++) {
+      const r = rowIndices[rIdx];
+      for (let cIdx = 0; cIdx < BOARD_SIZE; cIdx++) {
+        const c = colIndices[cIdx];
         const coord = posToCoord(c, r);
         const cell = document.createElement('div');
         cell.className = 'board-cell';
@@ -97,11 +133,21 @@ export class BoardRenderer {
           cell.appendChild(goalBadge);
         }
 
-        // Cell coordinate label (e.g. A1, B2)
-        const label = document.createElement('span');
-        label.className = 'coord-label';
-        label.textContent = coord;
-        cell.appendChild(label);
+        // Rank number indicator on leftmost visual column (cIdx === 0)
+        if (cIdx === 0) {
+          const rankLabel = document.createElement('span');
+          rankLabel.className = 'coord-rank';
+          rankLabel.textContent = (r + 1).toString();
+          cell.appendChild(rankLabel);
+        }
+
+        // File letter indicator on bottommost visual row (rIdx === BOARD_SIZE - 1)
+        if (rIdx === BOARD_SIZE - 1) {
+          const fileLabel = document.createElement('span');
+          fileLabel.className = 'coord-file';
+          fileLabel.textContent = COLUMNS[c];
+          cell.appendChild(fileLabel);
+        }
 
         // Click and Hover listeners
         cell.addEventListener('click', (e) => this.handleCellClick(c, r, coord, e));
@@ -111,6 +157,45 @@ export class BoardRenderer {
         this.container.appendChild(cell);
       }
     }
+  }
+
+  /**
+   * Static helper to render a compact 9x9 chessboard for multi-board spectator view
+   */
+  static renderMiniBoard(container, board, options = {}) {
+    if (!container) return;
+    container.innerHTML = '';
+    const miniGrid = document.createElement('div');
+    miniGrid.className = 'mini-board-9x9';
+    const lastMove = options.lastMove || null;
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const coord = posToCoord(c, r);
+        const cell = document.createElement('div');
+        cell.className = 'mini-cell ' + ((r + c) % 2 === 0 ? 'mini-light' : 'mini-dark');
+
+        if (GOAL_CELLS.includes(coord)) {
+          cell.classList.add('mini-goal');
+          cell.title = `Cứ điểm: ${coord}`;
+        }
+
+        if (lastMove && (lastMove.from === coord || lastMove.to === coord)) {
+          cell.classList.add('mini-last-move');
+        }
+
+        const piece = board ? board[r][c] : null;
+        if (piece) {
+          const pieceEl = document.createElement('span');
+          pieceEl.className = `mini-piece mini-piece-${piece.player.toLowerCase()}`;
+          pieceEl.textContent = PIECE_SYMBOLS[piece.type] || '♟';
+          cell.appendChild(pieceEl);
+        }
+
+        miniGrid.appendChild(cell);
+      }
+    }
+    container.appendChild(miniGrid);
   }
 
   handleCellHover(x, y, coord) {
