@@ -26,6 +26,7 @@ import {
 } from './gameRules.js';
 
 import { BoardRenderer } from './board.js';
+import { RenderSyncEngine } from './renderSync.js';
 import { SupabaseSyncEngine } from './supabaseSync.js';
 import { PlayhtmlSyncEngine } from './playhtmlSync.js';
 
@@ -61,13 +62,24 @@ class OttApp {
     // Ping RTT monitor
     this.pingInterval = null;
 
+    // Internet WebSocket Server Multiplayer sync (Render.com / Local Node Server)
+    this.renderSync = new RenderSyncEngine({
+      onRemoteUpdate: (data) => this.handleRemoteUpdate(data),
+      onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
+      onRoomJoined: (roomId, role, roomName) => this.handleRoomJoined(roomId, role, roomName),
+      onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence)
+    });
+
     // Supabase Realtime Serverless Multiplayer sync
-    this.syncEngine = new SupabaseSyncEngine({
+    this.supabaseSync = new SupabaseSyncEngine({
       onRemoteUpdate: (data) => this.handleRemoteUpdate(data),
       onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
       onRoomJoined: (roomId, role) => this.handleRoomJoined(roomId, role),
       onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence)
     });
+
+    // Active sync engine defaults to RenderSyncEngine (WebSocket Internet)
+    this.syncEngine = this.renderSync;
 
     // Elements
     this.dom = {};

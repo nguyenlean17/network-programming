@@ -21,7 +21,18 @@ const roomManager = new RoomManager();
 
 const PORT = process.env.PORT || 3000;
 
+// Body parser
 app.use(express.json());
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // Serve static frontend files
 app.use(express.static(rootDir));
 
@@ -35,7 +46,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Active rooms list endpoint (Lấy danh sách tất cả các phòng đang chơi)
+// Active rooms list endpoint
 app.get('/api/rooms', (req, res) => {
   res.json({
     status: 'ok',
@@ -45,23 +56,20 @@ app.get('/api/rooms', (req, res) => {
   });
 });
 
-// Create new room endpoint
+// Create room endpoint
 app.post('/api/rooms', (req, res) => {
-  const { roomId, title, preset, goalMode } = req.body || {};
-  const id = roomId || `ottv2-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const room = roomManager.getOrCreateRoom(id);
-  if (title) room.title = title;
-  if (preset) room.gameSession.preset = preset;
-  if (goalMode) room.gameSession.goalMode = goalMode;
+  const { roomId, roomName } = req.body || {};
+  const cleanId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
+  const cleanName = roomName || `Phòng ${cleanId}`;
+  const room = roomManager.getOrCreateRoom(cleanId, cleanName);
+
   broadcastRoomsList();
+
   res.json({
     status: 'ok',
-    roomId: id,
-    room: {
-      id,
-      title: room.title || `Phòng ${id}`,
-      status: room.gameSession.status
-    }
+    roomId: room.id,
+    name: room.name,
+    createdAt: room.createdAt
   });
 });
 
@@ -79,7 +87,7 @@ function broadcastRoomsList() {
 
 // WebSocket message dispatcher
 wss.on('connection', (ws) => {
-  // Send current rooms list on connect
+  // Send current rooms list immediately on connect
   ws.send(JSON.stringify({
     type: 'ROOMS_LIST',
     rooms: roomManager.getAllRoomsSummary()
@@ -88,7 +96,7 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const payload = JSON.parse(message.toString());
-      const { type, roomId, from, to, role, preset, playerName } = payload;
+      const { type, roomId, roomName, from, to, role, playerName } = payload;
 
       switch (type) {
         case 'GET_ROOMS': {
@@ -99,13 +107,39 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'CREATE_ROOM': {
+          const newRoomId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
+          const cleanName = roomName || `Phòng ${newRoomId}`;
+          const { room, role: assignedRole } = roomManager.createRoom(newRoomId, cleanName, ws, playerName || 'Player 1');
+
+          ws.send(JSON.stringify({
+            type: 'ROOM_JOINED',
+            roomId: room.id,
+            roomName: room.name,
+            role: assignedRole,
+            gameState: room.gameSession.getState(),
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
+          }));
+
+          broadcastRoomsList();
+          break;
+        }
+
         case 'JOIN_ROOM': {
           const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role, playerName);
           ws.send(JSON.stringify({
             type: 'ROOM_JOINED',
             roomId: room.id,
+            roomName: room.name,
             role: assignedRole,
-            gameState: room.gameSession.getState()
+            gameState: room.gameSession.getState(),
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
           }));
 
           // Notify other clients in room
@@ -113,9 +147,23 @@ wss.on('connection', (ws) => {
             type: 'PLAYER_PRESENCE',
             roomId: room.id,
             role: assignedRole,
-            totalConnected: room.clients.size
+            playerName: playerName || assignedRole,
+            totalConnected: room.clients.size,
+            players: {
+              p1: room.playerNames.P1,
+              p2: room.playerNames.P2
+            }
           });
 
+          broadcastRoomsList();
+          break;
+        }
+
+        case 'LEAVE_ROOM': {
+          roomManager.leaveRoom(ws);
+          ws.roomId = null;
+          ws.role = null;
+          ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
           broadcastRoomsList();
           break;
         }
@@ -143,7 +191,7 @@ wss.on('connection', (ws) => {
             return;
           }
 
-          // Broadcast authoritative state update to all clients
+          // Broadcast authoritative state update to all clients in room
           roomManager.broadcast(room, {
             type: 'STATE_UPDATE',
             gameState: result.gameState,
@@ -172,6 +220,19 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'REACTION': {
+          if (!ws.roomId) return;
+          const room = roomManager.rooms.get(ws.roomId);
+          if (!room) return;
+
+          roomManager.broadcast(room, {
+            type: 'REACTION',
+            emoji: payload.emoji,
+            senderRole: ws.role
+          });
+          break;
+        }
+
         default:
           break;
       }
@@ -186,9 +247,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
-  console.log(`🎮 OTTv2 Server running on http://localhost:${PORT}`);
+  console.log(`🎮 OTTv2 Server running on http://0.0.0.0:${PORT} (Port: ${PORT})`);
   console.log(`🌐 WebSockets listening for multiplayer rooms`);
   console.log(`===============================================`);
 });
