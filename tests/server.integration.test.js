@@ -64,6 +64,9 @@ try {
     await delay(100);
   }
   assert.ok(ready, 'server should start');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/server/server.js`)).status, 404, 'server code must not be public');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/render.yaml`)).status, 404, 'deployment config must not be public');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/playfun.html`)).status, 200, 'online game must be public');
 
   const url = `ws://127.0.0.1:${port}`;
   const [p1, p2, viewer] = await Promise.all([connect(url), connect(url), connect(url)]);

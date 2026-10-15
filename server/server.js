@@ -33,8 +33,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static frontend files
-app.use(express.static(rootDir));
+// Publish only browser assets. Server code, tests and deployment files stay private.
+app.get('/', (_req, res) => res.sendFile(path.join(rootDir, 'index.html')));
+for (const page of ['index.html', 'playfun.html', 'rooms.html']) {
+  app.get(`/${page}`, (_req, res) => res.sendFile(path.join(rootDir, page)));
+}
+for (const directory of ['css', 'js', 'shared']) {
+  app.use(`/${directory}`, express.static(path.join(rootDir, directory), { index: false }));
+}
+app.get('/OTTv2/index.html', (_req, res) => res.redirect('/'));
 
 // Keep the spelling used in some assignment handouts as a compatibility URL.
 app.get('/playfull.html', (_req, res) => res.redirect('/playfun.html'));
