@@ -1,6 +1,10 @@
 # Oẳn Tù Tì v2 (OTTv2) - Board Game Chiến Thuật 9×9
 ## Dự Án Web Game Oẳn Tù Tì v2: Chơi Cục Bộ & Đa Người Chơi
 
+**Giao diện:** Phong cách kawaii, nền kem và bàn cờ xanh dịu; đội Hồng (P1) và đội Xanh (P2). Quân SVG được vẽ riêng, dùng chung ở các chế độ. Luật chơi được thu gọn, nhật ký kỹ thuật được ẩn; thông báo lỗi và tình trạng sẵn sàng vẫn hiển thị. Giao diện hỗ trợ màn hình nhỏ, Enter/Space để chọn ô và giảm chuyển động theo cài đặt thiết bị.
+
+Tham khảo hướng hình ảnh: [Mushroom Chess Set — Vivian Lee](https://sva.design/projects/11715/mushroom-chess-set/) và [Kozy Chess](https://treapath.itch.io/kozy-chess). Không sao chép tài nguyên hình ảnh của các mẫu này.
+
 **Bản chính để mở và nộp là [`index.html`](index.html).** Trang [`playfun.html`](playfun.html) là chế độ online có tích hợp thư viện [PlayHTML](https://playhtml.fun/docs/). Đường dẫn cũ `OTTv2/index.html` chuyển về trang chính; `/playfull.html` chuyển tới `playfun.html` khi chạy bằng server của dự án.
 
 **Bản công khai:** [Chơi OTTv2 trên Internet](https://ottv2-game-2hxh.onrender.com/playfun.html). Mỗi người chơi mở liên kết phòng được chia sẻ và bấm **Sẵn sàng** trước khi bắt đầu.

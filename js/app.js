@@ -123,7 +123,7 @@ class OttApp {
       btnRoomResetGame: document.getElementById('btn-room-reset-game'),
       btnLeaveRoom: document.getElementById('btn-leave-room'),
 
-      // Player 1 Card
+      // Đội Hồng Card
       p1Card: document.getElementById('player1-card'),
       p1DisplayName: document.getElementById('p1-display-name'),
       p1ArmyStatus: document.getElementById('p1-army-status'),
@@ -134,7 +134,7 @@ class OttApp {
       p1PaperCount: document.getElementById('p1-paper-count'),
       p1ScissorsCount: document.getElementById('p1-scissors-count'),
 
-      // Player 2 Card
+      // Đội Xanh Card
       p2Card: document.getElementById('player2-card'),
       p2DisplayName: document.getElementById('p2-display-name'),
       p2ArmyStatus: document.getElementById('p2-army-status'),
@@ -327,6 +327,7 @@ class OttApp {
   // -------------------------------------------------------------
   switchMode(newMode) {
     this.gameMode = newMode;
+    document.body.dataset.mode = newMode;
     if (this.dom.presetSelect) this.dom.presetSelect.disabled = newMode === 'ONLINE';
 
     // Update Nav Tabs Active Class
@@ -453,12 +454,12 @@ class OttApp {
 
         <div class="room-matchup-box">
           <div class="room-player-side side-p1">
-            <span class="room-player-label">Player 1 (Đỏ)</span>
+            <span class="room-player-label">Đội Hồng</span>
             <span class="room-player-val">${escapeHtml(room.p1Name || (room.hasP1 ? 'Sẵn sàng' : 'Trống'))}</span>
           </div>
           <div class="room-vs-divider">VS</div>
           <div class="room-player-side side-p2">
-            <span class="room-player-label">Player 2 (Xanh)</span>
+            <span class="room-player-label">Đội Xanh</span>
             <span class="room-player-val">${escapeHtml(room.p2Name || (room.hasP2 ? 'Sẵn sàng' : 'Chờ tham gia...'))}</span>
           </div>
         </div>
@@ -470,7 +471,7 @@ class OttApp {
             <div class="state-row">
               <span class="state-label">Lượt hiện tại:</span>
               <span class="state-val" style="color: ${room.turn === 'P1' ? 'var(--p1-light)' : 'var(--p2-light)'};">
-                ${room.turn === 'P1' ? '🔴 Player 1 (Đỏ)' : '🔵 Player 2 (Xanh)'}
+                ${room.turn === 'P1' ? '🔴 Đội Hồng' : '🔵 Đội Xanh'}
               </span>
             </div>
             <div class="state-row">
@@ -502,7 +503,7 @@ class OttApp {
             ${room.winner ? `
               <div class="state-row" style="margin-top: 2px; color: var(--gold); font-weight: 800;">
                 <span>🏆 Thắng:</span>
-                <span>${room.winner === 'PLAYER_1' || room.winner === 'P1' ? 'Player 1' : 'Player 2'}</span>
+                <span>${room.winner === 'PLAYER_1' || room.winner === 'P1' ? 'Đội Hồng' : 'Đội Xanh'}</span>
               </div>
             ` : ''}
           </div>
@@ -583,7 +584,7 @@ class OttApp {
     this.updateTurnDisplay();
     this.startTurnTimer();
 
-    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Player 1 đi trước. P1 đến I1, P2 đến A9.</div>';
+    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Đội Hồng đi trước. P1 đến I1, P2 đến A9.</div>';
     this.showToast('Bắt đầu ván mới!', 'info');
   }
 
@@ -661,7 +662,7 @@ class OttApp {
     this.lastMove = { from, to, player: piece.player, pieceType: piece.type };
     this.moveHistory.push(this.lastMove);
 
-    const playerText = piece.player === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2';
+    const playerText = piece.player === PLAYERS.PLAYER_1 ? 'Đội Hồng' : 'Đội Xanh';
     const pieceIcon = PIECE_SYMBOLS[piece.type];
     const pieceName = PIECE_NAMES_VI[piece.type];
 
@@ -729,7 +730,7 @@ class OttApp {
   handleVictory(win) {
     this.stopTurnTimer();
     sounds.victory();
-    const winnerName = win.winner === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2';
+    const winnerName = win.winner === PLAYERS.PLAYER_1 ? 'Đội Hồng' : 'Đội Xanh';
     this.addLog(`🏆 <strong>${winnerName} WIN!</strong> ${win.details}`, 'win');
     this.showToast(`${winnerName} WIN!`, 'success');
 
@@ -741,7 +742,7 @@ class OttApp {
   updateStatsDisplay() {
     const counts = countPlayerPieces(this.board);
 
-    // Player 1
+    // Đội Hồng
     const p1 = counts[PLAYERS.PLAYER_1];
     this.dom.p1RockCount.textContent = p1[PIECE_TYPES.ROCK];
     this.dom.p1PaperCount.textContent = p1[PIECE_TYPES.PAPER];
@@ -752,7 +753,7 @@ class OttApp {
     if (this.dom.p1ArmyBar) this.dom.p1ArmyBar.style.width = `${p1Pct}%`;
     if (this.dom.p1MeterLabel) this.dom.p1MeterLabel.innerHTML = `<strong>${p1.total}</strong> / 15 quân (${p1Pct}%)`;
 
-    // Player 2
+    // Đội Xanh
     const p2 = counts[PLAYERS.PLAYER_2];
     this.dom.p2RockCount.textContent = p2[PIECE_TYPES.ROCK];
     this.dom.p2PaperCount.textContent = p2[PIECE_TYPES.PAPER];
@@ -770,14 +771,14 @@ class OttApp {
     if (this.dom.turnAvatar) this.dom.turnAvatar.textContent = isP1 ? 'P1' : 'P2';
 
     if (this.gameMode === 'BOT' && !isP1) {
-      this.dom.turnText.textContent = `Lượt của Máy (AI)`;
+      this.dom.turnText.textContent = `Lượt của bạn Máy`;
       if (this.dom.turnSubtext) this.dom.turnSubtext.textContent = 'Máy tính đang suy nghĩ...';
     } else {
-      this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
+      this.dom.turnText.textContent = `Lượt của ${isP1 ? 'Đội Hồng' : 'Đội Xanh'}`;
       if (this.dom.turnSubtext) {
         this.dom.turnSubtext.textContent = isP1
-          ? 'Phe Đỏ · Chọn 1 quân cờ để di chuyển 1 ô theo 8 hướng'
-          : 'Phe Xanh · Chọn 1 quân cờ để di chuyển 1 ô theo 8 hướng';
+          ? 'Đội Hồng · Chọn 1 quân cờ để di chuyển 1 ô theo 8 hướng'
+          : 'Đội Xanh · Chọn 1 quân cờ để di chuyển 1 ô theo 8 hướng';
       }
     }
 
@@ -785,7 +786,7 @@ class OttApp {
     this.dom.p2Card.classList.toggle('active-turn', !isP1);
 
     if (this.dom.moveHintText) {
-      this.dom.moveHintText.innerHTML = `💡 Lượt của <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Click một quân của bạn để xem 8 hướng di chuyển.`;
+      this.dom.moveHintText.innerHTML = `💡 Lượt của <strong>${isP1 ? 'Đội Hồng' : 'Đội Xanh'}</strong>. Chạm một quân của bạn để xem 8 hướng di chuyển.`;
     }
     if (this.gameMode === 'ONLINE' && !this.bothPlayersReady) {
       this.dom.turnText.textContent = 'Đang chờ hai người sẵn sàng…';
@@ -846,7 +847,7 @@ class OttApp {
   handleCellLeave() {
     if (!this.dom.moveHintText) return;
     const isP1 = this.currentTurn === PLAYERS.PLAYER_1;
-    this.dom.moveHintText.innerHTML = `💡 Lượt của <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Click một quân của bạn để xem 8 hướng di chuyển.`;
+    this.dom.moveHintText.innerHTML = `💡 Lượt của <strong>${isP1 ? 'Đội Hồng' : 'Đội Xanh'}</strong>. Chạm một quân của bạn để xem 8 hướng di chuyển.`;
   }
 
   addLog(msg, type = 'normal') {
@@ -922,10 +923,10 @@ class OttApp {
     let roleText = 'Khán giả';
     let roleClass = 'room-role-spec';
     if (role === 'P1') {
-      roleText = 'Bạn là: Player 1 (Đỏ)';
+      roleText = 'Bạn là: Đội Hồng';
       roleClass = 'room-role-p1';
     } else if (role === 'P2') {
-      roleText = 'Bạn là: Player 2 (Xanh)';
+      roleText = 'Bạn là: Đội Xanh';
       roleClass = 'room-role-p2';
     }
 
@@ -951,7 +952,7 @@ class OttApp {
   handleConnectionChange(connected, msg) {
     if (connected) {
       this.dom.onlineStatusBadge.className = 'status-badge online';
-      this.dom.onlineStatusBadge.textContent = `● Server Online`;
+      this.dom.onlineStatusBadge.textContent = `● Đã kết nối`;
       if (msg?.startsWith('⚠️')) this.showToast(msg, 'warning');
     } else {
       this.stopTurnTimer();
@@ -959,7 +960,7 @@ class OttApp {
       this.renderer.setInteractive(false);
       this.dom.btnRoomReady.disabled = true;
       this.dom.onlineStatusBadge.className = 'status-badge offline';
-      this.dom.onlineStatusBadge.textContent = `○ Server Offline`;
+      this.dom.onlineStatusBadge.textContent = `○ Mất kết nối`;
       if (msg) this.showToast(msg, 'warning');
     }
   }
@@ -1008,7 +1009,7 @@ class OttApp {
     this.updateStatsDisplay();
     this.updateTurnDisplay();
     if (data.timedOutRole) {
-      this.addLog(`⏱️ ${data.timedOutRole} hết 30 giây; server đã chuyển lượt.`, 'warning');
+      this.addLog(`⏱️ ${data.timedOutRole} hết 30 giây; đến lượt bạn kia.`, 'warning');
     }
 
     if (data.lastMove) {

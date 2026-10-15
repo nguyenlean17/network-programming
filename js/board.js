@@ -3,12 +3,12 @@
  * Handles 9x9 DOM rendering, selection states, valid move highlights, and animations.
  */
 
+import { pieceArt } from './pieceArt.js';
 import {
   BOARD_SIZE,
   COLUMNS,
   ROWS,
   GOAL_CELLS,
-  PIECE_SYMBOLS,
   PIECE_NAMES_VI,
   PLAYERS,
   sounds
@@ -76,6 +76,8 @@ export class BoardRenderer {
       for (let c = 0; c < BOARD_SIZE; c++) {
         const coord = posToCoord(c, r);
         const cell = document.createElement('div');
+        cell.setAttribute('role', 'button');
+        cell.tabIndex = 0;
         cell.className = 'board-cell';
         cell.dataset.x = c;
         cell.dataset.y = r;
@@ -105,6 +107,12 @@ export class BoardRenderer {
 
         // Click and Hover listeners
         cell.addEventListener('click', (e) => this.handleCellClick(c, r, coord, e));
+        cell.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.handleCellClick(c, r, coord, e);
+          }
+        });
         cell.addEventListener('mouseenter', () => this.handleCellHover(c, r, coord));
         cell.addEventListener('mouseleave', () => this.handleCellLeave());
 
@@ -179,13 +187,15 @@ export class BoardRenderer {
         // Content with high readability
         const pieceName = PIECE_NAMES_VI[piece.type] || piece.type;
         pieceEl.innerHTML = `
-          <span class="piece-icon">${PIECE_SYMBOLS[piece.type]}</span>
+          ${pieceArt(piece.type)}
           <span class="piece-tag">${pieceName}</span>
         `;
-        pieceEl.title = `${piece.player === PLAYERS.PLAYER_1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'} - Quân ${pieceName}`;
+        pieceEl.title = `${piece.player === PLAYERS.PLAYER_1 ? 'Đội Hồng · P1' : 'Đội Xanh · P2'} - Quân ${pieceName}`;
+        cell.setAttribute('aria-label', `${coord}: ${pieceEl.title}`);
       } else if (pieceEl) {
         pieceEl.remove();
       }
+      if (!piece) cell.setAttribute('aria-label', `${coord}${GOAL_CELLS.includes(coord) ? ': Ô đích' : ': Ô trống'}`);
     });
   }
 

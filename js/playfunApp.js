@@ -52,6 +52,13 @@ function log(message) {
   entry.className = 'history-item';
   entry.textContent = `[${new Date().toLocaleTimeString('vi-VN')}] ${message}`;
   history.prepend(entry);
+  while (history.children.length > 40) history.lastElementChild.remove();
+}
+
+function notice(message) {
+  const element = document.getElementById('player-notice');
+  element.textContent = message;
+  element.hidden = false;
 }
 
 function showReaction(emoji) {
@@ -75,7 +82,7 @@ function updateReadyState(ready) {
 
 const board = new BoardRenderer(boardElement, {
   onMove: ({ from, to }) => serverSync.sendAuthoritativeMove(from, to),
-  onInvalidClick: (reason) => log(reason)
+  onInvalidClick: notice
 });
 board.initBoard();
 
@@ -122,12 +129,13 @@ const serverSync = new RenderSyncEngine({
       return;
     }
     role = assignedRole;
+    document.getElementById('player-notice').hidden = true;
     myReady = false;
     board.setLocalRole(role);
     roomLabel.textContent = roomId;
     document.getElementById('btn-copy-room-link').disabled = false;
-    roleLabel.textContent = role === 'P1' ? 'Bạn là P1 (Đỏ)' :
-      role === 'P2' ? 'Bạn là P2 (Xanh)' : 'Bạn là khán giả';
+    roleLabel.textContent = role === 'P1' ? 'Bạn ở đội Hồng' :
+      role === 'P2' ? 'Bạn ở đội Xanh' : 'Bạn là khán giả';
     resetButton.disabled = role === 'SPECTATOR';
     readyButton.disabled = role === 'SPECTATOR';
     readyButton.textContent = '✅ Sẵn sàng';
@@ -140,24 +148,27 @@ const serverSync = new RenderSyncEngine({
     }
   },
   onConnectionChange: (connected, message) => {
-    serverBadge.textContent = connected ? '● Server đã kết nối' : '○ Server mất kết nối';
-    if (connected && message?.startsWith('⚠️')) log(message);
+    serverBadge.textContent = connected ? '● Đã kết nối' : '○ Mất kết nối';
+    if (connected && message?.startsWith('⚠️')) notice(message);
     if (!connected) {
       updateTurnTimer(null);
       readyButton.disabled = true;
       log(message || 'Mất kết nối server. Tải lại trang để vào lại phòng.');
+      notice('Kết nối bị gián đoạn. Bạn tải lại trang để vào chơi tiếp nhé.');
     }
     render();
   },
   onTimerUpdate: updateTurnTimer,
-  onRoomError: (message) => log(message),
+  onRoomError: notice,
   onRoomsList: (rooms) => {
     const current = rooms.find((room) => room.id === serverSync.roomId);
     bothPlayersPresent = Boolean(current?.hasP1 && current?.hasP2);
+    updatePlayerNotes(current?.hasP1, current?.hasP2, current?.ready);
     updateReadyState(current?.ready);
   },
   onPresenceUpdate: (presence) => {
     bothPlayersPresent = Boolean(presence.p1 && presence.p2);
+    updatePlayerNotes(presence.p1, presence.p2, presence.ready);
     updateReadyState(presence.ready);
   },
   onRemoteUpdate: (data) => {
@@ -173,7 +184,7 @@ const serverSync = new RenderSyncEngine({
     render();
 
     const move = data.lastMove === undefined ? gameState.lastMove : data.lastMove;
-    if (data.timedOutRole) log(`${data.timedOutRole} hết 30 giây; server đã chuyển lượt.`);
+    if (data.timedOutRole) log(`${data.timedOutRole} hết 30 giây; đến lượt bạn kia.`);
     const moveKey = move ? `${move.player}:${move.from}:${move.to}` : '';
     if (move && moveKey !== lastMoveKey) {
       lastMoveKey = moveKey;
@@ -194,19 +205,29 @@ const serverSync = new RenderSyncEngine({
   }
 });
 
+function updatePlayerNotes(p1, p2, ready) {
+  for (const [key, present] of [['p1', p1], ['p2', p2]]) {
+    document.getElementById(`${key}-ready-note`).textContent = !present
+      ? 'Chờ bạn vào chơi…' : ready?.[key] ? '✓ Đã sẵn sàng' : 'Đang chuẩn bị…';
+  }
+}
+
 function render() {
   const active = serverSync.isOnline && bothPlayersPresent &&
     bothPlayersReady && (role === 'P1' || role === 'P2') && gameState.status !== GAME_STATUS.ENDED;
   board.setInteractive(active);
   board.render(gameState.board, gameState.currentTurn, gameState.lastMove);
+  for (const [id, team] of [['player1-card', 'P1'], ['player2-card', 'P2']]) {
+    document.getElementById(id).classList.toggle('active-turn', bothPlayersReady && gameState.currentTurn === team);
+  }
 
   turnBanner.className = `turn-banner ${gameState.currentTurn === 'P1' ? 'p1-turn' : 'p2-turn'}`;
-  turnText.textContent = !serverSync.isOnline ? 'Đang chờ kết nối server…' :
+  turnText.textContent = !serverSync.isOnline ? 'Đang kết nối…' :
     !serverSync.roomId ? 'Chưa tham gia phòng. Hãy chọn phòng trong sảnh.' :
     gameState.status === GAME_STATUS.ENDED ? 'Ván đấu đã kết thúc' :
     !bothPlayersPresent ? 'Đang chờ đủ hai người chơi…' :
-    !bothPlayersReady ? 'Đang chờ P1 và P2 bấm sẵn sàng…' :
-    `Lượt đi: ${gameState.currentTurn === 'P1' ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
+    !bothPlayersReady ? 'Đang chờ hai bạn bấm Sẵn sàng…' :
+    `Lượt đi: ${gameState.currentTurn === 'P1' ? 'Đội Hồng' : 'Đội Xanh'}`;
 
   const counts = countPlayerPieces(gameState.board);
   for (const player of ['p1', 'p2']) {
@@ -221,8 +242,8 @@ function showVictory(result) {
   if (modal.classList.contains('active')) return;
   sounds.victory();
   document.getElementById('victory-title').textContent =
-    `${result.winner === 'P1' ? 'PLAYER 1 (ĐỎ)' : 'PLAYER 2 (XANH)'} CHIẾN THẮNG!`;
-  document.getElementById('victory-desc').textContent = result.details || '';
+    `${result.winner === 'P1' ? 'Đội Hồng' : 'Đội Xanh'} thắng rồi!`;
+  document.getElementById('victory-desc').textContent = 'Một nước đi thật hay. Cùng chơi thêm một ván nhé?';
   modal.classList.add('active');
   log(`Ván đấu kết thúc: ${result.details || 'đã có người thắng'}`);
 }
@@ -240,9 +261,9 @@ document.getElementById('btn-copy-room-link').addEventListener('click', async ()
   if (!serverSync.roomId) return;
   try {
     await navigator.clipboard.writeText(serverSync.getShareableLink());
-    log('Đã sao chép liên kết phòng.');
+    notice('Đã sao chép! Gửi liên kết này cho bạn của bạn nhé.');
   } catch {
-    log('Không thể sao chép. Hãy chép địa chỉ trên thanh trình duyệt.');
+    notice('Chưa sao chép được. Bạn có thể chép địa chỉ trên thanh trình duyệt nhé.');
   }
 });
 document.querySelectorAll('.btn-reaction').forEach((button) => {
