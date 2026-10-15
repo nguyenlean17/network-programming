@@ -67,6 +67,8 @@ try {
   assert.equal((await fetch(`http://127.0.0.1:${port}/server/server.js`)).status, 404, 'server code must not be public');
   assert.equal((await fetch(`http://127.0.0.1:${port}/render.yaml`)).status, 404, 'deployment config must not be public');
   assert.equal((await fetch(`http://127.0.0.1:${port}/playfun.html`)).status, 200, 'online game must be public');
+  assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms.length, 0,
+    'the lobby must not contain a fake default room');
 
   const url = `ws://127.0.0.1:${port}`;
   const [p1, p2, viewer] = await Promise.all([connect(url), connect(url), connect(url)]);
@@ -74,12 +76,18 @@ try {
   const roomId = `TEST-${port}`;
   p1.send({ type: 'CREATE_ROOM', roomId, roomName: 'Test room' });
   assert.equal((await p1.take((m) => m.type === 'ROOM_JOINED')).role, 'P1');
+  assert.equal((await p1.take((m) => m.type === 'TURN_TIMER')).active, false);
 
   p1.send({ type: 'MAKE_MOVE', from: 'B9', to: 'A9' });
   assert.match((await p1.take((m) => m.type === 'MOVE_ERROR')).message, /đủ 2 người/);
 
   p2.send({ type: 'JOIN_ROOM', roomId });
   assert.equal((await p2.take((m) => m.type === 'ROOM_JOINED')).role, 'P2');
+  assert.equal((await p2.take((m) => m.type === 'TURN_TIMER')).active, false);
+  p1.send({ type: 'SET_READY' });
+  assert.equal((await p1.take((m) => m.type === 'TURN_TIMER' && !m.active)).active, false);
+  p2.send({ type: 'SET_READY' });
+  assert.equal((await p1.take((m) => m.type === 'TURN_TIMER' && m.active)).active, true);
   viewer.send({ type: 'JOIN_ROOM', roomId, role: 'SPECTATOR' });
   assert.equal((await viewer.take((m) => m.type === 'ROOM_JOINED')).role, 'SPECTATOR');
 

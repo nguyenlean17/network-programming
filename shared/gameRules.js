@@ -18,7 +18,7 @@ import {
  * Converts col ('A'-'I') and row (1-9) to x, y indices (0-8)
  */
 export function coordToPos(cellId) {
-  if (!cellId || cellId.length < 2) return null;
+  if (typeof cellId !== 'string' || !/^[A-I][1-9]$/i.test(cellId)) return null;
   const colChar = cellId[0].toUpperCase();
   const rowNum = parseInt(cellId.slice(1), 10);
   const x = COLUMNS.indexOf(colChar);

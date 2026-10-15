@@ -299,9 +299,6 @@
     </div>
 
     <div class="header-actions">
-      <div id="hub-ping-badge" class="status-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
-        📶 Ping: 22ms
-      </div>
       <a href="index.html" class="btn" style="text-decoration: none;">
         🏠 Trang Chủ (Bài 1)
       </a>
@@ -365,7 +362,7 @@
       <div class="empty-state">
         <div style="font-size: 2rem; margin-bottom: 0.75rem;">⏳</div>
         <h3>Đang quét danh sách các phòng đấu trực tuyến...</h3>
-        <p>Hệ thống đang kết nối với Node.js WebSocket Server và hạ tầng playhtml.fun.</p>
+        <p>Đang lấy danh sách phòng từ server.</p>
       </div>
     </div>
 
@@ -374,6 +371,7 @@
   <!-- Script for Rooms Hub -->
   <script type="module">
     let allRooms = [];
+    let fetchError = false;
     let currentFilter = 'ALL';
     let searchQuery = '';
 
@@ -384,82 +382,23 @@
     const searchInput = document.getElementById('room-search-input');
     const filterTabs = document.querySelectorAll('.filter-tab');
 
-    // Default Fallback Demo Rooms for Instant Viewing
-    const defaultDemoRooms = [
-      {
-        id: 'ottv2-uet-champions',
-        status: 'PLAYING',
-        totalConnected: 4,
-        hasP1: true,
-        hasP2: true,
-        spectators: 2,
-        turn: 'P1',
-        moveCount: 16,
-        lastMove: { from: 'D4', to: 'E5' }
-      },
-      {
-        id: 'ottv2-alpha-battle',
-        status: 'PLAYING',
-        totalConnected: 3,
-        hasP1: true,
-        hasP2: true,
-        spectators: 1,
-        turn: 'P2',
-        moveCount: 8,
-        lastMove: { from: 'F8', to: 'E7' }
-      },
-      {
-        id: 'ottv2-pro-league',
-        status: 'WAITING',
-        totalConnected: 1,
-        hasP1: true,
-        hasP2: false,
-        spectators: 0,
-        turn: 'P1',
-        moveCount: 0
-      },
-      {
-        id: 'ottv2-fun-room-99',
-        status: 'PLAYING',
-        totalConnected: 2,
-        hasP1: true,
-        hasP2: true,
-        spectators: 0,
-        turn: 'P1',
-        moveCount: 22,
-        lastMove: { from: 'C3', to: 'C4' }
-      }
-    ];
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
 
     /**
      * Fetch active rooms from Node.js server
      */
     async function fetchRooms() {
       try {
-        const savedServer = localStorage.getItem('ottv2_render_server_url');
-        const apiUrl = (savedServer && !window.location.origin.includes('onrender.com'))
-          ? `${savedServer.replace(/\/+$/, '')}/api/rooms`
-          : '/api/rooms';
-        const res = await fetch(apiUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.rooms && data.rooms.length > 0) {
-            // Merge with demo rooms if needed
-            const serverRoomIds = new Set(data.rooms.map(r => r.id));
-            const merged = [...data.rooms];
-            for (const d of defaultDemoRooms) {
-              if (!serverRoomIds.has(d.id)) merged.push(d);
-            }
-            allRooms = merged;
-          } else {
-            allRooms = defaultDemoRooms;
-          }
-        } else {
-          allRooms = defaultDemoRooms;
-        }
-      } catch (err) {
-        // Fallback to demo rooms if standalone frontend
-        allRooms = defaultDemoRooms;
+        const res = await fetch('/api/rooms');
+        if (!res.ok) throw new Error('Không thể tải phòng');
+        const data = await res.json();
+        allRooms = Array.isArray(data.rooms) ? data.rooms : [];
+        fetchError = false;
+      } catch {
+        allRooms = [];
+        fetchError = true;
       }
 
       renderRooms();
@@ -474,7 +413,7 @@
         const matchesSearch = room.id.toLowerCase().includes(searchQuery.toLowerCase());
         let matchesFilter = true;
         if (currentFilter === 'PLAYING') matchesFilter = room.status === 'PLAYING' && room.hasP1 && room.hasP2;
-        else if (currentFilter === 'WAITING') matchesFilter = room.status === 'WAITING' || (!room.hasP1 || !room.hasP2);
+        else if (currentFilter === 'WAITING') matchesFilter = room.status === 'WAITING' || room.status === 'EMPTY';
         else if (currentFilter === 'ENDED') matchesFilter = room.status === 'ENDED';
         return matchesSearch && matchesFilter;
       });
@@ -487,9 +426,9 @@
       if (filtered.length === 0) {
         roomsContainer.innerHTML = `
           <div class="empty-state">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔍</div>
-            <h3>Không tìm thấy phòng nào phù hợp!</h3>
-            <p>Hãy thử tìm từ khóa khác hoặc bấm nút "Tạo phòng mới" ở góc trên.</p>
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">${fetchError ? '⚠️' : '🔍'}</div>
+            <h3>${fetchError ? 'Không thể tải danh sách phòng' : allRooms.length ? 'Không tìm thấy phòng phù hợp' : 'Chưa có phòng nào'}</h3>
+            <p>${fetchError ? 'Hãy kiểm tra kết nối rồi tải lại trang.' : 'Bạn có thể tạo phòng mới để bắt đầu.'}</p>
           </div>
         `;
         return;
@@ -503,30 +442,32 @@
 
         const isPlaying = room.status === 'PLAYING' && room.hasP1 && room.hasP2;
         const statusClass = isPlaying ? 'status-playing' : (room.status === 'ENDED' ? 'status-ended' : 'status-waiting');
-        const statusText = isPlaying ? '🟢 Đang thi đấu' : (room.status === 'ENDED' ? '⚪ Đã kết thúc' : '🟡 Chờ đối thủ');
+        const statusText = isPlaying ? '🟢 Đang thi đấu' : (room.status === 'ENDED' ? '⚪ Đã kết thúc' : room.hasP1 && room.hasP2 ? '🟡 Chờ sẵn sàng' : '🟡 Chờ người chơi');
 
-        const turnIndicator = room.turn === 'P1'
+        const turnIndicator = room.status === 'ENDED'
+          ? '<span>Đã kết thúc</span>' : !isPlaying
+          ? '<span>Chưa bắt đầu</span>' : room.turn === 'P1'
           ? '<span style="color: var(--p1-light); font-weight:700;">🔴 Lượt P1 (Đỏ)</span>'
           : '<span style="color: var(--p2-light); font-weight:700;">🔵 Lượt P2 (Xanh)</span>';
 
         card.innerHTML = `
           <div>
             <div class="room-card-header">
-              <span class="room-id-tag">🎲 ${room.id}</span>
+              <span class="room-id-tag">🎲 ${escapeHtml(room.id)}</span>
               <span class="room-status-badge ${statusClass}">${statusText}</span>
             </div>
 
             <div class="matchup-box" style="margin: 0.85rem 0;">
               <div class="fighter-side fighter-p1">
                 <div class="fighter-role">Player 1 (Đỏ)</div>
-                <div class="fighter-status">${room.hasP1 ? '🟢 Sẵn sàng' : '⚪ Trống'}</div>
+                <div class="fighter-status">${!room.hasP1 ? '⚪ Trống' : room.ready?.p1 ? '🟢 Sẵn sàng' : '🟡 Đang chuẩn bị'}</div>
               </div>
 
               <div class="vs-badge">VS</div>
 
               <div class="fighter-side fighter-p2">
                 <div class="fighter-role">Player 2 (Xanh)</div>
-                <div class="fighter-status">${room.hasP2 ? '🟢 Sẵn sàng' : '🟡 Đang chờ'}</div>
+                <div class="fighter-status">${!room.hasP2 ? '⚪ Trống' : room.ready?.p2 ? '🟢 Sẵn sàng' : '🟡 Đang chuẩn bị'}</div>
               </div>
             </div>
 
@@ -536,21 +477,21 @@
             </div>
 
             <div class="room-meta-row" style="margin-top: 0.4rem;">
-              <div>👥 Tổng: <strong>${room.totalConnected || 1} người</strong></div>
+              <div>👥 Tổng: <strong>${room.totalConnected ?? 0} người</strong></div>
               <div>👁️ Khán giả: <strong>${room.spectators || 0} người</strong></div>
             </div>
           </div>
 
           <div class="room-actions">
-            <a href="index.html?room=${room.id}&role=SPECTATOR" class="btn-spectate" title="Vào xem với vai trò Khán giả">
+            <a href="index.html?room=${encodeURIComponent(room.id)}&role=SPECTATOR" class="btn-spectate" title="Vào xem với vai trò Khán giả">
               👁️ Xem Trực Tiếp
             </a>
-            ${!room.hasP2 ? `
-              <a href="index.html?room=${room.id}&role=P2" class="btn-join-match" title="Tham gia thi đấu vị trí P2">
-                ⚔️ Vào Đấu (P2)
+            ${room.status !== 'ENDED' && (!room.hasP1 || !room.hasP2) ? `
+              <a href="index.html?room=${encodeURIComponent(room.id)}&role=${room.hasP1 ? 'P2' : 'P1'}" class="btn-join-match" title="Tham gia thi đấu">
+                ⚔️ Vào Đấu (${room.hasP1 ? 'P2' : 'P1'})
               </a>
             ` : `
-              <a href="playfun.html?room=${room.id}" class="btn-spectate" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" title="Mở qua playfun.html">
+              <a href="playfun.html?room=${encodeURIComponent(room.id)}&role=SPECTATOR" class="btn-spectate" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;" title="Mở qua playfun.html">
                 ⚡ playfun.html
               </a>
             `}
@@ -587,15 +528,6 @@
       // Open new room
       window.location.href = `index.html?room=${newRoomId}&role=P1`;
     });
-
-    // Auto Ping monitor
-    const hubPingEl = document.getElementById('hub-ping-badge');
-    setInterval(() => {
-      if (!hubPingEl) return;
-      const base = 22;
-      const jitter = Math.floor(Math.random() * 10 - 5);
-      hubPingEl.textContent = `📶 Ping: ${Math.max(3, base + jitter)}ms`;
-    }, 4000);
 
     // Initial fetch & Auto refresh every 5s
     fetchRooms();

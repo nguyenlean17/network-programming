@@ -73,6 +73,7 @@ export class PlayhtmlSyncEngine {
     if (!this.roomId) return '';
     const url = new URL(window.location.href);
     url.searchParams.set('room', this.roomId);
+    url.searchParams.delete('role');
     return url.toString();
   }
 }

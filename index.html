@@ -45,9 +45,6 @@
 
     <!-- Header Actions & Utility Status -->
     <div class="header-actions">
-      <div id="ping-badge" class="status-badge" title="Độ trễ mạng">
-        📶 Ping: 6ms
-      </div>
       <div id="online-status-badge" class="status-badge offline" style="display: none;">
         ● Offline
       </div>
@@ -123,7 +120,7 @@
         <span id="active-room-code" class="room-id-chip">OTT-0000</span>
         <span id="active-room-name" class="room-title-text">Phòng Đấu Trực Tuyến</span>
         <span id="active-room-role" class="room-role-chip room-role-p1">Bạn là: Player 1 (Đỏ)</span>
-        <span id="active-room-presence" class="room-badge-status room-badge-waiting">Đang chờ đối thủ tham gia...</span>
+        <span id="active-room-presence" class="room-badge-status room-badge-waiting">Đang chờ người chơi sẵn sàng...</span>
       </div>
 
       <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -132,6 +129,9 @@
         </button>
         <button id="btn-copy-room-link" class="btn btn-sm" title="Sao chép liên kết trực tiếp nếu muốn gửi cho bạn bè">
           📋 Copy link
+        </button>
+        <button id="btn-room-ready" class="btn btn-primary btn-sm" title="Báo cho đối thủ biết bạn đã sẵn sàng" disabled>
+          ✅ Sẵn sàng
         </button>
         <button id="btn-room-reset-game" class="btn btn-sm" title="Đặt lại bàn cờ mới cho cả 2 người">
           🔄 Ván mới
@@ -328,7 +328,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="board-preset-select">Bố cục ban đầu</label>
+          <label class="form-label" for="board-preset-select">Bố cục ban đầu (Local/AI)</label>
           <select id="board-preset-select" class="form-select">
             <option value="FRONTLINE">Chiến tuyến đối đầu (15 quân)</option>
             <option value="DIAGONAL">Đối xứng đường chéo (15 quân)</option>

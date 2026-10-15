@@ -10,20 +10,6 @@ import { countPlayerPieces } from '../shared/gameRules.js';
 export class RoomManager {
   constructor() {
     this.rooms = new Map(); // roomId -> room data
-    this.initDefaultRooms();
-  }
-
-  initDefaultRooms() {
-    const defaultRoomId = 'OTT-ROOM-1';
-    this.rooms.set(defaultRoomId, {
-      id: defaultRoomId,
-      name: 'Phòng Tập Luyện #1',
-      createdAt: Date.now(),
-      gameSession: new ServerGameSession(defaultRoomId),
-      clients: new Set(),
-      players: { P1: null, P2: null },
-      playerNames: { P1: 'Chờ P1...', P2: 'Chờ P2...' }
-    });
   }
 
   getOrCreateRoom(roomId, roomName = null) {
@@ -36,14 +22,17 @@ export class RoomManager {
         gameSession: new ServerGameSession(roomId),
         clients: new Set(),
         players: { P1: null, P2: null },
-        playerNames: { P1: 'Chờ P1...', P2: 'Chờ P2...' }
+        ready: { P1: false, P2: false },
+        playerNames: { P1: 'Chờ P1...', P2: 'Chờ P2...' },
+        turnDeadline: null,
+        turnTimer: null
       });
     }
     return this.rooms.get(roomId);
   }
 
   createRoom(roomId, roomName, ws, playerName = 'Player 1') {
-    const cleanId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
+    const cleanId = roomId;
     const cleanName = roomName || `Phòng ${cleanId}`;
 
     const room = this.getOrCreateRoom(cleanId, cleanName);
@@ -67,18 +56,22 @@ export class RoomManager {
       assignedRole = 'SPECTATOR';
     } else if (preferredRole === 'P1' && !room.players.P1) {
       room.players.P1 = ws;
+      room.ready.P1 = false;
       room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
       assignedRole = 'P1';
     } else if (preferredRole === 'P2' && !room.players.P2) {
       room.players.P2 = ws;
+      room.ready.P2 = false;
       room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
       assignedRole = 'P2';
     } else if (!preferredRole && !room.players.P1) {
       room.players.P1 = ws;
+      room.ready.P1 = false;
       room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
       assignedRole = 'P1';
     } else if (!preferredRole && !room.players.P2) {
       room.players.P2 = ws;
+      room.ready.P2 = false;
       room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
       assignedRole = 'P2';
     }
@@ -99,18 +92,20 @@ export class RoomManager {
     room.clients.delete(ws);
     if (room.players.P1 === ws) {
       room.players.P1 = null;
+      room.ready.P1 = false;
       room.playerNames.P1 = 'Chờ P1...';
     }
     if (room.players.P2 === ws) {
       room.players.P2 = null;
+      room.ready.P2 = false;
       room.playerNames.P2 = 'Chờ P2...';
     }
 
     ws.roomId = null;
     ws.role = null;
 
-    // Keep default room always, delete user-created rooms if totally empty
-    if (room.clients.size === 0 && room.id !== 'OTT-ROOM-1') {
+    if (room.clients.size === 0) {
+      clearTimeout(room.turnTimer);
       this.rooms.delete(roomId);
     }
   }
@@ -135,7 +130,7 @@ export class RoomManager {
       let roomStatus = 'WAITING';
       if (room.gameSession.status === 'ENDED') {
         roomStatus = 'ENDED';
-      } else if (hasP1 && hasP2) {
+      } else if (hasP1 && hasP2 && room.ready.P1 && room.ready.P2) {
         roomStatus = 'PLAYING';
       } else if (hasP1 || hasP2) {
         roomStatus = 'WAITING';
@@ -153,10 +148,12 @@ export class RoomManager {
         totalConnected,
         hasP1,
         hasP2,
+        ready: { p1: room.ready.P1, p2: room.ready.P2 },
         p1Name: room.playerNames ? room.playerNames.P1 : 'Player 1',
         p2Name: room.playerNames ? room.playerNames.P2 : 'Player 2',
         spectators,
         turn: room.gameSession.currentTurn,
+        turnDeadline: room.turnDeadline,
         moveCount: room.gameSession.moveHistory ? room.gameSession.moveHistory.length : 0,
         lastMove: room.gameSession.lastMove,
         winner: room.gameSession.winnerInfo ? room.gameSession.winnerInfo.winner : null,

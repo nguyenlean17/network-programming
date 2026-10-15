@@ -45,6 +45,8 @@ assert.strictEqual(posToCoord(0, 0), 'A1');
 assert.strictEqual(posToCoord(8, 8), 'I9');
 assert.strictEqual(posToCoord(4, 4), 'E5');
 assert.strictEqual(coordToPos('Z9'), null);
+assert.strictEqual(coordToPos('A1<script>'), null);
+assert.strictEqual(coordToPos('A10'), null);
 assert.strictEqual(posToCoord(10, 10), null);
 console.log('  ✓ Hệ tọa độ A1 <-> (x, y) chính xác 100%\n');
 

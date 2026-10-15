@@ -3,13 +3,15 @@
 
 **Bản chính để mở và nộp là [`index.html`](index.html).** Trang [`playfun.html`](playfun.html) là chế độ online có tích hợp thư viện [PlayHTML](https://playhtml.fun/docs/). Đường dẫn cũ `OTTv2/index.html` chuyển về trang chính; `/playfull.html` chuyển tới `playfun.html` khi chạy bằng server của dự án.
 
+**Bản công khai:** [Chơi OTTv2 trên Internet](https://ottv2-game-2hxh.onrender.com/playfun.html). Mỗi người chơi mở liên kết phòng được chia sẻ và bấm **Sẵn sàng** trước khi bắt đầu.
+
 Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ:
 1. **Chế độ 2 người chơi trên cùng một thiết bị (Local 2 Players - Phase 1)**: Lần lượt thay phiên thực hiện nước đi hoàn toàn ở client, không cần server.
 2. **Chế độ Phòng Đấu Trực Tuyến & Danh sách phòng (Authoritative Multiplayer Server - Phase 2)**:
    * Máy chủ Node.js (Express + WebSocket) quản lý trạng thái trò chơi tập trung (Authoritative source of truth).
-   * **Sảnh phòng trực tuyến (Live Room Lobby)**: Khi tạo một phòng mới, phòng đó **lập tức xuất hiện trong danh sách phòng**. Người chơi khác có thể **chọn phòng đó từ danh sách để vào chơi ngay mà không bắt buộc phải copy link** (vẫn có nút copy link nếu muốn chia sẻ).
+   * **Sảnh phòng trực tuyến (Live Room Lobby)**: Phòng do người dùng tạo xuất hiện trong danh sách thật; không có phòng hoặc số người xem giả. Người khác có thể chọn phòng hoặc dùng liên kết chia sẻ.
    * Hỗ trợ nhiều phòng cùng lúc (Room 001, Room 002, Room 003...).
-3. **Chế độ PlayHTML (`playfun.html`)**: Server WebSocket cấp vai trò P1/P2/khán giả, xác thực mọi nước đi và chuyển biểu cảm. PlayHTML chia sẻ bản sao trạng thái bàn cờ và con trỏ trong từng phòng; dữ liệu PlayHTML không có quyền ghi đè ván đấu trên server. Mỗi phòng có tối đa hai người đi quân, người đến sau chỉ xem.
+3. **Chế độ PlayHTML (`playfun.html`)**: Server WebSocket cấp vai trò P1/P2/khán giả, xác thực mọi nước đi và chuyển biểu cảm. PlayHTML chia sẻ bản sao trạng thái bàn cờ và con trỏ trong từng phòng; dữ liệu PlayHTML không có quyền ghi đè ván đấu trên server. Mỗi phòng có tối đa hai người đi quân, người đến sau chỉ xem. P1 và P2 đều phải bấm **Sẵn sàng** thì server mới bắt đầu đồng hồ 30 giây; hết giờ server chuyển lượt. Nếu một người rời phòng, đồng hồ dừng.
 4. **Chế độ Đấu với Máy (AI Engine 3 cấp độ)**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị RAM.
 5. **Thiết kế giao diện mới (Redesign)**: Phong cách **Minimalistic (Tối giản), hoàn toàn KHÔNG SỬ DỤNG GRADIENTS**; màu sắc đơn sắc (solid colors), đường nét sắc nét (crisp 1px borders), độ tương phản cao và độ rõ ràng tối đa trên mọi kích thước màn hình.
 
@@ -36,6 +38,8 @@ Mỗi người chơi có các quân cờ thuộc 3 loại:
 * ✌️ **Kéo** (Scissors)
 
 Người chơi 1 (Player 1 - Phe Đỏ) và Người chơi 2 (Player 2 - Phe Xanh) được phân biệt rõ rệt bằng màu sắc và huy hiệu trên bàn cờ.
+
+**Quy ước riêng của dự án:** Mỗi phe bắt đầu với 15 quân (5 quân mỗi loại). Hai bố cục khởi đầu chỉ dùng cho chế độ Local/AI; phòng online dùng bố cục chuẩn. Đề bài không ấn định số quân hoặc cách xếp ban đầu.
 
 ### 1.3. Di chuyển quân (King's Move)
 * Mỗi quân cờ di chuyển tương tự **quân Vua trong cờ vua**:
@@ -112,7 +116,11 @@ network-programming/
 │   └── gameRules.js             # Bộ luật cờ OTTv2 dùng chung cho server validate
 │
 └── tests/
-    └── rules.test.js            # Bộ kiểm thử Unit Test 12/12 bài kiểm tra luật chơi (100% Pass)
+    ├── rules.test.js            # Kiểm thử luật chơi
+    ├── multiplayer.test.js      # Vai trò trong phòng và đồng bộ PlayHTML
+    ├── renderSync.test.js       # Vào phòng qua liên kết khi đang kết nối
+    ├── server.integration.test.js # Tạo phòng, di chuyển và phân quyền
+    └── server.timer.test.js     # Đồng hồ khi sẵn sàng, hết lượt và ngắt kết nối
 ```
 
 ---
@@ -127,15 +135,15 @@ Theo đúng yêu cầu: **"Khi tạo một phòng, không cần phải copy link
    * Nhập tên phòng (ví dụ: *Phòng của Nam*) hoặc để trống để sinh mã tự động.
    * Nhấn nút **`➕ Tạo phòng ngay`**.
    * Máy chủ ghi nhận phòng mới, thiết lập Người chơi 1 là **Player 1 (Đỏ)**, và **lập tức phát sóng danh sách phòng mới (ROOMS_LIST) tới tất cả các client đang kết nối**.
-   * Màn hình của Người chơi 1 chuyển sang bàn cờ với trạng thái: *"Đang chờ đối thủ tham gia..."*.
+   * Màn hình của Người chơi 1 chuyển sang bàn cờ và chờ người thứ hai.
 2. **Người chơi 2 (Vào chơi từ danh sách)**:
    * Mở tab **`🌐 Phòng Đấu Online`** (ở một tab khác, trình duyệt khác, hoặc máy tính khác trong mạng).
    * Ngay lập tức nhìn thấy phòng của Người chơi 1 trong danh sách với huy hiệu **`🟡 Chờ người chơi 2`**.
    * Nhấn nút **`⚔️ Vào chơi (P2)`** trực tiếp từ danh sách.
    * **Không cần copy link**! Người chơi 2 được gán vai trò **Player 2 (Xanh)** và vào trận ngay.
-   * Trận đấu chính thức bắt đầu và đồng bộ thời gian thực cho cả hai người chơi.
+   * Cả hai bấm **✅ Sẵn sàng**. Lúc đó đồng hồ 30 giây của lượt P1 mới bắt đầu; server quyết định khi nào hết giờ và chuyển lượt.
 3. **Khán giả (Spectator)**:
-   * Nếu một phòng đã có đủ 2 người chơi, trạng thái chuyển thành **`🟢 Đang thi đấu`**.
+   * Khi hai người đã bấm sẵn sàng, trạng thái chuyển thành **`🟢 Đang thi đấu`**.
    * Người thứ ba bấm **`👁️ Xem trực tiếp`** để theo dõi trận đấu theo thời gian thực.
 4. **Chia sẻ link tùy chọn**:
    * Mỗi phòng đều có nút **`📋 Copy link`** nếu người chơi muốn gửi trực tiếp cho bạn bè qua chat/tin nhắn.
@@ -160,7 +168,7 @@ Kiểm tra tính chính xác của toàn bộ engine luật chơi OTTv2:
 ```bash
 npm test
 ```
-*Kết quả: 12/12 bài kiểm thử vượt qua xuất sắc (100% Pass).*
+Lệnh này chạy các kiểm thử luật chơi, phòng online, phân quyền và đồng hồ lượt.
 
 ### Bước 3: Khởi chạy máy chủ Server Node.js
 Chạy lệnh:
@@ -186,7 +194,10 @@ Sau khi khởi chạy, console sẽ thông báo:
 * Để chơi **Multiplayer Server**:
   * Người chơi 1: Chọn tab `🌐 Phòng Đấu Online`, bấm `➕ Tạo phòng ngay`.
   * Người chơi 2: Mở một cửa sổ trình duyệt ẩn danh hoặc tab mới tại `http://localhost:3000`, chọn tab `🌐 Phòng Đấu Online`, bấm `⚔️ Vào chơi (P2)` trên phòng vừa tạo.
-* Để chơi **chế độ PlayHTML**: Nhấn `⚡ PlayHTML` hoặc mở `http://localhost:3000/playfun.html`. Người đầu tiên được cấp P1 và có thể sao chép liên kết phòng. Người thứ hai mở liên kết đó để nhận P2; người tiếp theo là khán giả. Chỉ P1/P2 được đi quân hoặc tạo ván mới. Cần kết nối server để chơi; PlayHTML dùng để đồng bộ bản sao bàn cờ và con trỏ.
+  * Hai người đều bấm `✅ Sẵn sàng` để bắt đầu; tạo ván mới cần hai người bấm lại.
+* Để chơi **chế độ PlayHTML**: Nhấn `⚡ PlayHTML` hoặc mở `http://localhost:3000/playfun.html`. Người đầu tiên được cấp P1 và có thể sao chép liên kết phòng. Người thứ hai mở liên kết đó để nhận P2; người tiếp theo là khán giả. P1/P2 đều bấm `✅ Sẵn sàng` trước khi chơi. Cần kết nối server để chơi; PlayHTML dùng để đồng bộ bản sao bàn cờ và con trỏ.
+
+**Lưu ý triển khai:** Phòng và ván đấu hiện được giữ trong bộ nhớ của server. Khi server khởi động lại, các phòng cũ không còn; người chơi cần tạo phòng mới.
 
 ---
 

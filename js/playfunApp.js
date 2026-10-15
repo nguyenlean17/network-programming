@@ -11,8 +11,10 @@ const roleLabel = document.getElementById('playfun-role');
 const roomLabel = document.getElementById('display-room-id');
 const turnText = document.getElementById('turn-text');
 const turnBanner = document.getElementById('turn-banner');
+const turnTimer = document.getElementById('playfun-turn-timer');
 const history = document.getElementById('sync-history');
 const resetButton = document.getElementById('btn-sync-reset');
+const readyButton = document.getElementById('playfun-ready');
 const modal = document.getElementById('victory-modal');
 
 let gameState = {
@@ -24,8 +26,26 @@ let gameState = {
 };
 let role = null;
 let bothPlayersPresent = false;
+let bothPlayersReady = false;
+let myReady = false;
 let lastMoveKey = '';
 let lastMirrorKey = '';
+let timerInterval = null;
+
+function updateTurnTimer(data) {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  if (!data?.active || data.remainingMs === null) {
+    turnTimer.textContent = data?.gameEnded ? '⏱️ Ván đã kết thúc' : '⏱️ Chờ sẵn sàng';
+    return;
+  }
+  const deadline = Date.now() + data.remainingMs;
+  const update = () => {
+    turnTimer.textContent = `⏱️ ${Math.ceil(Math.max(0, deadline - Date.now()) / 1000)}s`;
+  };
+  update();
+  timerInterval = setInterval(update, 250);
+}
 
 function log(message) {
   const entry = document.createElement('div');
@@ -43,6 +63,14 @@ function showReaction(emoji) {
   element.style.top = `${rect.top + rect.height / 2}px`;
   document.body.appendChild(element);
   setTimeout(() => element.remove(), 1600);
+}
+
+function updateReadyState(ready) {
+  bothPlayersReady = Boolean(bothPlayersPresent && ready?.p1 && ready?.p2);
+  myReady = role === 'P1' ? Boolean(ready?.p1) : role === 'P2' ? Boolean(ready?.p2) : false;
+  readyButton.disabled = !serverSync.isOnline || !['P1', 'P2'].includes(role) || myReady || gameState.status === GAME_STATUS.ENDED;
+  readyButton.textContent = myReady ? '✓ Đã sẵn sàng' : '✅ Sẵn sàng';
+  render();
 }
 
 const board = new BoardRenderer(boardElement, {
@@ -78,11 +106,14 @@ const playhtmlSync = new PlayhtmlSyncEngine({
 const serverSync = new RenderSyncEngine({
   onRoomJoined: async (roomId, assignedRole) => {
     role = assignedRole;
+    myReady = false;
     board.setLocalRole(role);
     roomLabel.textContent = roomId;
     roleLabel.textContent = role === 'P1' ? 'Bạn là P1 (Đỏ)' :
       role === 'P2' ? 'Bạn là P2 (Xanh)' : 'Bạn là khán giả';
     resetButton.disabled = role === 'SPECTATOR';
+    readyButton.disabled = role === 'SPECTATOR';
+    readyButton.textContent = '✅ Sẵn sàng';
     document.getElementById('btn-victory-restart').disabled = role === 'SPECTATOR';
     render();
     log(`Đã vào phòng ${roomId} với vai trò ${role}.`);
@@ -93,13 +124,24 @@ const serverSync = new RenderSyncEngine({
   },
   onConnectionChange: (connected, message) => {
     serverBadge.textContent = connected ? '● Server đã kết nối' : '○ Server mất kết nối';
-    if (!connected) log(message || 'Mất kết nối server. Tải lại trang để vào lại phòng.');
+    if (connected && message?.startsWith('⚠️')) log(message);
+    if (!connected) {
+      updateTurnTimer(null);
+      readyButton.disabled = true;
+      log(message || 'Mất kết nối server. Tải lại trang để vào lại phòng.');
+    }
     render();
   },
+  onTimerUpdate: updateTurnTimer,
+  onRoomError: (message) => log(message),
   onRoomsList: (rooms) => {
     const current = rooms.find((room) => room.id === serverSync.roomId);
     bothPlayersPresent = Boolean(current?.hasP1 && current?.hasP2);
-    render();
+    updateReadyState(current?.ready);
+  },
+  onPresenceUpdate: (presence) => {
+    bothPlayersPresent = Boolean(presence.p1 && presence.p2);
+    updateReadyState(presence.ready);
   },
   onRemoteUpdate: (data) => {
     if (data.reaction) {
@@ -113,7 +155,8 @@ const serverSync = new RenderSyncEngine({
     board.clearSelection();
     render();
 
-    const move = data.lastMove || gameState.lastMove;
+    const move = data.lastMove === undefined ? gameState.lastMove : data.lastMove;
+    if (data.timedOutRole) log(`${data.timedOutRole} hết 30 giây; server đã chuyển lượt.`);
     const moveKey = move ? `${move.player}:${move.from}:${move.to}` : '';
     if (move && moveKey !== lastMoveKey) {
       lastMoveKey = moveKey;
@@ -136,14 +179,15 @@ const serverSync = new RenderSyncEngine({
 
 function render() {
   const active = serverSync.isOnline && bothPlayersPresent &&
-    (role === 'P1' || role === 'P2') && gameState.status !== GAME_STATUS.ENDED;
+    bothPlayersReady && (role === 'P1' || role === 'P2') && gameState.status !== GAME_STATUS.ENDED;
   board.setInteractive(active);
   board.render(gameState.board, gameState.currentTurn, gameState.lastMove);
 
   turnBanner.className = `turn-banner ${gameState.currentTurn === 'P1' ? 'p1-turn' : 'p2-turn'}`;
   turnText.textContent = !serverSync.isOnline ? 'Đang chờ kết nối server…' :
-    !bothPlayersPresent ? 'Đang chờ đủ hai người chơi…' :
     gameState.status === GAME_STATUS.ENDED ? 'Ván đấu đã kết thúc' :
+    !bothPlayersPresent ? 'Đang chờ đủ hai người chơi…' :
+    !bothPlayersReady ? 'Đang chờ P1 và P2 bấm sẵn sàng…' :
     `Lượt đi: ${gameState.currentTurn === 'P1' ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}`;
 
   const counts = countPlayerPieces(gameState.board);
@@ -169,6 +213,8 @@ resetButton.addEventListener('click', () => {
   if (role !== 'P1' && role !== 'P2') return;
   if (window.confirm('Tạo ván mới cho cả phòng?')) serverSync.sendResetGame();
 });
+
+readyButton.addEventListener('click', () => serverSync.sendReady());
 document.getElementById('btn-victory-restart').addEventListener('click', () => {
   if (role === 'P1' || role === 'P2') serverSync.sendResetGame();
 });
@@ -187,6 +233,6 @@ document.querySelectorAll('.btn-reaction').forEach((button) => {
 });
 
 const requestedRoom = new URLSearchParams(window.location.search).get('room');
-if (requestedRoom) serverSync.joinRoom(requestedRoom);
+if (requestedRoom) serverSync.joinRoom(requestedRoom, serverSync.getRoleFromUrl());
 else serverSync.createRoom('Phòng PlayHTML');
 render();

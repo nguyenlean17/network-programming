@@ -21,8 +21,11 @@ export class RenderSyncEngine {
     this.onRoomJoined = options.onRoomJoined || null;
     this.onPresenceUpdate = options.onPresenceUpdate || null;
     this.onRoomsList = options.onRoomsList || null;
+    this.onTimerUpdate = options.onTimerUpdate || null;
+    this.onRoomError = options.onRoomError || null;
 
     this.cachedRooms = [];
+    this.pendingConnectCallbacks = [];
   }
 
   resolveWsUrl(rawUrl) {
@@ -51,14 +54,21 @@ export class RenderSyncEngine {
   }
 
   generateRoomId() {
-    const num = Math.floor(1000 + Math.random() * 9000);
-    return `OTT-${num}`;
+    const token = globalThis.crypto?.randomUUID?.().slice(0, 8)
+      || Math.random().toString(36).slice(2, 10);
+    return `OTT-${token.toUpperCase()}`;
   }
 
   getRoomFromUrl() {
     if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
     return params.get('room') || null;
+  }
+
+  getRoleFromUrl() {
+    if (typeof window === 'undefined') return null;
+    const role = new URLSearchParams(window.location.search).get('role');
+    return ['P1', 'P2', 'SPECTATOR'].includes(role) ? role : null;
   }
 
   updateUrl(roomId) {
@@ -76,6 +86,7 @@ export class RenderSyncEngine {
     if (typeof window === 'undefined' || !this.roomId) return '';
     const url = new URL(window.location.href);
     url.searchParams.set('room', this.roomId);
+    url.searchParams.delete('role');
     return url.toString();
   }
 
@@ -83,10 +94,16 @@ export class RenderSyncEngine {
    * Connects to WebSocket server (for lobby monitoring or room participation)
    */
   connect(callback = null) {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       if (callback) callback(true);
       return;
     }
+    if (callback) this.pendingConnectCallbacks.push(callback);
+    if (this.ws?.readyState === WebSocket.CONNECTING) return;
+
+    const finishConnect = (connected) => {
+      for (const pending of this.pendingConnectCallbacks.splice(0)) pending(connected);
+    };
 
     const wsUrl = this.resolveWsUrl(this.getServerUrl());
 
@@ -100,7 +117,7 @@ export class RenderSyncEngine {
         }
         // Request rooms list immediately
         this.fetchRooms();
-        if (callback) callback(true);
+        finishConnect(true);
       };
 
       this.ws.onmessage = (event) => {
@@ -117,11 +134,12 @@ export class RenderSyncEngine {
         if (this.onConnectionChange) {
           this.onConnectionChange(false, 'Không thể kết nối máy chủ WebSocket.');
         }
-        if (callback) callback(false);
+        finishConnect(false);
       };
 
       this.ws.onclose = () => {
         this.isOnline = false;
+        finishConnect(false);
         if (this.onConnectionChange) {
           this.onConnectionChange(false, 'Mất kết nối máy chủ.');
         }
@@ -131,7 +149,7 @@ export class RenderSyncEngine {
       if (this.onConnectionChange) {
         this.onConnectionChange(false, err.message);
       }
-      if (callback) callback(false);
+      finishConnect(false);
     }
   }
 
@@ -157,15 +175,10 @@ export class RenderSyncEngine {
 
     this.connect((connected) => {
       if (!connected) return;
-      this.roomId = targetId;
-      this.roomName = targetName;
-      this.myRole = 'P1';
-      this.updateUrl(this.roomId);
-
       this.send({
         type: 'CREATE_ROOM',
-        roomId: this.roomId,
-        roomName: this.roomName,
+        roomId: targetId,
+        roomName: targetName,
         playerName: this.playerName
       });
     });
@@ -173,14 +186,11 @@ export class RenderSyncEngine {
 
   joinRoom(roomId, preferredRole = null) {
     if (!roomId) return;
-    this.roomId = roomId;
-    this.updateUrl(this.roomId);
-
     this.connect((connected) => {
       if (!connected) return;
       this.send({
         type: 'JOIN_ROOM',
-        roomId: this.roomId,
+        roomId,
         role: preferredRole,
         playerName: this.playerName
       });
@@ -203,6 +213,11 @@ export class RenderSyncEngine {
       type: 'RESET_GAME',
       roomId: this.roomId
     });
+  }
+
+  sendReady() {
+    if (!this.roomId || !this.ws) return;
+    this.send({ type: 'SET_READY', roomId: this.roomId });
   }
 
   sendReaction(emoji) {
@@ -250,6 +265,7 @@ export class RenderSyncEngine {
         this.roomId = data.roomId;
         this.roomName = data.roomName || `Phòng ${data.roomId}`;
         if (data.role) this.myRole = data.role;
+        this.updateUrl(this.roomId);
 
         if (this.onRoomJoined) {
           this.onRoomJoined(this.roomId, this.myRole, this.roomName);
@@ -265,9 +281,21 @@ export class RenderSyncEngine {
           this.onRemoteUpdate({
             gameState: data.gameState,
             lastMove: data.lastMove,
-            winnerInfo: data.winnerInfo
+            winnerInfo: data.winnerInfo,
+            timedOutRole: data.timedOutRole
           });
         }
+        break;
+      }
+
+      case 'TURN_TIMER': {
+        if (this.onTimerUpdate) this.onTimerUpdate(data);
+        break;
+      }
+
+      case 'ROOM_ERROR': {
+        if (!this.roomId) this.updateUrl(null);
+        if (this.onRoomError) this.onRoomError(data.message || 'Không thể vào phòng.');
         break;
       }
 

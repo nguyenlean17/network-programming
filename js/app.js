@@ -27,6 +27,10 @@ import { BoardRenderer } from './board.js';
 import { OttAi } from './ai.js';
 import { RenderSyncEngine } from './renderSync.js';
 
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[char]);
+
 class OttApp {
   constructor() {
     this.gameMode = 'LOCAL'; // 'LOCAL' | 'ONLINE' | 'BOT'
@@ -47,8 +51,9 @@ class OttApp {
     this.timerRemaining = 30;
     this.timerInterval = null;
 
-    // Ping monitor
-    this.pingInterval = null;
+    this.bothPlayersReady = false;
+    this.onlineClockDeadline = null;
+    this.onlineClockDuration = 30000;
 
     // Multiplayer Server Sync Engine
     this.syncEngine = new RenderSyncEngine({
@@ -56,7 +61,9 @@ class OttApp {
       onConnectionChange: (connected, msg) => this.handleConnectionChange(connected, msg),
       onRoomJoined: (roomId, role, roomName) => this.handleRoomJoined(roomId, role, roomName),
       onPresenceUpdate: (presence) => this.handlePresenceUpdate(presence),
-      onRoomsList: (rooms) => this.renderRoomsList(rooms)
+      onRoomsList: (rooms) => this.renderRoomsList(rooms),
+      onTimerUpdate: (timer) => this.handleOnlineTimer(timer),
+      onRoomError: (message) => this.showToast(message, 'warning')
     });
 
     this.dom = {};
@@ -66,13 +73,12 @@ class OttApp {
     this.cacheDomElements();
     this.initBoardRenderer();
     this.bindEvents();
-    this.startPingMonitor();
 
     // Check URL parameters (?room=...)
     const urlRoom = this.syncEngine.getRoomFromUrl();
     if (urlRoom) {
       this.switchMode('ONLINE');
-      this.syncEngine.joinRoom(urlRoom);
+      this.syncEngine.joinRoom(urlRoom, this.syncEngine.getRoleFromUrl());
     } else {
       this.switchMode('LOCAL');
       this.startNewGame();
@@ -92,7 +98,6 @@ class OttApp {
       tabModeBot: document.getElementById('tab-mode-bot'),
 
       // Header Actions & Status
-      pingBadge: document.getElementById('ping-badge'),
       onlineStatusBadge: document.getElementById('online-status-badge'),
       btnQuickGuide: document.getElementById('btn-quick-guide'),
       btnRules: document.getElementById('btn-rules'),
@@ -114,6 +119,7 @@ class OttApp {
       activeRoomPresence: document.getElementById('active-room-presence'),
       btnToggleLobby: document.getElementById('btn-toggle-lobby'),
       btnCopyRoomLink: document.getElementById('btn-copy-room-link'),
+      btnRoomReady: document.getElementById('btn-room-ready'),
       btnRoomResetGame: document.getElementById('btn-room-reset-game'),
       btnLeaveRoom: document.getElementById('btn-leave-room'),
 
@@ -214,6 +220,7 @@ class OttApp {
     // Preset Select
     if (this.dom.presetSelect) {
       this.dom.presetSelect.addEventListener('change', (e) => {
+        if (this.gameMode === 'ONLINE') return;
         this.boardPreset = e.target.value;
         this.startNewGame();
       });
@@ -306,6 +313,7 @@ class OttApp {
     this.dom.btnRoomResetGame.addEventListener('click', () => {
       this.syncEngine.sendResetGame();
     });
+    this.dom.btnRoomReady.addEventListener('click', () => this.syncEngine.sendReady());
 
     this.dom.btnLeaveRoom.addEventListener('click', () => {
       this.syncEngine.leaveRoom();
@@ -319,6 +327,7 @@ class OttApp {
   // -------------------------------------------------------------
   switchMode(newMode) {
     this.gameMode = newMode;
+    if (this.dom.presetSelect) this.dom.presetSelect.disabled = newMode === 'ONLINE';
 
     // Update Nav Tabs Active Class
     this.dom.tabModeLocal.classList.toggle('active', newMode === 'LOCAL');
@@ -336,6 +345,10 @@ class OttApp {
     }
 
     if (newMode === 'ONLINE') {
+      this.stopTurnTimer();
+      this.showWaitingForPlayers();
+      this.dom.p1ArmyStatus.textContent = 'Chờ người chơi';
+      this.dom.p2ArmyStatus.textContent = 'Chờ người chơi';
       // Connect to server and show lobby if not inside a room
       this.syncEngine.connect();
       if (!this.syncEngine.roomId) {
@@ -358,6 +371,10 @@ class OttApp {
       this.dom.gameArena.style.display = 'grid';
       this.dom.activeRoomBar.style.display = 'none';
       this.dom.onlineStatusBadge.style.display = 'none';
+      this.dom.p1ArmyStatus.textContent = 'Sẵn sàng';
+      this.dom.p2ArmyStatus.textContent = 'Sẵn sàng';
+      this.dom.btnNewGame.disabled = false;
+      this.dom.btnVictoryRestart.disabled = false;
       this.startNewGame();
     }
   }
@@ -371,7 +388,7 @@ class OttApp {
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
         const isLight = (r + c) % 2 === 0;
-        const isGoal = (r === 0 && c === 0) || (r === 8 && c === 8);
+        const isGoal = (r === 0 && c === 8) || (r === 8 && c === 0);
         const piece = board[r] ? board[r][c] : null;
 
         let pieceHtml = '';
@@ -414,7 +431,7 @@ class OttApp {
       card.className = 'room-card';
 
       let statusBadgeClass = 'room-badge-waiting';
-      let statusText = '🟡 Chờ người chơi 2';
+      let statusText = room.hasP1 ? '🟡 Chờ P2' : room.hasP2 ? '🟡 Chờ P1' : '🟡 Phòng trống';
 
       if (room.status === 'PLAYING') {
         statusBadgeClass = 'room-badge-playing';
@@ -422,12 +439,14 @@ class OttApp {
       } else if (room.status === 'ENDED') {
         statusBadgeClass = 'room-badge-ended';
         statusText = '⚪ Đã kết thúc';
+      } else if (room.hasP1 && room.hasP2) {
+        statusText = '🟡 Chờ cả hai sẵn sàng';
       }
 
       card.innerHTML = `
         <div class="room-card-top">
           <span class="room-title-text">
-            <span>⚔️</span> ${room.name || room.id}
+            <span>⚔️</span> ${escapeHtml(room.name || room.id)}
           </span>
           <span class="room-badge-status ${statusBadgeClass}">${statusText}</span>
         </div>
@@ -435,12 +454,12 @@ class OttApp {
         <div class="room-matchup-box">
           <div class="room-player-side side-p1">
             <span class="room-player-label">Player 1 (Đỏ)</span>
-            <span class="room-player-val">${room.p1Name || (room.hasP1 ? 'Sẵn sàng' : 'Trống')}</span>
+            <span class="room-player-val">${escapeHtml(room.p1Name || (room.hasP1 ? 'Sẵn sàng' : 'Trống'))}</span>
           </div>
           <div class="room-vs-divider">VS</div>
           <div class="room-player-side side-p2">
             <span class="room-player-label">Player 2 (Xanh)</span>
-            <span class="room-player-val">${room.p2Name || (room.hasP2 ? 'Sẵn sàng' : 'Chờ tham gia...')}</span>
+            <span class="room-player-val">${escapeHtml(room.p2Name || (room.hasP2 ? 'Sẵn sàng' : 'Chờ tham gia...'))}</span>
           </div>
         </div>
 
@@ -476,7 +495,7 @@ class OttApp {
               <div class="state-row" style="margin-top: 2px;">
                 <span class="state-label">Nước cuối:</span>
                 <span style="font-family: var(--font-mono); color: var(--gold-light); font-size: 0.72rem;">
-                  ${room.lastMove.from} → ${room.lastMove.to} ${room.lastMove.isCapture ? '⚔️' : ''}
+                  ${escapeHtml(room.lastMove.from)} → ${escapeHtml(room.lastMove.to)} ${room.lastMove.isCapture ? '⚔️' : ''}
                 </span>
               </div>
             ` : ''}
@@ -491,19 +510,19 @@ class OttApp {
 
         <div class="room-card-footer">
           <div class="room-card-info">
-            Mã: <code style="color: var(--gold-light);">${room.id}</code> · 👁️ ${room.spectators || 0} khán giả
+            Mã: <code style="color: var(--gold-light);">${escapeHtml(room.id)}</code> · 👁️ ${Number(room.spectators) || 0} khán giả
           </div>
           <div class="room-card-actions">
-            ${!room.hasP2 && room.status !== 'ENDED' ? `
-              <button class="btn btn-primary btn-sm btn-join-p2" data-room="${room.id}">
-                ⚔️ Vào chơi (P2)
+            ${(!room.hasP1 || !room.hasP2) && room.status !== 'ENDED' ? `
+              <button class="btn btn-primary btn-sm btn-join-player" data-room="${escapeHtml(room.id)}" data-role="${room.hasP1 ? 'P2' : 'P1'}">
+                ⚔️ Vào chơi (${room.hasP1 ? 'P2' : 'P1'})
               </button>
             ` : `
-              <button class="btn btn-sm btn-spectate" data-room="${room.id}">
+              <button class="btn btn-sm btn-spectate" data-room="${escapeHtml(room.id)}">
                 👁️ Xem trực tiếp
               </button>
             `}
-            <button class="btn btn-sm btn-copy-card-link" data-room="${room.id}" title="Copy link phòng">
+            <button class="btn btn-sm btn-copy-card-link" data-room="${escapeHtml(room.id)}" title="Copy link phòng">
               📋 Link
             </button>
           </div>
@@ -511,10 +530,10 @@ class OttApp {
       `;
 
       // Event listener for Join P2
-      const btnJoin = card.querySelector('.btn-join-p2');
+      const btnJoin = card.querySelector('.btn-join-player');
       if (btnJoin) {
         btnJoin.addEventListener('click', () => {
-          this.syncEngine.joinRoom(room.id, 'P2');
+          this.syncEngine.joinRoom(room.id, btnJoin.dataset.role);
         });
       }
 
@@ -532,6 +551,7 @@ class OttApp {
         btnCopy.addEventListener('click', () => {
           const url = new URL(window.location.href);
           url.searchParams.set('room', room.id);
+          url.searchParams.delete('role');
           if (navigator.clipboard) {
             navigator.clipboard.writeText(url.toString()).then(() => {
               this.showToast(`Đã copy link phòng ${room.id}!`, 'success');
@@ -568,6 +588,7 @@ class OttApp {
   }
 
   startTurnTimer() {
+    if (this.gameMode === 'ONLINE') return;
     this.stopTurnTimer();
     this.timerRemaining = this.turnDuration;
     this.updateTimerDisplay();
@@ -606,6 +627,7 @@ class OttApp {
   }
 
   handleTurnTimeout() {
+    if (this.gameMode === 'ONLINE') return;
     this.addLog(`⏱️ Hết thời gian 30s! Chuyển lượt đi.`, 'warning');
     this.showToast('Hết 30s lượt đi, tự động đổi lượt!', 'warning');
     sounds.block();
@@ -765,6 +787,10 @@ class OttApp {
     if (this.dom.moveHintText) {
       this.dom.moveHintText.innerHTML = `💡 Lượt của <strong>${isP1 ? 'Player 1 (Đỏ)' : 'Player 2 (Xanh)'}</strong>. Click một quân của bạn để xem 8 hướng di chuyển.`;
     }
+    if (this.gameMode === 'ONLINE' && !this.bothPlayersReady) {
+      this.dom.turnText.textContent = 'Đang chờ hai người sẵn sàng…';
+      if (this.dom.turnSubtext) this.dom.turnSubtext.textContent = 'Mỗi người bấm “Sẵn sàng” để bắt đầu đồng hồ.';
+    }
   }
 
   handlePieceSelected(piece, coord, validMoves) {
@@ -845,17 +871,28 @@ class OttApp {
     this.addLog(`💬 Thả biểu cảm: ${emoji}`, 'info');
   }
 
-  startPingMonitor() {
-    if (this.pingInterval) clearInterval(this.pingInterval);
-    const updatePing = () => {
-      if (!this.dom.pingBadge) return;
-      const basePing = this.gameMode === 'ONLINE' ? 24 : 6;
-      const jitter = Math.floor(Math.random() * 8 - 4);
-      const ping = Math.max(3, basePing + jitter);
-      this.dom.pingBadge.textContent = `📶 Ping: ${ping}ms`;
+  showWaitingForPlayers(label = 'Chờ sẵn sàng') {
+    this.onlineClockDeadline = null;
+    if (this.dom.turnTimerText) this.dom.turnTimerText.textContent = label;
+    if (this.dom.turnTimerBar) this.dom.turnTimerBar.style.width = '0%';
+  }
+
+  handleOnlineTimer(timer) {
+    if (this.gameMode !== 'ONLINE') return;
+    this.stopTurnTimer();
+    if (!timer.active || timer.remainingMs === null) {
+      this.showWaitingForPlayers(timer.gameEnded ? 'Đã kết thúc' : 'Chờ sẵn sàng');
+      return;
+    }
+    this.onlineClockDuration = timer.durationMs;
+    this.onlineClockDeadline = Date.now() + timer.remainingMs;
+    const update = () => {
+      const remaining = Math.max(0, this.onlineClockDeadline - Date.now());
+      this.dom.turnTimerText.textContent = `${Math.ceil(remaining / 1000)}s`;
+      this.dom.turnTimerBar.style.width = `${Math.min(100, remaining / this.onlineClockDuration * 100)}%`;
     };
-    updatePing();
-    this.pingInterval = setInterval(updatePing, 4000);
+    update();
+    this.timerInterval = setInterval(update, 250);
   }
 
   // -------------------------------------------------------------
@@ -863,6 +900,10 @@ class OttApp {
   // -------------------------------------------------------------
   handleRoomJoined(roomId, role, roomName) {
     if (!roomId) {
+      this.bothPlayersReady = false;
+      this.stopTurnTimer();
+      this.showWaitingForPlayers();
+      this.dom.btnNewGame.disabled = false;
       // Left room
       this.dom.lobbySection.style.display = 'flex';
       this.dom.gameArena.style.display = 'none';
@@ -892,20 +933,31 @@ class OttApp {
     this.dom.activeRoomRole.className = `room-role-chip ${roleClass}`;
 
     this.renderer.setLocalRole(role);
+    const isPlayer = role === 'P1' || role === 'P2';
+    this.dom.btnNewGame.disabled = !isPlayer;
+    this.dom.btnRoomResetGame.disabled = !isPlayer;
+    this.dom.btnVictoryRestart.disabled = !isPlayer;
+    this.dom.btnRoomReady.disabled = role !== 'P1' && role !== 'P2';
+    this.dom.btnRoomReady.textContent = '✅ Sẵn sàng';
 
     this.dom.onlineStatusBadge.style.display = 'inline-flex';
     this.dom.onlineStatusBadge.className = 'status-badge online';
     this.dom.onlineStatusBadge.textContent = `● Online: ${roomId}`;
 
     this.showToast(`Đã vào phòng ${roomId}! (${roleText})`, 'success');
-    this.addLog(`🌐 Đã tham gia phòng <strong>${roomId}</strong> với vai trò: <strong>${roleText}</strong>`, 'info');
+    this.addLog(`🌐 Đã tham gia phòng <strong>${escapeHtml(roomId)}</strong> với vai trò: <strong>${roleText}</strong>`, 'info');
   }
 
   handleConnectionChange(connected, msg) {
     if (connected) {
       this.dom.onlineStatusBadge.className = 'status-badge online';
       this.dom.onlineStatusBadge.textContent = `● Server Online`;
+      if (msg?.startsWith('⚠️')) this.showToast(msg, 'warning');
     } else {
+      this.stopTurnTimer();
+      if (this.gameMode === 'ONLINE') this.showWaitingForPlayers();
+      this.renderer.setInteractive(false);
+      this.dom.btnRoomReady.disabled = true;
       this.dom.onlineStatusBadge.className = 'status-badge offline';
       this.dom.onlineStatusBadge.textContent = `○ Server Offline`;
       if (msg) this.showToast(msg, 'warning');
@@ -915,12 +967,23 @@ class OttApp {
   handlePresenceUpdate(presence) {
     if (!presence || !this.dom.activeRoomPresence) return;
 
-    if (presence.p1 && presence.p2) {
+    this.bothPlayersReady = Boolean(presence.p1 && presence.p2 && presence.ready?.p1 && presence.ready?.p2);
+    this.dom.p1ArmyStatus.textContent = !presence.p1 ? 'Chờ người chơi' : presence.ready?.p1 ? 'Đã sẵn sàng' : 'Chưa sẵn sàng';
+    this.dom.p2ArmyStatus.textContent = !presence.p2 ? 'Chờ người chơi' : presence.ready?.p2 ? 'Đã sẵn sàng' : 'Chưa sẵn sàng';
+    const role = this.syncEngine.myRole;
+    const ownReady = role === 'P1' ? presence.ready?.p1 : role === 'P2' ? presence.ready?.p2 : false;
+    this.dom.btnRoomReady.disabled = !this.syncEngine.isOnline || !['P1', 'P2'].includes(role) || ownReady || this.gameStatus === GAME_STATUS.ENDED;
+    this.dom.btnRoomReady.textContent = ownReady ? '✓ Đã sẵn sàng' : '✅ Sẵn sàng';
+    this.renderer.setInteractive(this.bothPlayersReady && this.gameStatus !== GAME_STATUS.ENDED &&
+      (this.syncEngine.myRole === 'P1' || this.syncEngine.myRole === 'P2'));
+    this.updateTurnDisplay();
+
+    if (this.bothPlayersReady) {
       this.dom.activeRoomPresence.className = 'room-badge-status room-badge-playing';
       this.dom.activeRoomPresence.textContent = '🟢 Cả 2 người chơi đã sẵn sàng!';
     } else {
       this.dom.activeRoomPresence.className = 'room-badge-status room-badge-waiting';
-      this.dom.activeRoomPresence.textContent = '🟡 Đang chờ đối thủ tham gia...';
+      this.dom.activeRoomPresence.textContent = `🟡 P1 ${presence.ready?.p1 ? '✓' : '○'} · P2 ${presence.ready?.p2 ? '✓' : '○'} — chờ sẵn sàng`;
     }
   }
 
@@ -944,7 +1007,9 @@ class OttApp {
     this.renderer.render(this.board, this.currentTurn, this.lastMove);
     this.updateStatsDisplay();
     this.updateTurnDisplay();
-    this.startTurnTimer();
+    if (data.timedOutRole) {
+      this.addLog(`⏱️ ${data.timedOutRole} hết 30 giây; server đã chuyển lượt.`, 'warning');
+    }
 
     if (data.lastMove) {
       if (data.lastMove.isCapture) {
@@ -958,6 +1023,9 @@ class OttApp {
 
     if (status === GAME_STATUS.ENDED && winnerInfo) {
       this.handleVictory(winnerInfo);
+    } else if (this.gameMode === 'ONLINE') {
+      this.renderer.setInteractive(this.bothPlayersReady &&
+        (this.syncEngine.myRole === 'P1' || this.syncEngine.myRole === 'P2'));
     }
   }
 }

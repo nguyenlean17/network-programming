@@ -4,6 +4,7 @@
  */
 
 import http from 'http';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
@@ -20,6 +21,15 @@ const wss = new WebSocketServer({ server });
 const roomManager = new RoomManager();
 
 const PORT = process.env.PORT || 3000;
+const TURN_DURATION_MS = Number(process.env.TURN_DURATION_MS) > 0
+  ? Number(process.env.TURN_DURATION_MS) : 30000;
+const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
+
+const newRoomId = () => `OTT-${randomUUID().slice(0, 8).toUpperCase()}`;
+const validRoomId = (value) => typeof value === 'string' && ROOM_ID_PATTERN.test(value);
+const cleanLabel = (value, fallback) => typeof value === 'string'
+  ? (value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 32) || fallback)
+  : fallback;
 
 // Body parser
 app.use(express.json());
@@ -69,8 +79,10 @@ app.get('/api/rooms', (req, res) => {
 // Create room endpoint
 app.post('/api/rooms', (req, res) => {
   const { roomId, roomName } = req.body || {};
-  const cleanId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
-  const cleanName = roomName || `Phòng ${cleanId}`;
+  const cleanId = roomId || newRoomId();
+  if (!validRoomId(cleanId)) return res.status(400).json({ error: 'Mã phòng không hợp lệ.' });
+  if (roomManager.rooms.has(cleanId)) return res.status(409).json({ error: 'Mã phòng đã tồn tại.' });
+  const cleanName = cleanLabel(roomName, `Phòng ${cleanId}`);
   const room = roomManager.getOrCreateRoom(cleanId, cleanName);
 
   broadcastRoomsList();
@@ -101,9 +113,59 @@ function broadcastRoomPresence(room) {
     roomId: room.id,
     p1: !!room.players.P1,
     p2: !!room.players.P2,
+    ready: { p1: room.ready.P1, p2: room.ready.P2 },
     players: { p1: room.playerNames.P1, p2: room.playerNames.P2 },
     totalConnected: room.clients.size
   });
+}
+
+function broadcastTurnClock(room) {
+  roomManager.broadcast(room, {
+    type: 'TURN_TIMER',
+    active: room.turnDeadline !== null,
+    remainingMs: room.turnDeadline === null ? null : Math.max(0, room.turnDeadline - Date.now()),
+    durationMs: TURN_DURATION_MS,
+    gameEnded: room.gameSession.status === 'ENDED'
+  });
+}
+
+function expireTurn(room) {
+  if (roomManager.rooms.get(room.id) !== room || room.turnDeadline === null) return;
+  clearTimeout(room.turnTimer);
+  room.turnTimer = null;
+  room.turnDeadline = null;
+  if (!room.players.P1 || !room.players.P2 || !room.ready.P1 || !room.ready.P2 || room.gameSession.status === 'ENDED') {
+    broadcastTurnClock(room);
+    return;
+  }
+
+  const timedOutRole = room.gameSession.currentTurn;
+  room.gameSession.currentTurn = timedOutRole === 'P1' ? 'P2' : 'P1';
+  roomManager.broadcast(room, {
+    type: 'STATE_UPDATE',
+    gameState: room.gameSession.getState(),
+    lastMove: null,
+    timedOutRole
+  });
+  syncTurnClock(room, true);
+  broadcastRoomsList();
+}
+
+function syncTurnClock(room, restart = false) {
+  const ready = room.players.P1 && room.players.P2 && room.ready.P1 && room.ready.P2 && room.gameSession.status !== 'ENDED';
+  if (!ready || restart) {
+    clearTimeout(room.turnTimer);
+    room.turnTimer = null;
+    room.turnDeadline = null;
+  }
+  if (ready && room.turnDeadline === null) {
+    room.turnDeadline = Date.now() + TURN_DURATION_MS;
+    const deadline = room.turnDeadline;
+    room.turnTimer = setTimeout(() => {
+      if (room.turnDeadline === deadline) expireTurn(room);
+    }, TURN_DURATION_MS);
+  }
+  broadcastTurnClock(room);
 }
 
 // WebSocket message dispatcher
@@ -129,9 +191,14 @@ wss.on('connection', (ws) => {
         }
 
         case 'CREATE_ROOM': {
-          const newRoomId = roomId || `OTT-${Math.floor(1000 + Math.random() * 9000)}`;
-          const cleanName = roomName || `Phòng ${newRoomId}`;
-          const { room, role: assignedRole } = roomManager.createRoom(newRoomId, cleanName, ws, playerName || 'Player 1');
+          const requestedId = roomId || newRoomId();
+          if (!validRoomId(requestedId) || roomManager.rooms.has(requestedId)) {
+            ws.send(JSON.stringify({ type: 'ROOM_ERROR', message: 'Mã phòng không hợp lệ hoặc đã tồn tại.' }));
+            break;
+          }
+          const cleanName = cleanLabel(roomName, `Phòng ${requestedId}`);
+          const previousRoom = ws.roomId ? roomManager.rooms.get(ws.roomId) : null;
+          const { room, role: assignedRole } = roomManager.createRoom(requestedId, cleanName, ws, cleanLabel(playerName, 'Player 1'));
 
           ws.send(JSON.stringify({
             type: 'ROOM_JOINED',
@@ -146,12 +213,22 @@ wss.on('connection', (ws) => {
           }));
 
           broadcastRoomPresence(room);
+          syncTurnClock(room);
+          if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
+            broadcastRoomPresence(previousRoom);
+            syncTurnClock(previousRoom);
+          }
           broadcastRoomsList();
           break;
         }
 
         case 'JOIN_ROOM': {
-          const { room, role: assignedRole } = roomManager.joinRoom(roomId || 'default', ws, role, playerName);
+          if (!validRoomId(roomId)) {
+            ws.send(JSON.stringify({ type: 'ROOM_ERROR', message: 'Mã phòng không hợp lệ.' }));
+            break;
+          }
+          const previousRoom = ws.roomId && ws.roomId !== roomId ? roomManager.rooms.get(ws.roomId) : null;
+          const { room, role: assignedRole } = roomManager.joinRoom(roomId, ws, role, cleanLabel(playerName, 'Player'));
           ws.send(JSON.stringify({
             type: 'ROOM_JOINED',
             roomId: room.id,
@@ -165,7 +242,11 @@ wss.on('connection', (ws) => {
           }));
 
           broadcastRoomPresence(room);
-
+          syncTurnClock(room);
+          if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
+            broadcastRoomPresence(previousRoom);
+            syncTurnClock(previousRoom);
+          }
           broadcastRoomsList();
           break;
         }
@@ -176,7 +257,20 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
           if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
             broadcastRoomPresence(previousRoom);
+            syncTurnClock(previousRoom);
           }
+          broadcastRoomsList();
+          break;
+        }
+
+        case 'SET_READY': {
+          if (!ws.roomId) return;
+          const room = roomManager.rooms.get(ws.roomId);
+          if (!room || !['P1', 'P2'].includes(ws.role) || room.players[ws.role] !== ws) return;
+          if (room.gameSession.status === 'ENDED') return;
+          room.ready[ws.role] = true;
+          broadcastRoomPresence(room);
+          syncTurnClock(room);
           broadcastRoomsList();
           break;
         }
@@ -195,8 +289,14 @@ wss.on('connection', (ws) => {
             return;
           }
 
-          if (!room.players.P1 || !room.players.P2) {
+          if (!room.players.P1 || !room.players.P2 || !room.ready.P1 || !room.ready.P2) {
             ws.send(JSON.stringify({ type: 'MOVE_ERROR', message: 'Cần đủ 2 người chơi để bắt đầu.' }));
+            return;
+          }
+
+          if (room.turnDeadline === null || Date.now() >= room.turnDeadline) {
+            if (room.turnDeadline !== null) expireTurn(room);
+            ws.send(JSON.stringify({ type: 'MOVE_ERROR', message: 'Đã hết thời gian lượt đi.' }));
             return;
           }
 
@@ -216,7 +316,7 @@ wss.on('connection', (ws) => {
             lastMove: result.lastMove,
             winnerInfo: result.winnerInfo
           });
-
+          syncTurnClock(room, true);
           broadcastRoomsList();
           break;
         }
@@ -231,13 +331,16 @@ wss.on('connection', (ws) => {
           }
 
           const newState = room.gameSession.reset();
+          room.ready.P1 = false;
+          room.ready.P2 = false;
           roomManager.broadcast(room, {
             type: 'STATE_UPDATE',
             gameState: newState,
             lastMove: null,
             winnerInfo: null
           });
-
+          broadcastRoomPresence(room);
+          syncTurnClock(room, true);
           broadcastRoomsList();
           break;
         }
@@ -246,6 +349,7 @@ wss.on('connection', (ws) => {
           if (!ws.roomId) return;
           const room = roomManager.rooms.get(ws.roomId);
           if (!room) return;
+          if (!['👏', '⚔️', '🔥', '😱', '🏆'].includes(payload.emoji)) return;
 
           roomManager.broadcast(room, {
             type: 'REACTION',
@@ -268,6 +372,7 @@ wss.on('connection', (ws) => {
     roomManager.leaveRoom(ws);
     if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
       broadcastRoomPresence(previousRoom);
+      syncTurnClock(previousRoom);
     }
     broadcastRoomsList();
   });
