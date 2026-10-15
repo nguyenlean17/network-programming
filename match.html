@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Replay trận bot — OTTv2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/kawaii.css">
+  <link rel="stylesheet" href="css/bots.css">
+  <link rel="stylesheet" href="css/replay.css">
+</head>
+<body>
+  <header class="hub-header">
+    <a class="back-link" href="/bots.html">← Bot & giải</a>
+    <div class="brand-mark" aria-hidden="true">✿</div>
+    <div class="brand-text"><strong>Replay OTTv2</strong><span>Xem lại từng nước đi.</span></div>
+  </header>
+  <main class="replay-main">
+    <section class="welcome-card replay-heading">
+      <div><span class="eyebrow">TRẬN ĐẤU ĐÃ LƯU</span><h1>Phát lại ván bot</h1><p id="player-summary" class="card-meta"></p><p id="replay-status" role="status">Đang tải dữ liệu trận…</p></div>
+      <div class="welcome-sticker" aria-hidden="true">🎬</div>
+    </section>
+    <section class="panel replay-panel">
+      <div class="board-wrapper replay-board-wrap"><div id="board-container" class="board-grid" aria-label="Bàn cờ OTTv2 replay"></div></div>
+      <div class="replay-toolbar">
+        <button id="first-move" class="button" type="button" aria-label="Về đầu">⏮</button>
+        <button id="previous-move" class="button" type="button" aria-label="Nước trước">◀</button>
+        <button id="play-pause" class="button primary" type="button">▶ Phát</button>
+        <button id="next-move" class="button" type="button" aria-label="Nước tiếp">▶</button>
+        <button id="last-move" class="button" type="button" aria-label="Tới cuối">⏭</button>
+      </div>
+      <label class="move-range">Nước đi <span id="move-counter">0 / 0</span><input id="move-range" type="range" min="0" max="0" value="0"></label>
+      <p id="move-description" class="form-hint">Bàn cờ hiển thị trạng thái ban đầu.</p>
+    </section>
+  </main>
+  <script type="module" src="js/replayPage.js"></script>
+</body>
+</html>

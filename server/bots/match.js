@@ -15,6 +15,7 @@ export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID
   const memories = { P1: null, P2: null };
   let result = null;
 
+  try {
   for (let ply = 0; ply < maxPlies; ply++) {
     const player = game.currentTurn;
     const request = botRequest(game, player, ply, memories[player]);
@@ -27,8 +28,11 @@ export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID
     try {
       raw = await runner(player, request);
     } catch (error) {
-      result = { winner: player === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1,
-        reason: error?.code === 'BOT_TIMEOUT' ? 'BOT_TIMEOUT' : 'BOT_CRASH',
+      // The injected runner represents bot execution; untyped exceptions are bot crashes.
+      // Infrastructure adapters must explicitly tag their failures RUNNER_ERROR.
+      const botFault = error?.code === 'BOT_TIMEOUT' || error?.code === 'BOT_CRASH' || !error?.code;
+      result = { winner: botFault ? (player === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1) : null,
+        reason: error?.code === 'BOT_TIMEOUT' ? 'BOT_TIMEOUT' : botFault ? 'BOT_CRASH' : 'RUNNER_ERROR',
         faultPlayer: player, detail: String(error?.message || error).slice(0, 200) };
       break;
     }
@@ -54,6 +58,9 @@ export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID
       result = { winner: applied.winnerInfo.winner, reason: applied.winnerInfo.reason, faultPlayer: null };
       break;
     }
+  }
+  } finally {
+    await runner.close?.();
   }
 
   result ??= { winner: null, reason: 'MOVE_LIMIT', faultPlayer: null };

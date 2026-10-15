@@ -24,11 +24,11 @@ Bot Python đọc **một** JSON từ stdin và ghi **một** JSON vào stdout c
 {"apiVersion":"1.0","move":{"from":"A8","to":"A7"},"memory":null}
 ```
 
-Chỉ chấp nhận một JSON object, phiên bản `1.0`, tọa độ A1–I9 và `memory` là JSON tối đa 1 KiB. Toàn bộ stdout tối đa 4 KiB. JSON lỗi, thiếu nước đi, phiên bản sai, nước không hợp lệ, crash hoặc hết thời gian đều là lỗi bot và xử thua theo đề xuất thể lệ. Kết quả phân biệt `MALFORMED_OUTPUT`, `INVALID_MOVE`, `BOT_CRASH` và `BOT_TIMEOUT`. Lớp Docker runner đặt giới hạn 2 giây/lượt, 0,5 CPU, 64 MiB RAM, 32 tiến trình và tắt mạng; cần kiểm thử container thực trước khi dùng cho file nộp. Không gọi bot từ web process.
+Chỉ chấp nhận một JSON object, phiên bản `1.0`, tọa độ A1–I9 và `memory` là JSON tối đa 1 KiB. Toàn bộ stdout tối đa 4 KiB. JSON lỗi, thiếu nước đi, phiên bản sai, nước không hợp lệ, crash hoặc hết thời gian đều là lỗi bot và xử thua theo đề xuất thể lệ. Kết quả phân biệt `MALFORMED_OUTPUT`, `INVALID_MOVE`, `BOT_CRASH` và `BOT_TIMEOUT`. Worker hiện tích hợp Render Sandboxes, tắt mạng và giới hạn mỗi quyết định khoảng 2,5 giây (hạn dừng tiến trình 2 giây). Cần thử nghiệm trên workspace Render thật trước khi mở nhận bot; API web không chạy mã bot.
 
 ## Đề xuất xử lý ván không kết thúc
 
-Nếu đến lượt mà không có nước đi hợp lệ: hòa (`NO_LEGAL_MOVES`). Sau 300 lượt đi mà chưa tới ô đích: hòa (`MOVE_LIMIT`). Đây là **đề xuất thể lệ**, cần công bố trước khi mở giải; không làm thay đổi luật phòng người với người. Thắng mục tiêu vẫn chỉ là P1 đến I1 hoặc P2 đến A9. Công thức điểm và tiêu chí phụ chưa được ấn định, chờ thể lệ từ chủ dự án.
+Nếu đến lượt mà không có nước đi hợp lệ: hòa (`NO_LEGAL_MOVES`). Sau 300 nửa-lượt (plies, mỗi lần một bot đi) mà chưa tới ô đích: hòa (`MOVE_LIMIT`). Đây là **đề xuất thể lệ**, cần công bố trước khi mở giải; không làm thay đổi luật phòng người với người. Thắng mục tiêu vẫn chỉ là P1 đến I1 hoặc P2 đến A9.
 
 Bot lỗi, timeout hoặc trả nước không hợp lệ xử thua. Điểm giải đã chốt: thắng 3, hòa 1, thua 0. Khi bằng điểm, hiện tạm xếp đồng hạng; chưa dùng tiêu chí phụ.
 

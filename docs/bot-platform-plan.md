@@ -42,10 +42,10 @@ Các khóa ngoại phải trỏ tới phiên bản bất biến. Cần ràng bu�
 
 1. **Audit**: tài liệu này; không sửa game hiện hữu.
 2. **Engine + Bot API**: `server/bots/protocol.js`, `server/bots/match.js`, `server/bots/replay.js`, `docs/bot-api-v1.md`, `examples/bots/*.py`, các bài kiểm thử `tests/bot-*.test.js`. Tận dụng `shared/gameRules.js` và `server/game.js`.
-3. **Quản lý + sandbox**: `server/bots/dockerRunner.js` là lớp gọi Docker cách ly ban đầu; tiếp tục thêm API xác thực, migration, kho file, validator, worker và kiểm thử container thực. Không dùng subprocess Python không cách ly cho file nộp.
-4. **Website**: trang bot, upload, luyện tập; dùng lại bàn cờ cho replay.
-5. **Giải đấu**: scheduler, đăng ký, khóa phiên bản, điểm cấu hình, replay, admin và audit log.
-6. **Triển khai**: worker container riêng, cơ sở dữ liệu và kho file bền vững, kiểm thử tích hợp và hồi quy, cập nhật README. Chỉ bật upload công khai khi toàn bộ ranh giới bảo mật hoạt động.
+3. **Quản lý + sandbox**: đã có `auth.js`, `platformRouter.js`, `migrate.js`, migration PostgreSQL, validator/runner Render Sandbox và worker hàng đợi. Bản nộp được cách ly; chưa xác minh bằng tài khoản Render Sandbox thật, chưa có xác minh email hoặc kiểm thử end-to-end trên hạ tầng thật.
+4. **Website**: đã có trang đăng nhập, tải bot, Practice Arena, đăng ký giải, quản lý vòng đời giải, trạng thái job và replay.
+5. **Giải đấu**: API và UI hiện hỗ trợ vòng tròn, khóa phiên bản, queue, bảng 3/1/0, replay, pause/resume và retry job. Single elimination và tiêu chí phụ xếp hạng chưa triển khai.
+6. **Triển khai**: mã nguồn có cấu hình API web và worker riêng. Cần cấp Postgres bền vững, quyền Render Sandboxes, cấu hình worker an toàn rồi chạy kiểm thử tích hợp thực tế trước khi mở nhận bot công khai. Không thể xác nhận triển khai production khi chưa có các thông tin/quyền đó.
 
 ## Quyết định nghiệp vụ cần xác nhận
 
@@ -57,11 +57,10 @@ Các khóa ngoại phải trỏ tới phiên bản bất biến. Cần ràng bu�
 
 Không chạy file nộp trong Node/host. File ZIP cần chống zip slip, bom nén và giới hạn kích thước. Container không có mạng, quyền root, secret hay mount nhạy cảm, có quota CPU/RAM/process/output/thời gian. Đảm bảo một job được ghi kết quả đúng một lần sau khi worker chết hoặc chạy lại. Quy tắc hòa 300 lượt hoặc không còn nước hợp lệ cần được công bố cùng thể lệ trước trận giải đầu tiên.
 
-## Kết quả thực hiện tại mốc này
+## Trạng thái hiện tại
 
-- Giai đoạn 1: kiểm kê xong; bộ kiểm thử gốc đạt trước khi sửa.
-- Giai đoạn 2: Bot API 1.0, coordinator, hai bot mẫu và kiểm thử giao thức/trận cục bộ đã thêm. Bộ kiểm thử gốc và mới đạt trên máy có Python.
-- Giai đoạn 3: có lớp Docker runner với giới hạn mạng, quyền, CPU, RAM, tiến trình, file, stdout và thời gian; **chưa kiểm thử với Docker thật**, vì máy hiện tại không có lệnh Docker. Chưa có upload, auth, DB hay worker chạy nền. Không gọi runner từ web API.
-- Thể lệ nhận từ chủ dự án: trận không còn nước hợp lệ hoặc chạm giới hạn 300 lượt được tính hòa; bot lỗi, timeout hoặc đi sai xử thua. `runBotMatch` ghi rõ lý do kết thúc.
-- Bảng điểm `server/bots/standings.js` tính thắng 3, hòa 1, thua 0 từ các trận đã hoàn tất; trận đang chạy/bị treo không được tính. Đội cùng điểm được đồng hạng; chưa áp dụng tiêu chí phụ.
-- Hạ tầng: Render được chọn nếu khả thi. Cần quyền Render Sandboxes (hiện early access) hoặc runner biệt lập khác. DB Render miễn phí không đáp ứng lưu lịch sử dài hạn vì hết hạn sau 30 ngày; triển khai thật cần Postgres trả phí hoặc dịch vụ bền vững tương đương.
+- Có Bot API 1.0, coordinator dùng `ServerGameSession`, hai bot Python mẫu, schema/migration PostgreSQL, tài khoản, tải bot cách ly, API giải vòng tròn, bảng xếp hạng 3/1/0, replay, worker và UI người chơi/quản trị.
+- Nguồn nộp giới hạn 64 KiB, lưu trong DB, và worker mới được lấy từ DB để chạy; Sandbox per-seat tắt mạng. Retry dành cho lỗi worker/hạ tầng, lỗi bot hợp lệ trong sandbox được ghi kết quả theo thể lệ.
+- Bộ kiểm thử `npm test` đạt trên máy dev (bao gồm chạy hai bot mẫu Python); kiểm thử sandbox Render thật, migration trên Postgres thật và worker end-to-end chưa thể chạy nếu chưa có dịch vụ/credentials.
+- Practice Arena tạo trận vào cùng hàng đợi cách ly; mỗi người dùng giới hạn tối đa ba trận đang chạy/chờ. Chưa triển khai xác minh email, single elimination hoặc tiêu chí phụ xếp hạng. Chưa bật/cấu hình worker trong Render Blueprint để tránh khởi tạo tài nguyên tính phí ngoài ý muốn.
+- Render Sandbox cần quyền workspace. Chỉ mở nhận mã bot công khai sau khi cấp Postgres bền vững, bật worker riêng và xác nhận chạy an toàn trên workspace thật.

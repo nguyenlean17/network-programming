@@ -9,7 +9,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
+import pg from 'pg';
 import { RoomManager } from './room.js';
+import { migrateBotPlatform } from './bots/migrate.js';
+import { createBotPlatformRouter } from './bots/platformRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +22,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const roomManager = new RoomManager();
+const { Pool } = pg;
 
 const PORT = process.env.PORT || 3000;
 const TURN_DURATION_MS = Number(process.env.TURN_DURATION_MS) > 0
@@ -55,6 +59,21 @@ const cleanLabel = (value, fallback) => typeof value === 'string'
 // Body parser
 app.use(express.json());
 
+const authSecret = process.env.AUTH_SECRET || '';
+const hasBotPlatformConfig = Boolean(process.env.DATABASE_URL) && Buffer.byteLength(authSecret) >= 32;
+const platformPool = hasBotPlatformConfig
+  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 8, connectionTimeoutMillis: 5000 })
+  : null;
+let botPlatformReady = false;
+let migrationRetry = null;
+if (platformPool) app.use('/api/platform', (req, res, next) => {
+  if (!botPlatformReady) return res.status(503).json({ error: 'Bot platform storage is not ready' });
+  next();
+}, createBotPlatformRouter({ pool: platformPool, authSecret }));
+else app.use('/api/platform', (_req, res) => res.status(503).json({
+  error: 'Bot platform is not configured. Set DATABASE_URL and a 32-byte AUTH_SECRET.'
+}));
+
 // CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -66,7 +85,7 @@ app.use((req, res, next) => {
 
 // Publish only browser assets. Server code, tests and deployment files stay private.
 app.get('/', (_req, res) => res.sendFile(path.join(rootDir, 'index.html')));
-for (const page of ['index.html', 'playfun.html', 'rooms.html']) {
+for (const page of ['index.html', 'playfun.html', 'rooms.html', 'bots.html', 'match.html']) {
   app.get(`/${page}`, (_req, res) => res.sendFile(path.join(rootDir, page)));
 }
 for (const directory of ['css', 'js', 'shared']) {
@@ -83,6 +102,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     game: 'OTTv2',
     activeRooms: roomManager.rooms.size,
+    botPlatform: botPlatformReady ? 'ready' : 'unavailable',
     timestamp: new Date().toISOString()
   });
 });
@@ -406,9 +426,34 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`===============================================`);
-  console.log(`🎮 OTTv2 Server running on http://0.0.0.0:${PORT} (Port: ${PORT})`);
-  console.log(`🌐 WebSockets listening for multiplayer rooms`);
-  console.log(`===============================================`);
-});
+async function startServer() {
+  if (platformPool) {
+    const preparePlatform = async () => {
+      try {
+        await migrateBotPlatform(platformPool);
+        const bootstrapAdminEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
+        if (bootstrapAdminEmail) {
+          await platformPool.query("UPDATE users SET role = 'ADMIN' WHERE lower(email) = $1", [bootstrapAdminEmail]);
+        }
+        botPlatformReady = true;
+        console.log('Bot platform database is ready');
+        if (migrationRetry) clearInterval(migrationRetry);
+      } catch (error) {
+        botPlatformReady = false;
+        console.error('Bot platform database is unavailable:', error.message);
+      }
+    };
+    await preparePlatform();
+    if (!botPlatformReady) {
+      migrationRetry = setInterval(preparePlatform, 30000);
+    }
+  }
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`===============================================`);
+    console.log(`🎮 OTTv2 Server running on http://0.0.0.0:${PORT} (Port: ${PORT})`);
+    console.log(`🌐 WebSockets listening for multiplayer rooms`);
+    console.log(`===============================================`);
+  });
+}
+
+startServer();

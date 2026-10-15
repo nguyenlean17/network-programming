@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Quản lý bot OTTv2 và theo dõi các giải đấu lập trình AI.">
+  <title>Bot & giải đấu — OTTv2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/bots.css">
+</head>
+<body>
+  <header class="hub-header">
+    <a class="back-link" href="/" aria-label="Quay lại trang chơi">← OTTv2</a>
+    <div class="brand-mark" aria-hidden="true">✿</div>
+    <div class="brand-text"><strong>Góc bot</strong><span>Thử tài chiến thuật, từng nước một.</span></div>
+    <button id="logout-button" class="button quiet" hidden>Đăng xuất</button>
+  </header>
+
+  <main class="hub-main">
+    <section class="welcome-card">
+      <div>
+        <span class="eyebrow">OTTv2 · BOT ARENA</span>
+        <h1>Chào mừng đến góc đấu bot <span aria-hidden="true">🌱</span></h1>
+        <p>Tạo bot Python, lưu từng phiên bản và theo dõi giải đấu. Bot mới tải lên được giữ cách ly cho tới khi kiểm tra an toàn hoàn tất.</p>
+      </div>
+      <div class="welcome-sticker" aria-hidden="true">🤖</div>
+    </section>
+
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section id="public-tournament-panel" class="panel public-tournament-panel">
+      <div class="section-heading"><div><span class="eyebrow">LỊCH TRANH TÀI</span><h2>Các giải đang mở</h2></div><span class="heading-sticker">📣</span></div>
+      <div id="public-tournament-list" class="card-list"><p class="empty-state">Đang tải giải đấu…</p></div>
+    </section>
+
+    <section id="auth-panel" class="panel auth-panel">
+      <div class="section-heading"><div><span class="eyebrow">BẮT ĐẦU NÀO</span><h2>Tài khoản của bạn</h2></div><span class="heading-sticker">🧋</span></div>
+      <div class="auth-switch" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
+        <button class="auth-tab selected" type="button" data-auth-mode="login" role="tab" aria-selected="true">Đăng nhập</button>
+        <button class="auth-tab" type="button" data-auth-mode="register" role="tab" aria-selected="false">Tạo tài khoản</button>
+      </div>
+      <form id="auth-form" class="form-grid">
+        <label id="display-name-field" hidden>Tên hiển thị<input name="displayName" maxlength="48" autocomplete="nickname" placeholder="Tên bạn muốn mọi người thấy"></label>
+        <label>Email<input name="email" type="email" maxlength="254" required autocomplete="email" placeholder="ban@example.com"></label>
+        <label>Mật khẩu<input name="password" type="password" minlength="12" maxlength="256" required autocomplete="current-password" placeholder="Ít nhất 12 ký tự"></label>
+        <button id="auth-submit" class="button primary" type="submit">Đăng nhập</button>
+      </form>
+      <p class="form-hint">Mật khẩu tối thiểu 12 ký tự. Phiên đăng nhập được giữ trong tab này.</p>
+    </section>
+
+    <section id="account-panel" hidden>
+      <div class="section-heading account-heading"><div><span class="eyebrow">KHU VỰC CỦA BẠN</span><h2>Xin chào, <span id="account-name"></span> <span aria-hidden="true">🌼</span></h2></div><span id="role-badge" class="pill">Người chơi</span></div>
+      <div class="hub-grid">
+        <section class="panel">
+          <div class="section-heading"><div><span class="eyebrow">BỘ SƯU TẬP</span><h2>Bot của mình</h2></div><span class="heading-sticker">🧠</span></div>
+          <form id="create-bot-form" class="inline-form">
+            <label class="sr-only" for="bot-name">Tên bot</label>
+            <input id="bot-name" name="name" maxlength="48" required placeholder="Đặt tên cho bot mới">
+            <button class="button primary" type="submit">＋ Tạo bot</button>
+          </form>
+          <div id="bot-list" class="card-list"><p class="empty-state">Đang tải danh sách bot…</p></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading"><div><span class="eyebrow">CÙNG TRANH TÀI</span><h2>Giải đấu</h2></div><span class="heading-sticker">🏆</span></div>
+          <div id="tournament-list" class="card-list"><p class="empty-state">Đang tải giải đấu…</p></div>
+        </section>
+      </div>
+
+      <section class="panel practice-panel">
+        <div class="section-heading"><div><span class="eyebrow">SÂN TẬP</span><h2>Thử bot của bạn</h2></div><span class="heading-sticker">🎮</span></div>
+        <p class="card-meta">Chọn phiên bản đã kiểm tra của bạn và một bot đã sẵn sàng. Trận tập dùng cùng luật với giải đấu nhưng không tính điểm xếp hạng.</p>
+        <form id="practice-form" class="admin-form">
+          <label>Bot của mình<select name="ownBotVersionId" required></select></label>
+          <label>Bot đối thủ<select name="opponentBotVersionId" required></select></label>
+          <button class="button primary" type="submit">Bắt đầu trận tập</button>
+        </form>
+        <div class="section-heading"><div><span class="eyebrow">LỊCH SỬ GẦN ĐÂY</span><h2>Trận luyện tập</h2></div></div>
+        <div id="practice-match-list" class="card-list"><p class="empty-state">Đang tải trận tập…</p></div>
+      </section>
+
+      <section id="admin-panel" class="panel admin-panel" hidden>
+        <div class="section-heading"><div><span class="eyebrow">DÀNH CHO QUẢN TRỊ</span><h2>Mở giải mới</h2></div><span class="heading-sticker">📋</span></div>
+        <form id="create-tournament-form" class="admin-form">
+          <label>Tên giải<input name="name" maxlength="100" required placeholder="Ví dụ: OTTv2 mùa thu"></label>
+          <label>Hạn đăng ký<input name="submissionDeadline" type="datetime-local"></label>
+          <p class="form-hint">Thể thức vòng tròn · Thắng 3 điểm · Hòa 1 điểm · Thua 0 điểm. Các bot phải qua kiểm tra sandbox trước khi dự giải.</p>
+          <button class="button primary" type="submit">Tạo giải</button>
+        </form>
+        <div class="section-heading"><div><span class="eyebrow">TÁC VỤ NỀN</span><h2>Hàng đợi</h2></div></div>
+        <div id="admin-job-list" class="card-list"><p class="empty-state">Đang tải tác vụ…</p></div>
+      </section>
+    </section>
+    <footer>Luật chơi và kết quả do máy chủ OTTv2 xác nhận. <a href="/">Trở lại bàn cờ</a></footer>
+  </main>
+  <script type="module" src="js/botHub.js"></script>
+</body>
+</html>
