@@ -30,6 +30,8 @@ Chỉ chấp nhận một JSON object, phiên bản `1.0`, tọa độ A1–I9 v
 
 Nếu đến lượt mà không có nước đi hợp lệ: hòa (`NO_LEGAL_MOVES`). Sau 300 lượt đi mà chưa tới ô đích: hòa (`MOVE_LIMIT`). Đây là **đề xuất thể lệ**, cần công bố trước khi mở giải; không làm thay đổi luật phòng người với người. Thắng mục tiêu vẫn chỉ là P1 đến I1 hoặc P2 đến A9. Công thức điểm và tiêu chí phụ chưa được ấn định, chờ thể lệ từ chủ dự án.
 
+Bot lỗi, timeout hoặc trả nước không hợp lệ xử thua. Điểm giải đã chốt: thắng 3, hòa 1, thua 0. Khi bằng điểm, hiện tạm xếp đồng hạng; chưa dùng tiêu chí phụ.
+
 ## Chạy bot mẫu cục bộ
 
 `examples/bots/first_legal.py` và `examples/bots/goal_seeker.py` là ví dụ hợp lệ. Với request JSON đầy đủ lưu trong `request.json`, chạy `python examples/bots/first_legal.py < request.json` trên máy của chính bạn. **Không dùng lệnh này cho file bot từ người lạ.** Hệ thống công khai chỉ được nhận file sau khi worker sandbox hoạt động.

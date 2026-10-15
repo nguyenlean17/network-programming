@@ -50,7 +50,7 @@ Các khóa ngoại phải trỏ tới phiên bản bất biến. Cần ràng bu�
 ## Quyết định nghiệp vụ cần xác nhận
 
 - Đã nhận đề xuất thể lệ: không còn nước đi hợp lệ hoặc đạt 300 lượt là hòa; bot lỗi, timeout hoặc đi sai xử thua. Cần công bố trước khi mở giải.
-- Công thức điểm và tiêu chí phụ của giải là gì? Nếu chưa có quy định, bắt buộc khai báo và công bố khi tạo giải, trước trận đầu.
+- Điểm đã được chốt: thắng 3, hòa 1, thua 0. Chưa có tiêu chí phụ; hiện xếp đồng hạng khi cùng điểm, chưa so đối đầu hay hiệu số.
 - Cần xác nhận hạ tầng cho worker container và lưu trữ bền vững trước khi tuyên bố website công khai hỗ trợ nộp bot.
 
 ## Rủi ro cần kiểm soát
@@ -62,4 +62,6 @@ Không chạy file nộp trong Node/host. File ZIP cần chống zip slip, bom n
 - Giai đoạn 1: kiểm kê xong; bộ kiểm thử gốc đạt trước khi sửa.
 - Giai đoạn 2: Bot API 1.0, coordinator, hai bot mẫu và kiểm thử giao thức/trận cục bộ đã thêm. Bộ kiểm thử gốc và mới đạt trên máy có Python.
 - Giai đoạn 3: có lớp Docker runner với giới hạn mạng, quyền, CPU, RAM, tiến trình, file, stdout và thời gian; **chưa kiểm thử với Docker thật**, vì máy hiện tại không có lệnh Docker. Chưa có upload, auth, DB hay worker chạy nền. Không gọi runner từ web API.
-- Đề xuất mới từ chủ dự án: trận bị kẹt hoặc chạm giới hạn lượt được tính hòa; điểm giải chờ công thức chính thức từ chủ dự án. Hiện `runBotMatch` biểu diễn hai trường hợp bằng `NO_LEGAL_MOVES` và `MOVE_LIMIT`, với giới hạn mặc định 300 lượt.
+- Thể lệ nhận từ chủ dự án: trận không còn nước hợp lệ hoặc chạm giới hạn 300 lượt được tính hòa; bot lỗi, timeout hoặc đi sai xử thua. `runBotMatch` ghi rõ lý do kết thúc.
+- Bảng điểm `server/bots/standings.js` tính thắng 3, hòa 1, thua 0 từ các trận đã hoàn tất; trận đang chạy/bị treo không được tính. Đội cùng điểm được đồng hạng; chưa áp dụng tiêu chí phụ.
+- Hạ tầng: Render được chọn nếu khả thi. Cần quyền Render Sandboxes (hiện early access) hoặc runner biệt lập khác. DB Render miễn phí không đáp ứng lưu lịch sử dài hạn vì hết hạn sau 30 ngày; triển khai thật cần Postgres trả phí hoặc dịch vụ bền vững tương đương.
