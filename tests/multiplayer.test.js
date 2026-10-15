@@ -23,8 +23,16 @@ assert.equal(manager.joinRoom(roomId, replacement, null, 'New Blue').role, 'P2')
 manager.joinRoom('OTHER-ROOM', replacement, null, 'New Blue');
 assert.equal(manager.rooms.get(roomId).players.P2, null, 'moving rooms releases the old seat');
 manager.leaveRoom(p1);
+assert.equal(manager.rooms.has(roomId), false, 'last player leaving removes the room even with spectators');
+assert.equal(spectator.roomId, null, 'spectators are detached from deleted rooms');
 manager.leaveRoom(spectator);
 assert.equal(manager.rooms.has(roomId), false, 'empty custom rooms are removed');
+
+const pending = manager.getOrCreateRoom('PENDING');
+assert.equal(manager.pruneEmptyRooms(30000, pending.createdAt + 29999), 0);
+assert.equal(manager.pruneEmptyRooms(30000, pending.createdAt + 30000), 1);
+assert.equal(manager.rooms.has('PENDING'), false, 'rooms created without joining expire');
+assert.equal(manager.rooms.has('OTHER-ROOM'), true, 'one active player keeps a waiting room alive');
 
 let update;
 let lastData;

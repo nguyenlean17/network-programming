@@ -24,6 +24,27 @@ const PORT = process.env.PORT || 3000;
 const TURN_DURATION_MS = Number(process.env.TURN_DURATION_MS) > 0
   ? Number(process.env.TURN_DURATION_MS) : 30000;
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
+const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) > 0 ? Number(process.env.HEARTBEAT_MS) : 15000;
+const EMPTY_ROOM_TTL_MS = Number(process.env.EMPTY_ROOM_TTL_MS) > 0 ? Number(process.env.EMPTY_ROOM_TTL_MS) : 30000;
+
+// Detect silently lost connections (network loss or a suspended device).
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    if (ws.readyState === 1) ws.ping();
+  }
+}, HEARTBEAT_MS);
+const roomCleanup = setInterval(() => {
+  if (roomManager.pruneEmptyRooms(EMPTY_ROOM_TTL_MS)) broadcastRoomsList();
+}, Math.min(5000, EMPTY_ROOM_TTL_MS));
+wss.on('close', () => {
+  clearInterval(heartbeat);
+  clearInterval(roomCleanup);
+});
 
 const newRoomId = () => `OTT-${randomUUID().slice(0, 8).toUpperCase()}`;
 const validRoomId = (value) => typeof value === 'string' && ROOM_ID_PATTERN.test(value);
@@ -170,6 +191,8 @@ function syncTurnClock(room, restart = false) {
 
 // WebSocket message dispatcher
 wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
   // Send current rooms list immediately on connect
   ws.send(JSON.stringify({
     type: 'ROOMS_LIST',
@@ -225,6 +248,11 @@ wss.on('connection', (ws) => {
         case 'JOIN_ROOM': {
           if (!validRoomId(roomId)) {
             ws.send(JSON.stringify({ type: 'ROOM_ERROR', message: 'Mã phòng không hợp lệ.' }));
+            break;
+          }
+          const targetRoom = roomManager.rooms.get(roomId);
+          if (role === 'SPECTATOR' && (!targetRoom || (!targetRoom.players.P1 && !targetRoom.players.P2))) {
+            ws.send(JSON.stringify({ type: 'ROOM_ERROR', message: 'Phòng không còn người chơi để xem.' }));
             break;
           }
           const previousRoom = ws.roomId && ws.roomId !== roomId ? roomManager.rooms.get(ws.roomId) : null;

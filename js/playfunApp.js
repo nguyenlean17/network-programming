@@ -105,10 +105,27 @@ const playhtmlSync = new PlayhtmlSyncEngine({
 
 const serverSync = new RenderSyncEngine({
   onRoomJoined: async (roomId, assignedRole) => {
+    if (!roomId) {
+      role = null;
+      bothPlayersPresent = false;
+      bothPlayersReady = false;
+      myReady = false;
+      updateTurnTimer(null);
+      roomLabel.textContent = 'Đã đóng';
+      roleLabel.textContent = 'Phòng đã đóng. Về sảnh để chọn phòng khác.';
+      readyButton.disabled = true;
+      resetButton.disabled = true;
+      document.getElementById('btn-copy-room-link').disabled = true;
+      document.getElementById('btn-victory-restart').disabled = true;
+      modal.classList.remove('active');
+      render();
+      return;
+    }
     role = assignedRole;
     myReady = false;
     board.setLocalRole(role);
     roomLabel.textContent = roomId;
+    document.getElementById('btn-copy-room-link').disabled = false;
     roleLabel.textContent = role === 'P1' ? 'Bạn là P1 (Đỏ)' :
       role === 'P2' ? 'Bạn là P2 (Xanh)' : 'Bạn là khán giả';
     resetButton.disabled = role === 'SPECTATOR';
@@ -185,6 +202,7 @@ function render() {
 
   turnBanner.className = `turn-banner ${gameState.currentTurn === 'P1' ? 'p1-turn' : 'p2-turn'}`;
   turnText.textContent = !serverSync.isOnline ? 'Đang chờ kết nối server…' :
+    !serverSync.roomId ? 'Chưa tham gia phòng. Hãy chọn phòng trong sảnh.' :
     gameState.status === GAME_STATUS.ENDED ? 'Ván đấu đã kết thúc' :
     !bothPlayersPresent ? 'Đang chờ đủ hai người chơi…' :
     !bothPlayersReady ? 'Đang chờ P1 và P2 bấm sẵn sàng…' :
@@ -219,8 +237,9 @@ document.getElementById('btn-victory-restart').addEventListener('click', () => {
   if (role === 'P1' || role === 'P2') serverSync.sendResetGame();
 });
 document.getElementById('btn-copy-room-link').addEventListener('click', async () => {
+  if (!serverSync.roomId) return;
   try {
-    await navigator.clipboard.writeText(playhtmlSync.getShareableLink() || window.location.href);
+    await navigator.clipboard.writeText(serverSync.getShareableLink());
     log('Đã sao chép liên kết phòng.');
   } catch {
     log('Không thể sao chép. Hãy chép địa chỉ trên thanh trình duyệt.');

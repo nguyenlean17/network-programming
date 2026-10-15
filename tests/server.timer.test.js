@@ -12,8 +12,8 @@ async function freePort() {
   return port;
 }
 
-async function connect(url) {
-  const socket = new WebSocket(url);
+async function connect(url, options = {}) {
+  const socket = new WebSocket(url, options);
   const messages = [];
   const waiters = [];
   socket.on('message', (raw) => {
@@ -49,7 +49,7 @@ async function connect(url) {
 const port = await freePort();
 const server = spawn(process.execPath, ['server/server.js'], {
   cwd: process.cwd(),
-  env: { ...process.env, PORT: String(port), TURN_DURATION_MS: '800' },
+  env: { ...process.env, PORT: String(port), TURN_DURATION_MS: '800', HEARTBEAT_MS: '200', EMPTY_ROOM_TTL_MS: '200' },
   stdio: 'ignore',
   windowsHide: true
 });
@@ -92,6 +92,41 @@ try {
   assert.equal(room.turn, 'P2', 'turn must stay unchanged after a player leaves');
   assert.equal(room.turnDeadline, null, 'clock must pause after a player leaves');
   console.log('✓ Turn timer waits for both ready players, switches on timeout and pauses on disconnect');
+
+  const viewer = await connect(`ws://127.0.0.1:${port}`);
+  clients.push(viewer);
+  viewer.send({ type: 'JOIN_ROOM', roomId, role: 'SPECTATOR' });
+  await viewer.take((m) => m.type === 'ROOM_JOINED');
+  p1.send({ type: 'LEAVE_ROOM' });
+  await viewer.take((m) => m.type === 'ROOM_CLOSED' && m.roomId === roomId);
+  let rooms = (await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms;
+  assert.equal(rooms.length, 0, 'spectators must not keep abandoned rooms alive');
+  viewer.send({ type: 'JOIN_ROOM', roomId, role: 'SPECTATOR' });
+  await viewer.take((m) => m.type === 'ROOM_ERROR');
+  rooms = (await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms;
+  assert.equal(rooms.length, 0, 'stale spectator links must not recreate rooms');
+
+  const created = await fetch(`http://127.0.0.1:${port}/api/rooms`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomId: 'UNUSED' })
+  });
+  assert.equal(created.status, 200);
+  await delay(550);
+  rooms = (await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms;
+  assert.equal(rooms.length, 0, 'unclaimed HTTP rooms must expire');
+
+  const lost = await connect(`ws://127.0.0.1:${port}`, { autoPong: false });
+  clients.push(lost);
+  lost.send({ type: 'CREATE_ROOM', roomId: 'LOST-CONNECTION' });
+  await lost.take((m) => m.type === 'ROOM_JOINED');
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Heartbeat did not close lost connection')), 4000);
+    lost.socket.once('close', () => { clearTimeout(timeout); resolve(); });
+  });
+  await viewer.take((m) => m.type === 'ROOMS_LIST' && !m.rooms.some((r) => r.id === 'LOST-CONNECTION'));
+  rooms = (await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms;
+  assert.equal(rooms.length, 0, 'heartbeat must remove ghost players and their rooms');
+  console.log('✓ Empty rooms are removed, stale spectator links rejected, and dead connections reclaimed');
 } finally {
   for (const client of clients) client.socket.terminate();
   server.kill();

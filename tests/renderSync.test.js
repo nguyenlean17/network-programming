@@ -39,4 +39,13 @@ sync.handleServerMessage({ type: 'ROOM_JOINED', roomId: 'OTT-RACE', role: 'SPECT
 assert.equal(new URL(sync.getShareableLink()).searchParams.has('role'), false,
   'shared links should let the invitee take a free player seat');
 
+let closedRoom;
+sync.onRoomJoined = (id) => { closedRoom = id; };
+sync.handleServerMessage({ type: 'ROOM_CLOSED', roomId: 'OTHER' });
+assert.equal(sync.roomId, 'OTT-RACE', 'unrelated close messages must be ignored');
+sync.handleServerMessage({ type: 'ROOM_CLOSED', roomId: 'OTT-RACE' });
+assert.equal(sync.roomId, null);
+assert.equal(sync.myRole, null);
+assert.equal(closedRoom, null, 'UI is notified when its room is removed');
+
 console.log('✓ Joining from a link waits for connection and keeps spectator role');

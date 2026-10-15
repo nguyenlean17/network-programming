@@ -104,10 +104,34 @@ export class RoomManager {
     ws.roomId = null;
     ws.role = null;
 
-    if (room.clients.size === 0) {
-      clearTimeout(room.turnTimer);
-      this.rooms.delete(roomId);
+    if (!room.players.P1 && !room.players.P2) this.removeRoom(room);
+  }
+
+  removeRoom(room) {
+    clearTimeout(room.turnTimer);
+    room.turnTimer = null;
+    room.turnDeadline = null;
+    this.broadcast(room, {
+      type: 'ROOM_CLOSED', roomId: room.id,
+      message: 'Phòng đã được xóa vì không còn người chơi.'
+    });
+    for (const client of room.clients) {
+      client.roomId = null;
+      client.role = null;
     }
+    room.clients.clear();
+    this.rooms.delete(room.id);
+  }
+
+  pruneEmptyRooms(maxAgeMs, now = Date.now()) {
+    let removed = 0;
+    for (const room of this.rooms.values()) {
+      if (!room.players.P1 && !room.players.P2 && now - room.createdAt >= maxAgeMs) {
+        this.removeRoom(room);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   broadcast(room, messageObj) {

@@ -199,6 +199,8 @@ Sau khi khởi chạy, console sẽ thông báo:
 
 **Lưu ý triển khai:** Phòng và ván đấu hiện được giữ trong bộ nhớ của server. Khi server khởi động lại, các phòng cũ không còn; người chơi cần tạo phòng mới.
 
+**Tự dọn phòng:** Khi người chơi cuối cùng rời đi, server xóa phòng kể cả khi vẫn còn khán giả và thông báo cho người đang xem. Phòng tạo qua API nhưng không ai vào sẽ bị xóa sau khoảng 30–35 giây. Server kiểm tra kết nối mỗi 15 giây để phát hiện người mất mạng trong khoảng 30 giây; phòng có ít nhất một người chơi còn kết nối vẫn được giữ lại. Liên kết xem phòng đã xóa không tạo lại phòng trống.
+
 ---
 
 ## 5. Hướng Dẫn Đẩy Mã Nguồn Lên Git (GitHub / GitLab)

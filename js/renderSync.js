@@ -299,6 +299,18 @@ export class RenderSyncEngine {
         break;
       }
 
+      case 'ROOM_CLOSED': {
+        if (data.roomId !== this.roomId) break;
+        this.roomId = null;
+        this.roomName = null;
+        this.myRole = null;
+        this.updateUrl(null);
+        if (this.onTimerUpdate) this.onTimerUpdate({ active: false, remainingMs: null });
+        if (this.onRoomJoined) this.onRoomJoined(null, null);
+        if (this.onRoomError) this.onRoomError(data.message);
+        break;
+      }
+
       case 'PLAYER_PRESENCE': {
         if (this.onPresenceUpdate) {
           this.onPresenceUpdate(data);
