@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oẳn Tù Tì v2 (OTTv2) - Chiến thuật cờ 9×9</title>
+  <meta name="description" content="Trò chơi Oẳn tù tì v2 (OTTv2) - Board game chiến thuật 9x9 tối giản cho 2 người chơi và multiplayer online thời gian thực.">
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Minimalistic Stylesheet (NO GRADIENTS) -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✊</text></svg>">
+  <link rel="stylesheet" href="css/kawaii.css">
+</head>
+<body>
+
+  <!-- Minimalist App Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-badge">✿</div>
+      <div class="logo-title">
+        <h1>Oẳn tù tì v2</h1>
+        <p>Một bàn cờ nhỏ, một cuộc vui lớn.</p>
+      </div>
+    </div>
+
+    <!-- Mode Switcher Navigation Tabs -->
+    <nav class="mode-tabs-nav" aria-label="Chế độ chơi">
+      <button id="tab-mode-local" class="mode-tab-btn active" title="Chơi 2 người trên cùng một thiết bị">
+        👥 Cùng một máy
+      </button>
+      <button id="tab-mode-online" class="mode-tab-btn" title="Danh sách phòng & Thi đấu trực tuyến">
+        🌿 Chơi trực tuyến
+      </button>
+      <button id="tab-mode-bot" class="mode-tab-btn" title="Đấu với máy tính thông minh">
+        🐻 Chơi với máy
+      </button>
+      <a hidden href="playfun.html" class="mode-tab-btn" title="Tạo phòng và mời bạn chơi">
+        🌷 Rủ bạn chơi
+      </a>
+    </nav>
+
+    <!-- Header Actions & Utility Status -->
+    <div class="header-actions">
+      <div id="online-status-badge" class="status-badge offline" style="display: none;">
+        ● Offline
+      </div>
+      <button id="btn-quick-guide" class="btn" title="Hướng dẫn 3 bước nhanh">
+        💡 Hướng dẫn
+      </button>
+      <button hidden id="btn-rules" class="btn" title="Xem luật chơi chi tiết">
+        📖 Luật chơi
+      </button>
+      <button id="btn-sound" class="btn" title="Bật/Tắt âm thanh">
+        🔊 Âm thanh
+      </button>
+      <button id="btn-new-game" class="btn btn-danger" title="Bắt đầu ván mới">
+        🔄 Ván mới
+      </button>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       View 1: Online Multiplayer Lobby (Danh sách phòng & Tạo phòng)
+       ===================================================================== -->
+  <section id="lobby-section" class="lobby-section" style="display: none;">
+    <div class="lobby-banner">
+      <div>
+        <h2>🌿 Rủ bạn vào chơi nào</h2>
+        <p>
+          Tạo góc chơi của hai bạn, hoặc ghé một phòng còn chỗ trống.
+        </p>
+      </div>
+
+      <div class="lobby-action-row">
+        <div class="lobby-create-box">
+          <input id="lobby-room-name-input" type="text" placeholder="Nhập tên phòng (VD: Phòng của Nam)..." maxlength="32">
+          <button id="lobby-btn-create-room" class="btn btn-primary">
+            ➕ Tạo phòng ngay
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Rooms Grid Header & Controls -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">Các phòng đang mở</span>
+        <span id="lobby-room-count-badge" class="status-badge">0 phòng</span>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem;">
+        <button id="lobby-btn-refresh" class="btn" title="Cập nhật danh sách phòng từ máy chủ">
+          🔄 Làm mới danh sách
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Rooms Grid Container -->
+    <div id="rooms-container" class="rooms-grid">
+      <!-- Loading State -->
+      <div class="empty-rooms-placeholder">
+        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⏳</div>
+        <h4>Đang tìm phòng cho bạn…</h4>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       View 2: Main Game Arena (Board 9x9, P1, P2)
+       ===================================================================== -->
+  <main id="game-arena" class="main-container">
+
+    <!-- Active Room Status Banner (Only visible when connected to an online room) -->
+    <div id="active-room-bar" class="active-room-bar" style="display: none; grid-column: 1 / -1; width: 100%;">
+      <div class="room-meta-group">
+        <span id="active-room-code" class="room-id-chip">OTT-0000</span>
+        <span id="active-room-name" class="room-title-text">Phòng Đấu Trực Tuyến</span>
+        <span id="active-room-role" class="room-role-chip room-role-p1">Bạn là: Đội Hồng</span>
+        <span id="active-room-presence" class="room-badge-status room-badge-waiting">Đang chờ người chơi sẵn sàng...</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <button id="btn-toggle-lobby" class="btn btn-sm" title="Xem danh sách tất cả các phòng đang thi đấu">
+          📺 Xem các phòng khác
+        </button>
+        <button id="btn-copy-room-link" class="btn btn-sm" title="Sao chép liên kết trực tiếp nếu muốn gửi cho bạn bè">
+          ↗ Mời bạn
+        </button>
+        <button id="btn-room-ready" class="btn btn-primary btn-sm" title="Báo cho đối thủ biết bạn đã sẵn sàng" disabled>
+          ✅ Sẵn sàng
+        </button>
+        <button id="btn-room-reset-game" class="btn btn-sm" title="Đặt lại bàn cờ mới cho cả 2 người">
+          🔄 Ván mới
+        </button>
+        <button id="btn-leave-room" class="btn btn-danger btn-sm" title="Rời khỏi phòng đấu này và quay lại sảnh">
+          🚪 Rời phòng
+        </button>
+      </div>
+    </div>
+
+    <!-- Left Column: Bạn Hồng Status Card (Ruby Legion - Đỏ) -->
+    <aside class="left-column">
+      <div id="player1-card" class="glass-card player-card p1 active-turn">
+        <div class="player-header">
+          <div class="player-identity">
+            <div class="player-avatar" aria-hidden="true">🐰</div>
+            <div>
+              <div id="p1-display-name" class="player-name">Bạn Hồng</div>
+              <div class="player-badge">Đội Hồng · P1</div>
+            </div>
+          </div>
+          <div id="p1-army-status" class="army-status-pill">Sẵn sàng</div>
+        </div>
+
+        <!-- Army Progress Track -->
+        <div class="army-meter-wrap">
+          <div class="army-meter-header">
+            <span>Lực lượng quân số:</span>
+            <span id="p1-meter-label"><strong id="p1-total-count">15</strong> quân</span>
+          </div>
+          <div class="army-progress-track">
+            <div id="p1-army-bar" class="army-progress-bar p1" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 3 Piece Types Counter -->
+        <div class="piece-counts-grid">
+          <div id="p1-rock-box" class="piece-stat-box" title="Quân Đấm: Ăn Kéo, bị Lá khắc">
+            <span class="stat-icon">✊</span>
+            <span class="stat-label">Đấm</span>
+            <span id="p1-rock-count" class="count-pill">5</span>
+          </div>
+          <div id="p1-paper-box" class="piece-stat-box" title="Quân Lá: Ăn Đấm, bị Kéo khắc">
+            <span class="stat-icon">✋</span>
+            <span class="stat-label">Lá</span>
+            <span id="p1-paper-count" class="count-pill">5</span>
+          </div>
+          <div id="p1-scissors-box" class="piece-stat-box" title="Quân Kéo: Ăn Lá, bị Đấm khắc">
+            <span class="stat-icon">✌️</span>
+            <span class="stat-label">Kéo</span>
+            <span id="p1-scissors-count" class="count-pill">5</span>
+          </div>
+        </div>
+
+        <div class="player-total-row">
+          <span>Mục tiêu chiến thắng:</span>
+          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đưa quân tới I1</strong>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Column: Turn Banner, Quick Rules & 9x9 Board -->
+    <section class="center-column">
+      <!-- Minimalist Turn Banner -->
+      <div id="turn-banner" class="turn-banner turn-p1">
+        <div class="turn-main-row">
+          <div class="turn-identity">
+            <div id="turn-avatar" class="turn-avatar">P1</div>
+            <div>
+              <div id="turn-text" class="turn-text">Lượt của Đội Hồng</div>
+              <div id="turn-subtext" class="turn-subtext">Click một quân cờ của bạn để di chuyển 1 ô theo 8 hướng</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div id="turn-timer-badge" class="timer-badge" title="Đồng hồ đếm ngược mỗi lượt">
+              ⏱️ <span id="turn-timer-text">30s</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              Ô đích: P1 → <strong style="color: var(--gold);">I1</strong> · P2 → <strong style="color: var(--gold);">A9</strong>
+            </div>
+          </div>
+        </div>
+        <!-- Linear Countdown Timer Progress Bar -->
+        <div class="timer-progress-track">
+          <div id="turn-timer-bar" class="timer-progress-bar" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <!-- Quick Rules Bar -->
+      <details class="rules-pocket" style="margin:0 0 12px"><summary>📖 Ai ăn được ai?</summary><div class="quick-rules-bar">
+        <div class="rule-chip" title="Đấm đập Kéo"><span style="color:#ef4444;">✊</span> Đấm > ✌️ Kéo</div>
+        <div class="rule-chip" title="Kéo cắt Lá"><span style="color:#3b82f6;">✌️</span> Kéo > ✋ Lá</div>
+        <div class="rule-chip" title="Lá bọc Đấm"><span style="color:#10b981;">✋</span> Lá > ✊ Đấm</div>
+        <div class="rule-chip" title="Cùng loại đứng chặn đường nhau, không thể ăn nhau">🛡️ Cùng loại chặn nhau</div>
+        <div class="rule-chip chip-goal" title="P1 đến I1, P2 đến A9 để thắng">👑 I1 / A9: Thắng</div>
+      </div>
+
+      </details>
+      <!-- Combat / Move Helper Alert Box -->
+      <div id="move-hint-box" class="move-hint-box">
+        <span>💡</span>
+        <span id="move-hint-text">Chọn một quân cờ của bạn để xem 8 hướng di chuyển & quy tắc ăn quân.</span>
+      </div>
+
+      <!-- 9x9 Chess Board Container with Ranks (1-9) & Files (A-I) -->
+      <div class="board-wrapper">
+        <div class="board-files-header">
+          <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
+        </div>
+        <div class="board-middle-row">
+          <div class="board-ranks-side">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+          </div>
+          <div id="board-container" class="board-grid"></div>
+          <div class="board-ranks-side">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+          </div>
+        </div>
+        <div class="board-files-header">
+          <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Bạn Xanh Card, Game Settings & Battle Log -->
+    <aside class="right-column">
+      <!-- Bạn Xanh Status Card (Sapphire Vanguard - Xanh) -->
+      <div id="player2-card" class="glass-card player-card p2">
+        <div class="player-header">
+          <div class="player-identity">
+            <div class="player-avatar" aria-hidden="true">🐻</div>
+            <div>
+              <div id="p2-display-name" class="player-name">Bạn Xanh</div>
+              <div class="player-badge">Đội Xanh · P2</div>
+            </div>
+          </div>
+          <div id="p2-army-status" class="army-status-pill">Sẵn sàng</div>
+        </div>
+
+        <!-- Army Progress Track -->
+        <div class="army-meter-wrap">
+          <div class="army-meter-header">
+            <span>Lực lượng quân số:</span>
+            <span id="p2-meter-label"><strong id="p2-total-count">15</strong> quân</span>
+          </div>
+          <div class="army-progress-track">
+            <div id="p2-army-bar" class="army-progress-bar p2" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 3 Piece Types Counter -->
+        <div class="piece-counts-grid">
+          <div id="p2-rock-box" class="piece-stat-box" title="Quân Đấm: Ăn Kéo, bị Lá khắc">
+            <span class="stat-icon">✊</span>
+            <span class="stat-label">Đấm</span>
+            <span id="p2-rock-count" class="count-pill">5</span>
+          </div>
+          <div id="p2-paper-box" class="piece-stat-box" title="Quân Lá: Ăn Đấm, bị Kéo khắc">
+            <span class="stat-icon">✋</span>
+            <span class="stat-label">Lá</span>
+            <span id="p2-paper-count" class="count-pill">5</span>
+          </div>
+          <div id="p2-scissors-box" class="piece-stat-box" title="Quân Kéo: Ăn Lá, bị Đấm khắc">
+            <span class="stat-icon">✌️</span>
+            <span class="stat-label">Kéo</span>
+            <span id="p2-scissors-count" class="count-pill">5</span>
+          </div>
+        </div>
+
+        <div class="player-total-row">
+          <span>Mục tiêu chiến thắng:</span>
+          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đưa quân tới A9</strong>
+        </div>
+      </div>
+
+      <!-- Game Mode & Options Panel -->
+      <div class="glass-card control-panel">
+        <div class="form-group">
+          <label class="form-label" for="game-mode-select">Chế độ chơi</label>
+          <select id="game-mode-select" class="form-select">
+            <option value="LOCAL">Hai bạn cùng một máy</option>
+            <option value="BOT">Chơi với máy</option>
+            <option value="MULTIPLAYER">Phòng Đấu Online</option>
+          </select>
+        </div>
+
+        <!-- AI Difficulty (3 Levels) -->
+        <div class="form-group" id="ai-difficulty-group" style="display: none;">
+          <label class="form-label" for="ai-difficulty-select">Bạn muốn thử mức nào?</label>
+          <select id="ai-difficulty-select" class="form-select">
+            <option value="easy">🌱 Dễ · Làm quen</option>
+            <option value="medium">🌷 Vừa · Thử sức</option>
+            <option value="hard" selected>🌳 Khó · Thử thách</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="board-preset-select">Cách xếp bàn cờ</label>
+          <select id="board-preset-select" class="form-select">
+            <option value="FRONTLINE">Hai hàng đối diện</option>
+            <option value="DIAGONAL">Hai góc đối diện</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Live Battle Log & Reactions -->
+      <div class="glass-card log-card">
+        <div class="log-header">
+          <span>📜 Nhật ký chiến đấu</span>
+        </div>
+        <div id="battle-log" class="battle-log-scroll">
+          <div class="log-entry info">Chào mừng đến với OTTv2! Chọn một quân để bắt đầu.</div>
+        </div>
+        <!-- Quick Emoji Reactions -->
+        <div class="quick-reactions">
+          <button class="btn-reaction" data-emoji="👏" title="Vỗ tay">👏</button>
+          <button class="btn-reaction" data-emoji="⚔️" title="Chiến thôi">⚔️</button>
+          <button class="btn-reaction" data-emoji="🔥" title="Cháy quá">🔥</button>
+          <button class="btn-reaction" data-emoji="😱" title="Bất ngờ">😱</button>
+          <button class="btn-reaction" data-emoji="🏆" title="Chiến thắng">🏆</button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Minimalist Toast Alert -->
+  <div id="toast-alert" class="toast">Thông báo</div>
+
+  <!-- Modal: Quick Illustrated Guide -->
+  <div id="guide-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">💡 Hướng dẫn nhanh OTTv2 (3 bước vào trận)</h2>
+        <button aria-label="Đóng hướng dẫn" id="close-guide-modal" class="close-btn">&times;</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem;">
+        <div style="background-color: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <h4 style="color: var(--gold-light); font-size: 0.9rem; margin-bottom: 0.25rem;">1. Di chuyển 1 ô theo 8 hướng như quân Vua</h4>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">Mỗi lượt, bạn chọn một quân cờ của mình và đi tối đa 1 ô theo bất kỳ hướng nào (ngang, dọc, chéo). Ô hợp lệ sẽ hiện chấm tròn xanh lá.</p>
+        </div>
+
+        <div style="background-color: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <h4 style="color: var(--gold-light); font-size: 0.9rem; margin-bottom: 0.25rem;">2. Quy tắc ăn quân & Chặn đường</h4>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
+            • ✊ Đấm ăn ✌️ Kéo · ✌️ Kéo ăn ✋ Lá · ✋ Lá ăn ✊ Đấm.<br>
+            • <strong>Hai quân cùng loại:</strong> Không thể ăn nhau, chỉ đứng chặn đường nhau.<br>
+            • <strong>Bị khắc chế:</strong> Không được phép đi vào ô có quân địch khắc chế mình.
+          </p>
+        </div>
+
+        <div style="background-color: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <h4 style="color: var(--gold-light); font-size: 0.9rem; margin-bottom: 0.25rem;">3. Điều kiện chiến thắng</h4>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
+            • Đưa một quân tới ô đích của đối phương: <strong>P1 đến I1</strong>, <strong>P2 đến A9</strong>.
+          </p>
+        </div>
+      </div>
+
+      <button id="btn-guide-got-it" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.65rem;">
+        Mình hiểu rồi, chơi thôi!
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal: Game Rules -->
+  <div id="rules-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">📖 Luật chơi Oẳn tù tì v2 (OTTv2)</h2>
+        <button aria-label="Đóng luật chơi" id="close-rules-modal" class="close-btn">&times;</button>
+      </div>
+
+      <div class="rules-diagram">
+        <div class="cycle-step">✊<span>Đấm</span></div>
+        <div class="cycle-arrow">▶</div>
+        <div class="cycle-step">✌️<span>Kéo</span></div>
+        <div class="cycle-arrow">▶</div>
+        <div class="cycle-step">✋<span>Lá</span></div>
+        <div class="cycle-arrow">▶</div>
+        <div class="cycle-step">✊<span>Đấm</span></div>
+      </div>
+
+      <ul class="rules-list">
+        <li><strong>Bàn cờ:</strong> Kích thước 9 hàng × 9 cột = 81 ô (A1 đến I9). Hai ô đích là <strong>I1</strong> và <strong>A9</strong>.</li>
+        <li><strong>Di chuyển quân:</strong> Tối đa <strong>1 ô theo 8 hướng</strong> (ngang, dọc, chéo) giống quân Vua trong cờ vua. Không được di chuyển quá 1 ô mỗi lượt.</li>
+        <li><strong>Luật ăn quân:</strong>
+          <ul>
+            <li>✊ Đấm có thể ăn ✌️ Kéo</li>
+            <li>✌️ Kéo có thể ăn ✋ Lá</li>
+            <li>✋ Lá có thể ăn ✊ Đấm</li>
+          </ul>
+        </li>
+        <li><strong>Hai quân cùng loại:</strong> KHÔNG thể ăn nhau (Đấm vs Đấm, Lá vs Lá, Kéo vs Kéo). Hai quân chỉ đứng chặn đường nhau.</li>
+        <li><strong>Quân bị khắc chế:</strong> Quân tấn công bị đối phương khắc chế thì không được đi vào ô đó.</li>
+        <li><strong>Điều kiện thắng:</strong> Đưa một quân tới ô đích của đối phương: P1 đến <strong>I1</strong>, P2 đến <strong>A9</strong>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Modal: Victory Celebration -->
+  <div id="victory-modal" class="modal-overlay">
+    <div class="modal-content victory-card">
+      <div class="victory-icon">🏆</div>
+      <h2 id="victory-title" class="victory-title">PLAYER 1 WIN!</h2>
+      <p id="victory-desc" class="victory-desc">Đã hoàn thành điều kiện chiến thắng ván cờ!</p>
+      <button id="btn-victory-restart" class="btn btn-primary" style="padding: 0.65rem 2rem; font-size: 0.95rem;">
+        🎮 Chơi lại ván mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Entry Script -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>

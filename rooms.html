@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sảnh chơi · Oẳn tù tì v2</title>
+  <meta name="description" content="Sảnh theo dõi tất cả các phòng đấu multiplayer đang chơi trò chơi Oẳn Tù Tì v2 (OTTv2) 9x9 theo thời gian thực.">
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📺</text></svg>">
+
+  <style>
+    .hub-container {
+      max-width: 1200px;
+      margin: 1.5rem auto;
+      padding: 0 1.25rem;
+    }
+    .hub-header-banner {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+    .hub-title-box h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.35rem;
+    }
+    .hub-title-box p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .hub-stats-row {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    .hub-stat-item {
+      text-align: center;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+    .hub-stat-val {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--gold);
+      display: block;
+    }
+    .hub-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Filters & Search Toolbar */
+    .toolbar-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 0.5rem 0.85rem;
+      flex: 1;
+      max-width: 380px;
+    }
+    .search-box input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      width: 100%;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .filter-tab {
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .filter-tab.active, .filter-tab:hover {
+      background: var(--p1-gradient);
+      color: #fff;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    /* Rooms Grid */
+    .rooms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1.25rem;
+    }
+    .room-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .room-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(96, 165, 250, 0.5);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    }
+    .room-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .room-id-tag {
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: #f1f5f9;
+      font-family: monospace;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .room-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+    }
+    .status-playing {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-waiting {
+      background: rgba(234, 179, 8, 0.15);
+      color: #facc15;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    .status-ended {
+      background: rgba(148, 163, 184, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    /* Matchup Visualizer */
+    .matchup-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      padding: 0.85rem;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .fighter-side {
+      text-align: center;
+    }
+    .fighter-role {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 0.2rem;
+    }
+    .fighter-p1 .fighter-role { color: var(--p1-light); }
+    .fighter-p2 .fighter-role { color: var(--p2-light); }
+    .fighter-status {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .vs-badge {
+      font-weight: 900;
+      font-size: 0.9rem;
+      color: var(--gold);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+    }
+
+    .room-meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .room-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn-spectate {
+      flex: 1;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-strong);
+      color: var(--p2-light);
+      padding: 0.55rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      transition: all 0.2s;
+    }
+    .btn-spectate:hover {
+      background-color: var(--bg-surface-hover);
+      color: #fff;
+    }
+    .btn-join-match {
+      flex: 1;
+      background-color: var(--p1-color);
+      border: 1px solid var(--p1-dark);
+      color: #fff;
+      padding: 0.55rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      transition: all 0.2s;
+    }
+    .btn-join-match:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 3.5rem 1rem;
+      color: var(--text-muted);
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 16px;
+      border: 1px dashed var(--border-subtle);
+    }
+  </style>
+  <link rel="stylesheet" href="css/kawaii.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-badge" style="background-color: var(--p2-color); color: #ffffff;">📺</div>
+      <div class="logo-title">
+        <h1>Oẳn tù tì v2</h1>
+        <p>Một bàn cờ nhỏ, một cuộc vui lớn.</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <a href="index.html" class="btn" style="text-decoration: none;">
+        Chơi tại máy
+      </a>
+
+      <button id="btn-quick-create" class="btn btn-primary">
+        ➕ Tạo phòng mới
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Hub -->
+  <main class="hub-container">
+
+    <!-- Top Banner Summary -->
+    <div class="hub-header-banner">
+      <div class="hub-title-box">
+        <h1>
+          <span>🌷</span> Góc hẹn của những người bạn
+        </h1>
+        <p>
+          Một chỗ trống, một người bạn mới. Vào chơi hoặc ghé xem một ván nhé!
+        </p>
+      </div>
+
+      <div class="hub-stats-row">
+        <div class="hub-stat-item">
+          <span id="stat-total-rooms" class="hub-stat-val">0</span>
+          <span class="hub-stat-label">Tổng số phòng</span>
+        </div>
+        <div class="hub-stat-item">
+          <span id="stat-active-matches" class="hub-stat-val" style="color: #34d399;">0</span>
+          <span class="hub-stat-label">Đang thi đấu</span>
+        </div>
+        <div class="hub-stat-item">
+          <span id="stat-spectators" class="hub-stat-val" style="color: #60a5fa;">0</span>
+          <span class="hub-stat-label">Khán giả</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar: Search & Filters -->
+    <div class="toolbar-bar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input aria-label="Tìm tên hoặc mã phòng" id="room-search-input" type="text" placeholder="Tìm tên hoặc mã phòng…">
+      </div>
+
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="ALL">Tất cả</button>
+        <button class="filter-tab" data-filter="PLAYING">🟢 Đang đấu</button>
+        <button class="filter-tab" data-filter="WAITING">🟡 Chờ người</button>
+        <button class="filter-tab" data-filter="ENDED">⚪ Đã xong</button>
+      </div>
+    </div>
+
+    <!-- Rooms Live Grid -->
+    <div id="rooms-container" class="rooms-grid">
+      <!-- Loading State -->
+      <div class="empty-state">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">⏳</div>
+        <h3>Đang tìm những bàn cờ…</h3>
+        <p>Chờ một chút nhé.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Script for Rooms Hub -->
+  <script type="module">
+    let allRooms = [];
+    let fetchError = false;
+    let currentFilter = 'ALL';
+    let searchQuery = '';
+
+    const roomsContainer = document.getElementById('rooms-container');
+    const statTotalRooms = document.getElementById('stat-total-rooms');
+    const statActiveMatches = document.getElementById('stat-active-matches');
+    const statSpectators = document.getElementById('stat-spectators');
+    const searchInput = document.getElementById('room-search-input');
+    const filterTabs = document.querySelectorAll('.filter-tab');
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+
+    /**
+     * Fetch active rooms from Node.js server
+     */
+    async function fetchRooms() {
+      try {
+        const res = await fetch('/api/rooms');
+        if (!res.ok) throw new Error('Không thể tải phòng');
+        const data = await res.json();
+        allRooms = Array.isArray(data.rooms) ? data.rooms : [];
+        fetchError = false;
+      } catch {
+        allRooms = [];
+        fetchError = true;
+      }
+
+      renderRooms();
+    }
+
+    /**
+     * Render Rooms to DOM
+     */
+    function renderRooms() {
+      // Filter logic
+      const filtered = allRooms.filter(room => {
+        const matchesSearch = `${room.name || ''} ${room.id}`.toLowerCase().includes(searchQuery.toLowerCase());
+        let matchesFilter = true;
+        if (currentFilter === 'PLAYING') matchesFilter = room.status === 'PLAYING' && room.hasP1 && room.hasP2;
+        else if (currentFilter === 'WAITING') matchesFilter = room.status === 'WAITING' || room.status === 'EMPTY';
+        else if (currentFilter === 'ENDED') matchesFilter = room.status === 'ENDED';
+        return matchesSearch && matchesFilter;
+      });
+
+      // Update Top Stats
+      statTotalRooms.textContent = allRooms.length;
+      statActiveMatches.textContent = allRooms.filter(r => r.status === 'PLAYING' && r.hasP1 && r.hasP2).length;
+      statSpectators.textContent = allRooms.reduce((acc, r) => acc + (r.spectators || 0), 0);
+
+      if (filtered.length === 0) {
+        roomsContainer.innerHTML = `
+          <div class="empty-state">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">${fetchError ? '⚠️' : '🔍'}</div>
+            <h3>${fetchError ? 'Không thể tải danh sách phòng' : allRooms.length ? 'Không tìm thấy phòng phù hợp' : 'Chưa có phòng nào'}</h3>
+            <p>${fetchError ? 'Hãy kiểm tra kết nối rồi tải lại trang.' : 'Bạn có thể tạo phòng mới để bắt đầu.'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      roomsContainer.innerHTML = '';
+
+      filtered.forEach(room => {
+        const card = document.createElement('div');
+        card.className = 'room-card';
+
+        const isPlaying = room.status === 'PLAYING' && room.hasP1 && room.hasP2;
+        const statusClass = isPlaying ? 'status-playing' : (room.status === 'ENDED' ? 'status-ended' : 'status-waiting');
+        const statusText = isPlaying ? '🟢 Đang thi đấu' : (room.status === 'ENDED' ? '⚪ Đã kết thúc' : room.hasP1 && room.hasP2 ? '🟡 Chờ sẵn sàng' : '🟡 Chờ người chơi');
+
+        const turnIndicator = room.status === 'ENDED'
+          ? '<span>Đã kết thúc</span>' : !isPlaying
+          ? '<span>Chưa bắt đầu</span>' : room.turn === 'P1'
+          ? '<span style="color: var(--p1-light); font-weight:700;">Lượt đội Hồng</span>'
+          : '<span style="color: var(--p2-light); font-weight:700;">Lượt đội Xanh</span>';
+
+        card.innerHTML = `
+          <div>
+            <div class="room-card-header">
+              <span class="room-id-tag">🎲 ${escapeHtml(room.name || room.id)}</span><small class="room-caption">${escapeHtml(room.id)}</small>
+              <span class="room-status-badge ${statusClass}">${statusText}</span>
+            </div>
+
+            <div class="matchup-box" style="margin: 0.85rem 0;">
+              <div class="fighter-side fighter-p1">
+                <div class="fighter-role">🐰 Đội Hồng</div>
+                <div class="fighter-status">${!room.hasP1 ? '⚪ Trống' : room.ready?.p1 ? '🟢 Sẵn sàng' : '🟡 Đang chuẩn bị'}</div>
+              </div>
+
+              <div class="vs-badge">VS</div>
+
+              <div class="fighter-side fighter-p2">
+                <div class="fighter-role">🐻 Đội Xanh</div>
+                <div class="fighter-status">${!room.hasP2 ? '⚪ Trống' : room.ready?.p2 ? '🟢 Sẵn sàng' : '🟡 Đang chuẩn bị'}</div>
+              </div>
+            </div>
+
+            <div class="room-meta-row">
+              <div>${turnIndicator}</div>
+              <div>Số nước cờ: <strong>${room.moveCount || 0}</strong></div>
+            </div>
+
+            <div class="room-meta-row" style="margin-top: 0.4rem;">
+              <div>👥 Tổng: <strong>${room.totalConnected ?? 0} người</strong></div>
+              <div>👁️ Khán giả: <strong>${room.spectators || 0} người</strong></div>
+            </div>
+          </div>
+
+          <div class="room-actions">
+            <a href="playfun.html?room=${encodeURIComponent(room.id)}&role=SPECTATOR" class="btn-spectate" title="Vào xem với vai trò Khán giả">
+              Ghé xem
+            </a>
+            ${room.status !== 'ENDED' && (!room.hasP1 || !room.hasP2) ? `
+              <a href="playfun.html?room=${encodeURIComponent(room.id)}&role=${room.hasP1 ? 'P2' : 'P1'}" class="btn-join-match" title="Tham gia thi đấu">
+                Vào chơi (${room.hasP1 ? 'P2' : 'P1'})
+              </a>
+            ` : ''}
+          </div>
+        `;
+
+        roomsContainer.appendChild(card);
+      });
+    }
+
+    // Filter Tabs
+    filterTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        filterTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentFilter = tab.dataset.filter;
+        renderRooms();
+      });
+    });
+
+    // Search input
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      renderRooms();
+    });
+
+    // Quick Create Room
+    document.getElementById('btn-quick-create').addEventListener('click', () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      const newRoomId = `ottv2-${code}`;
+
+      // Open new room
+      window.location.href = `playfun.html?room=${newRoomId}&role=P1`;
+    });
+
+    // Initial fetch & Auto refresh every 5s
+    fetchRooms();
+    setInterval(fetchRooms, 5000);
+  </script>
+</body>
+</html>
