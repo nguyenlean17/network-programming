@@ -1,10 +1,12 @@
 services:
   - type: web
     name: ottv2-game
-    env: node
+    runtime: node
     plan: free
-    buildCommand: npm install
+    region: singapore
+    buildCommand: npm ci
     startCommand: node server/server.js
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: 20

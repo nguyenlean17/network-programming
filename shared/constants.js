@@ -35,8 +35,12 @@ export const BOARD_SIZE = 9; // 9x9 board
 export const COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 export const ROWS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-// Special winning / goal cells
-export const GOAL_CELLS = ['A1', 'I9'];
+// Each player wins only by reaching the opponent's goal.
+export const PLAYER_GOALS = {
+  [PLAYERS.PLAYER_1]: 'I1',
+  [PLAYERS.PLAYER_2]: 'A9'
+};
+export const GOAL_CELLS = Object.values(PLAYER_GOALS);
 
 // Combat relation: Key beats Value
 export const BEATS = {
@@ -62,6 +66,5 @@ export const GAME_STATUS = {
 };
 
 export const WIN_REASONS = {
-  ELIMINATION: 'ELIMINATION',   // Ăn sạch hoàn toàn 1 loại quân
-  GOAL_REACHED: 'GOAL_REACHED'  // Đưa quân vào ô đích (A1 hoặc I9)
+  GOAL_REACHED: 'GOAL_REACHED'  // Đưa quân vào ô đích của đối phương
 };

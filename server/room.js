@@ -51,29 +51,36 @@ export class RoomManager {
   }
 
   joinRoom(roomId, ws, preferredRole = null, playerName = 'Player') {
+    if (ws.roomId && ws.roomId !== roomId) {
+      this.leaveRoom(ws);
+    }
     const room = this.getOrCreateRoom(roomId);
     room.clients.add(ws);
 
     let assignedRole = 'SPECTATOR';
 
-    if (preferredRole === 'P1' && (!room.players.P1 || room.players.P1 === ws)) {
-      room.players.P1 = ws;
-      room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
+    if (room.players.P1 === ws) {
       assignedRole = 'P1';
-    } else if (preferredRole === 'P2' && (!room.players.P2 || room.players.P2 === ws)) {
-      room.players.P2 = ws;
-      room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
+    } else if (room.players.P2 === ws) {
       assignedRole = 'P2';
-    } else if (!room.players.P1) {
-      room.players.P1 = ws;
-      room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
-      assignedRole = 'P1';
-    } else if (!room.players.P2) {
-      room.players.P2 = ws;
-      room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
-      assignedRole = 'P2';
-    } else {
+    } else if (preferredRole === 'SPECTATOR') {
       assignedRole = 'SPECTATOR';
+    } else if (preferredRole === 'P1' && !room.players.P1) {
+      room.players.P1 = ws;
+      room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
+      assignedRole = 'P1';
+    } else if (preferredRole === 'P2' && !room.players.P2) {
+      room.players.P2 = ws;
+      room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
+      assignedRole = 'P2';
+    } else if (!preferredRole && !room.players.P1) {
+      room.players.P1 = ws;
+      room.playerNames.P1 = playerName || 'Player 1 (Đỏ)';
+      assignedRole = 'P1';
+    } else if (!preferredRole && !room.players.P2) {
+      room.players.P2 = ws;
+      room.playerNames.P2 = playerName || 'Player 2 (Xanh)';
+      assignedRole = 'P2';
     }
 
     ws.roomId = roomId;
@@ -85,7 +92,8 @@ export class RoomManager {
 
   leaveRoom(ws) {
     if (!ws.roomId) return;
-    const room = this.rooms.get(ws.roomId);
+    const roomId = ws.roomId;
+    const room = this.rooms.get(roomId);
     if (!room) return;
 
     room.clients.delete(ws);
@@ -98,9 +106,12 @@ export class RoomManager {
       room.playerNames.P2 = 'Chờ P2...';
     }
 
+    ws.roomId = null;
+    ws.role = null;
+
     // Keep default room always, delete user-created rooms if totally empty
     if (room.clients.size === 0 && room.id !== 'OTT-ROOM-1') {
-      this.rooms.delete(ws.roomId);
+      this.rooms.delete(roomId);
     }
   }
 

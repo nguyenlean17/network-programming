@@ -38,8 +38,8 @@
       <button id="tab-mode-bot" class="mode-tab-btn" title="Đấu với máy tính thông minh">
         🤖 Đấu với Máy (AI)
       </button>
-      <a href="playfun.html" class="mode-tab-btn" title="Thư viện playfun.html">
-        ⚡ playfull.html
+      <a href="playfun.html" class="mode-tab-btn" title="Phòng chơi dùng PlayHTML">
+        ⚡ PlayHTML
       </a>
     </nav>
 
@@ -188,7 +188,7 @@
 
         <div class="player-total-row">
           <span>Mục tiêu chiến thắng:</span>
-          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đột kích ô A1 hoặc I9</strong>
+          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đưa quân tới I1</strong>
         </div>
       </div>
     </aside>
@@ -210,7 +210,7 @@
               ⏱️ <span id="turn-timer-text">30s</span>
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted);">
-              Ô Đích: <strong style="color: var(--gold);">A1</strong> hoặc <strong style="color: var(--gold);">I9</strong>
+              Ô đích: P1 → <strong style="color: var(--gold);">I1</strong> · P2 → <strong style="color: var(--gold);">A9</strong>
             </div>
           </div>
         </div>
@@ -226,7 +226,7 @@
         <div class="rule-chip" title="Kéo cắt Lá"><span style="color:#3b82f6;">✌️</span> Kéo > ✋ Lá</div>
         <div class="rule-chip" title="Lá bọc Đấm"><span style="color:#10b981;">✋</span> Lá > ✊ Đấm</div>
         <div class="rule-chip" title="Cùng loại đứng chặn đường nhau, không thể ăn nhau">🛡️ Cùng loại chặn nhau</div>
-        <div class="rule-chip chip-goal" title="Đưa bất kỳ quân nào vào ô A1 hoặc I9 để thắng ngay">👑 Vào A1 / I9: Thắng</div>
+        <div class="rule-chip chip-goal" title="P1 đến I1, P2 đến A9 để thắng">👑 I1 / A9: Thắng</div>
       </div>
 
       <!-- Combat / Move Helper Alert Box -->
@@ -302,7 +302,7 @@
 
         <div class="player-total-row">
           <span>Mục tiêu chiến thắng:</span>
-          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đột kích ô A1 hoặc I9</strong>
+          <strong style="color: var(--gold); font-size: 0.8rem;">★ Đưa quân tới A9</strong>
         </div>
       </div>
 
@@ -384,10 +384,9 @@
         </div>
 
         <div style="background-color: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.75rem;">
-          <h4 style="color: var(--gold-light); font-size: 0.9rem; margin-bottom: 0.25rem;">3. Điều kiện chiến thắng (Có 2 cách)</h4>
+          <h4 style="color: var(--gold-light); font-size: 0.9rem; margin-bottom: 0.25rem;">3. Điều kiện chiến thắng</h4>
           <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
-            • <strong>Cách 1 (Diệt chủng):</strong> Ăn sạch hoàn toàn 1 loại quân của đối phương (ví dụ đối phương mất sạch quân Kéo).<br>
-            • <strong>Cách 2 (Đột kích cứ điểm):</strong> Đưa bất kỳ quân nào vào ô đích <strong>A1</strong> hoặc <strong>I9</strong>.
+            • Đưa một quân tới ô đích của đối phương: <strong>P1 đến I1</strong>, <strong>P2 đến A9</strong>.
           </p>
         </div>
       </div>
@@ -417,7 +416,7 @@
       </div>
 
       <ul class="rules-list">
-        <li><strong>Bàn cờ:</strong> Kích thước 9 hàng × 9 cột = 81 ô (A1 đến I9). Hai ô <strong>A1</strong> và <strong>I9</strong> là hai ô đích đặc biệt.</li>
+        <li><strong>Bàn cờ:</strong> Kích thước 9 hàng × 9 cột = 81 ô (A1 đến I9). Hai ô đích là <strong>I1</strong> và <strong>A9</strong>.</li>
         <li><strong>Di chuyển quân:</strong> Tối đa <strong>1 ô theo 8 hướng</strong> (ngang, dọc, chéo) giống quân Vua trong cờ vua. Không được di chuyển quá 1 ô mỗi lượt.</li>
         <li><strong>Luật ăn quân:</strong>
           <ul>
@@ -428,12 +427,7 @@
         </li>
         <li><strong>Hai quân cùng loại:</strong> KHÔNG thể ăn nhau (Đấm vs Đấm, Lá vs Lá, Kéo vs Kéo). Hai quân chỉ đứng chặn đường nhau.</li>
         <li><strong>Quân bị khắc chế:</strong> Quân tấn công bị đối phương khắc chế thì không được đi vào ô đó.</li>
-        <li><strong>Điều kiện thắng (2 cách):</strong>
-          <ol>
-            <li><strong>Cách 1:</strong> Ăn sạch hoàn toàn <strong>MỘT loại quân</strong> của đối phương.</li>
-            <li><strong>Cách 2:</strong> Đưa bất kỳ quân nào của mình vào ô đích <strong>A1</strong> hoặc <strong>I9</strong>.</li>
-          </ol>
-        </li>
+        <li><strong>Điều kiện thắng:</strong> Đưa một quân tới ô đích của đối phương: P1 đến <strong>I1</strong>, P2 đến <strong>A9</strong>.</li>
       </ul>
     </div>
   </div>

@@ -31,7 +31,7 @@ class OttApp {
   constructor() {
     this.gameMode = 'LOCAL'; // 'LOCAL' | 'ONLINE' | 'BOT'
     this.boardPreset = 'FRONTLINE'; // 'FRONTLINE' | 'DIAGONAL'
-    this.goalMode = 'ANY'; // A1 or I9 wins instantly as per official rules
+    this.goalMode = 'OPPOSITE'; // P1 reaches I1; P2 reaches A9.
     this.currentTurn = PLAYERS.PLAYER_1;
     this.gameStatus = GAME_STATUS.PLAYING;
     this.board = null;
@@ -383,7 +383,7 @@ class OttApp {
         cellsHtml += `<div class="mini-cell ${isLight ? 'cell-light' : ''} ${isGoal ? 'is-goal' : ''}">${pieceHtml}</div>`;
       }
     }
-    return `<div class="mini-board-preview" title="Bản đồ thế cờ thu nhỏ 9x9 (A1 ở góc trên trái, I9 ở góc dưới phải)">${cellsHtml}</div>`;
+    return `<div class="mini-board-preview" title="Bản đồ thế cờ thu nhỏ 9x9; ô đích là I1 và A9">${cellsHtml}</div>`;
   }
 
   renderRoomsList(rooms) {
@@ -563,7 +563,7 @@ class OttApp {
     this.updateTurnDisplay();
     this.startTurnTimer();
 
-    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Player 1 đi trước. Mục tiêu: A1 hoặc I9.</div>';
+    this.dom.battleLog.innerHTML = '<div class="log-entry info">Trận đấu bắt đầu! Player 1 đi trước. P1 đến I1, P2 đến A9.</div>';
     this.showToast('Bắt đầu ván mới!', 'info');
   }
 
@@ -657,7 +657,7 @@ class OttApp {
       sounds.move();
     }
 
-    // Check Win Condition (A1 or I9, or eliminating 1 type)
+    // Check whether the mover reached the opponent's goal.
     const win = checkWinCondition(this.board, this.lastMove, this.goalMode);
     if (win.hasWinner) {
       this.stopTurnTimer();
@@ -796,7 +796,7 @@ class OttApp {
       if (check.isCapture && targetPiece) {
         const targetName = PIECE_NAMES_VI[targetPiece.type] || targetPiece.type;
         this.dom.moveHintText.innerHTML = `⚔️ <strong>ĂN QUÂN HỢP LỆ</strong>: ${selName} ăn ${targetName} tại [<strong>${coord}</strong>]!`;
-      } else if (coord === 'A1' || coord === 'I9') {
+      } else if (coord === 'A9' || coord === 'I1') {
         this.dom.moveHintText.innerHTML = `👑 <strong>ĐỘT KÍCH Ô ĐÍCH [${coord}]</strong>: Vào ô này để THẮNG NGAY!`;
       } else {
         this.dom.moveHintText.innerHTML = `➡️ Di chuyển 1 ô đến ô trống [<strong>${coord}</strong>].`;

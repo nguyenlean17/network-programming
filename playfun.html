@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bài tập 2: OTTv2 với Thư viện playfun.html (playhtml.fun Real-Time Server)</title>
+  <title>OTTv2 — Chơi online với PlayHTML</title>
   <meta name="description" content="Bài tập 2 Lập trình mạng: Game Oẳn Tù Tì v2 bàn cờ 9x9 đồng bộ nhiều người chơi thời gian thực bằng thư viện playhtml.fun">
 
   <!-- Google Fonts: Outfit -->
@@ -77,22 +77,22 @@
     <div class="logo-area">
       <div class="logo-badge" style="background-color: var(--color-success); color: #ffffff;">⚡</div>
       <div class="logo-title">
-        <h1>OTTv2 — Thư viện playfun.html</h1>
-        <p>Bài tập 2: Đồng bộ Real-Time nhiều người chơi qua playhtml.fun & PartyKit</p>
+        <h1>OTTv2 — PlayHTML</h1>
+        <p>Phòng chơi online: server xác thực nước đi, PlayHTML đồng bộ bản sao bàn cờ</p>
       </div>
     </div>
 
     <div class="header-actions">
-      <div id="pf-ping-badge" class="status-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;" title="Độ trễ truyền dẫn mạng (RTT)">
-        📶 Ping: 24ms
+      <div id="pf-ping-badge" class="status-badge" title="Trạng thái kết nối server">
+        ○ Đang kết nối server
       </div>
       <a href="rooms.html" class="btn btn-primary" style="text-decoration: none;" title="Xem tất cả các phòng multiplayer đang thi đấu">
         📺 Sảnh Xem Phòng
       </a>
-      <a href="index.html" class="btn" style="text-decoration: none;" title="Về trang chủ chơi cục bộ">
-        🏠 Chơi Local / AI (Bài 1)
+      <a href="index.html" class="btn" style="text-decoration: none;" title="Về trang chính">
+        🏠 Trang chính
       </a>
-      <button id="btn-sync-reset" class="btn btn-danger" title="Đặt lại ván cờ">
+      <button id="btn-sync-reset" class="btn btn-danger" title="Đặt lại ván cờ" disabled>
         🔄 Ván mới
       </button>
     </div>
@@ -106,7 +106,7 @@
       <div>
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
           <h2 style="font-size: 1.15rem; color: var(--accent-gold); margin: 0;">
-            Đồng Bộ Trực Tuyến Đa Người Chơi (playhtml / playfun.html)
+            Phòng đấu trực tuyến với PlayHTML
           </h2>
           <span id="playfun-status-badge" class="playfun-status-badge">
             <span class="live-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
@@ -114,7 +114,7 @@
           </span>
         </div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
-          Dữ liệu bàn cờ và con trỏ chuột được đồng bộ tự động giữa các người chơi trong cùng một phòng qua PartyKit Serverless.
+          Server quản lý vai trò, nước đi và biểu cảm. PlayHTML chia sẻ bản sao bàn cờ và con trỏ trong phòng.
         </p>
       </div>
 
@@ -124,10 +124,8 @@
           <button id="btn-copy-room-link" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">📋 Copy link</button>
         </div>
 
-        <div class="role-btn-group" style="margin: 0;">
-          <button id="btn-role-p1" class="role-btn active" data-role="P1">Đỏ (P1)</button>
-          <button id="btn-role-p2" class="role-btn" data-role="P2">Xanh (P2)</button>
-          <button id="btn-role-spec" class="role-btn" data-role="SPECTATOR">Khán giả</button>
+        <div class="role-indicator">
+          <strong id="playfun-role">Đang chờ server cấp vai trò…</strong>
         </div>
       </div>
     </div>
@@ -146,7 +144,7 @@
         </div>
 
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Cứ điểm xuất phát: <strong>A1</strong> · Cứ điểm mục tiêu: <strong>I9</strong>
+          Cứ điểm phe mình: <strong>A9</strong> · Ô đích đối phương: <strong>I1</strong>
         </div>
 
         <div class="piece-counts-grid">
@@ -176,8 +174,7 @@
         <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.08); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.8rem;">
           <strong>🎯 Mục tiêu thắng:</strong>
           <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
-            <li>Đưa bất kỳ quân nào vào ô <strong>I9</strong></li>
-            <li>Hoặc ăn sạch 1 loại quân bất kỳ của P2</li>
+            <li>Đưa một quân vào ô <strong>I1</strong></li>
           </ul>
         </div>
       </div>
@@ -188,7 +185,7 @@
           📡 Nhật ký đồng bộ
         </h3>
         <div id="sync-history" class="history-box">
-          <div class="history-item">Khởi tạo giao thức playfun.html...</div>
+          <div class="history-item">Đang kết nối phòng chơi…</div>
         </div>
 
         <!-- Quick Reactions -->
@@ -209,9 +206,6 @@
           <div class="turn-pulse"></div>
           <span id="turn-text">Lượt đi: Player 1 (Đỏ)</span>
         </div>
-        <div id="pf-turn-timer" class="timer-badge" title="Đồng hồ đếm ngược mỗi lượt">
-          ⏱️ <span id="pf-timer-text">30s</span>
-        </div>
       </div>
 
       <div class="board-wrapper">
@@ -221,14 +215,13 @@
 
         <div class="board-with-row-labels">
           <div class="coord-labels-left">
-            <span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
           </div>
 
-          <!-- Board Grid with playhtml real-time synchronization attribute -->
-          <div id="board" class="board-grid" can-play id="ottv2-shared-board"></div>
+          <div id="board" class="board-grid"></div>
 
           <div class="coord-labels-left">
-            <span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
           </div>
         </div>
 
@@ -252,7 +245,7 @@
         </div>
 
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Cứ điểm xuất phát: <strong>I9</strong> · Cứ điểm mục tiêu: <strong>A1</strong>
+          Cứ điểm phe mình: <strong>I1</strong> · Ô đích đối phương: <strong>A9</strong>
         </div>
 
         <div class="piece-counts-grid">
@@ -282,8 +275,7 @@
         <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.08); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); font-size: 0.8rem;">
           <strong>🎯 Mục tiêu thắng:</strong>
           <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
-            <li>Đưa bất kỳ quân nào vào ô <strong>A1</strong></li>
-            <li>Hoặc ăn sạch 1 loại quân bất kỳ của P1</li>
+            <li>Đưa một quân vào ô <strong>A9</strong></li>
           </ul>
         </div>
       </div>
@@ -311,398 +303,12 @@
       <div class="victory-icon">🏆</div>
       <h2 id="victory-title" class="victory-title">CHIẾN THẮNG!</h2>
       <p id="victory-desc" class="victory-desc">Đã hoàn thành điều kiện chiến thắng ván cờ!</p>
-      <button id="btn-victory-restart" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+      <button id="btn-victory-restart" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;" disabled>
         🎮 Chơi lại ván mới
       </button>
     </div>
   </div>
 
-  <!-- Realtime Script Module -->
-  <script type="module">
-    import {
-      createInitialBoard,
-      validateMove,
-      getValidMovesForPiece,
-      countPlayerPieces,
-      checkWinCondition,
-      posToCoord,
-      coordToPos
-    } from './shared/gameRules.js';
-
-    import {
-      PLAYERS,
-      PIECE_TYPES,
-      PIECE_SYMBOLS,
-      PIECE_NAMES_VI,
-      GOAL_CELLS,
-      sounds
-    } from './js/constants.js';
-
-    import { PlayhtmlSyncEngine } from './js/playhtmlSync.js';
-
-    // State Variables
-    let currentBoard = createInitialBoard();
-    let currentTurn = PLAYERS.PLAYER_1;
-    let selectedPos = null;
-    let validMoves = [];
-    let lastMove = null;
-    let myRole = 'P1';
-    let isGameOver = false;
-
-    const boardEl = document.getElementById('board');
-    const turnBanner = document.getElementById('turn-banner');
-    const turnText = document.getElementById('turn-text');
-    const p1Card = document.getElementById('player1-card');
-    const p2Card = document.getElementById('player2-card');
-    const statusBadge = document.getElementById('playfun-status-badge');
-    const roomDisplay = document.getElementById('display-room-id');
-    const syncHistory = document.getElementById('sync-history');
-
-    function logHistory(msg) {
-      if (!syncHistory) return;
-      const item = document.createElement('div');
-      item.className = 'history-item';
-      const time = new Date().toLocaleTimeString('vi-VN');
-      item.innerHTML = `<strong>[${time}]</strong> ${msg}`;
-      syncHistory.prepend(item);
-    }
-
-    // Initialize PlayHTML Multiplayer Sync
-    const syncEngine = new PlayhtmlSyncEngine({
-      onRemoteUpdate: (state) => {
-        if (state.reaction) {
-          triggerFloatingReaction(state.reaction);
-          logHistory(`💬 Đối thủ vừa thả biểu cảm: ${state.reaction}`);
-          return;
-        }
-
-        logHistory('Nhận cập nhật nước đi từ đối thủ qua playhtml.fun');
-        if (state.board) currentBoard = state.board;
-        if (state.turn) currentTurn = state.turn;
-        if (state.lastMove) lastMove = state.lastMove;
-        selectedPos = null;
-        validMoves = [];
-        sounds.playMove();
-        render();
-        startTurnTimer();
-
-        const winResult = checkWinCondition(currentBoard, lastMove);
-        if (winResult.hasWinner) {
-          handleGameOver(winResult);
-        }
-      },
-      onConnectionChange: (connected) => {
-        if (connected) {
-          statusBadge.innerHTML = `<span class="live-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span> playhtml.fun Online`;
-          logHistory('🟢 Đã đồng bộ với phòng trực tuyến!');
-        } else {
-          statusBadge.innerHTML = `● Chế độ Local Hotseat`;
-        }
-      }
-    });
-
-    // Room ID
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('room') || 'ottv2-room-1';
-    roomDisplay.textContent = roomId;
-
-    // Connect to room
-    syncEngine.initRoom(roomId).then(() => {
-      logHistory(`Tham gia phòng: <strong>${roomId}</strong>`);
-    }).catch(err => {
-      console.warn('PlayHTML auto-connect:', err);
-    });
-
-    // Render Board
-    function render() {
-      boardEl.innerHTML = '';
-
-      for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-          const coord = posToCoord(c, r);
-          const cell = document.createElement('div');
-          cell.className = 'board-cell';
-          cell.dataset.x = c;
-          cell.dataset.y = r;
-
-          // Checkered background
-          cell.classList.add((c + r) % 2 === 0 ? 'cell-light' : 'cell-dark');
-
-          // Goal cells A1 & I9
-          if (GOAL_CELLS.includes(coord)) {
-            cell.classList.add('cell-goal');
-            const goalIcon = document.createElement('span');
-            goalIcon.className = 'goal-marker';
-            goalIcon.textContent = coord === 'A1' ? '🏁 A1' : '🏁 I9';
-            cell.appendChild(goalIcon);
-          }
-
-          // Last move highlight
-          if (lastMove) {
-            if (lastMove.from === coord) cell.classList.add('last-from');
-            if (lastMove.to === coord) cell.classList.add('last-to');
-          }
-
-          // Selection
-          if (selectedPos && selectedPos.x === c && selectedPos.y === r) {
-            cell.classList.add('selected');
-          }
-
-          // Valid move markers
-          const validMove = validMoves.find(m => m.x === c && m.y === r);
-          if (validMove) {
-            if (validMove.isCapture) {
-              cell.classList.add('valid-capture');
-            } else {
-              cell.classList.add('valid-dest');
-            }
-          }
-
-          // Render Piece
-          const piece = currentBoard[r][c];
-          if (piece) {
-            const pieceEl = document.createElement('div');
-            pieceEl.className = `piece piece-${piece.player.toLowerCase()}`;
-            pieceEl.innerHTML = `
-              <span class="piece-icon">${PIECE_SYMBOLS[piece.type] || '♟'}</span>
-              <span class="piece-tag">${PIECE_NAMES_VI[piece.type] || ''}</span>
-            `;
-            cell.appendChild(pieceEl);
-          }
-
-          boardEl.appendChild(cell);
-        }
-      }
-
-      // Update Turn Banner & Cards
-      if (currentTurn === PLAYERS.PLAYER_1) {
-        turnBanner.className = 'turn-banner p1-turn';
-        turnText.textContent = 'Lượt đi: Player 1 (Đỏ)';
-        p1Card.classList.add('active-turn');
-        p2Card.classList.remove('active-turn');
-      } else {
-        turnBanner.className = 'turn-banner p2-turn';
-        turnText.textContent = 'Lượt đi: Player 2 (Xanh)';
-        p2Card.classList.add('active-turn');
-        p1Card.classList.remove('active-turn');
-      }
-
-      // Update Piece Counts
-      const counts = countPlayerPieces(currentBoard);
-      document.getElementById('p1-rock-count').textContent = counts.P1.ROCK;
-      document.getElementById('p1-paper-count').textContent = counts.P1.PAPER;
-      document.getElementById('p1-scissors-count').textContent = counts.P1.SCISSORS;
-      document.getElementById('p2-rock-count').textContent = counts.P2.ROCK;
-      document.getElementById('p2-paper-count').textContent = counts.P2.PAPER;
-      document.getElementById('p2-scissors-count').textContent = counts.P2.SCISSORS;
-    }
-
-    // Move execution
-    function performMove(fromX, fromY, toX, toY) {
-      const fromCoord = posToCoord(fromX, fromY);
-      const toCoord = posToCoord(toX, toY);
-      const movingPiece = currentBoard[fromY][fromX];
-      const targetPiece = currentBoard[toY][toX];
-
-      // Update local state
-      currentBoard[toY][toX] = movingPiece;
-      currentBoard[fromY][fromX] = null;
-      lastMove = { from: fromCoord, to: toCoord, player: currentTurn };
-
-      if (targetPiece) {
-        sounds.playCapture();
-        logHistory(`${currentTurn === 'P1' ? 'P1 (Đỏ)' : 'P2 (Xanh)'} đã ăn ${PIECE_NAMES_VI[targetPiece.type]} tại ${toCoord}!`);
-      } else {
-        sounds.playMove();
-        logHistory(`${currentTurn === 'P1' ? 'P1' : 'P2'} đi từ ${fromCoord} → ${toCoord}`);
-      }
-
-      // Check win
-      const winResult = checkWinCondition(currentBoard, lastMove);
-      if (winResult.hasWinner) {
-        handleGameOver(winResult);
-      } else {
-        currentTurn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
-      }
-
-      // Sync through playhtml
-      syncEngine.broadcastState({
-        board: currentBoard,
-        turn: currentTurn,
-        lastMove
-      });
-
-      selectedPos = null;
-      validMoves = [];
-      render();
-    }
-
-    function handleGameOver(result) {
-      isGameOver = true;
-      sounds.playVictory();
-      const modal = document.getElementById('victory-modal');
-      const title = document.getElementById('victory-title');
-      const desc = document.getElementById('victory-desc');
-
-      title.textContent = `${result.winner === 'P1' ? 'PLAYER 1 (ĐỎ)' : 'PLAYER 2 (XANH)'} CHIẾN THẮNG!`;
-      desc.textContent = result.details || 'Đã thỏa mãn điều kiện kết thúc trò chơi!';
-      modal.classList.add('visible');
-      logHistory(`🏆 Trận đấu kết thúc: ${title.textContent}`);
-    }
-
-    // Board click interaction
-    boardEl.addEventListener('click', (e) => {
-      if (isGameOver) return;
-      const cell = e.target.closest('.board-cell');
-      if (!cell) return;
-
-      const x = parseInt(cell.dataset.x, 10);
-      const y = parseInt(cell.dataset.y, 10);
-      const clickedPiece = currentBoard[y][x];
-
-      // If a piece is already selected, try to move
-      if (selectedPos) {
-        const destMove = validMoves.find(m => m.x === x && m.y === y);
-        if (destMove) {
-          performMove(selectedPos.x, selectedPos.y, x, y);
-          return;
-        }
-      }
-
-      // Check role enforcement
-      if (myRole !== 'SPECTATOR' && myRole !== currentTurn) {
-        sounds.playBlocked();
-        logHistory(`⚠️ Chưa tới lượt của bạn (${myRole})!`);
-        return;
-      }
-
-      // Select piece
-      if (clickedPiece && clickedPiece.player === currentTurn) {
-        selectedPos = { x, y };
-        validMoves = getValidMovesForPiece(currentBoard, x, y, currentTurn);
-        sounds.playClick();
-        render();
-      } else {
-        selectedPos = null;
-        validMoves = [];
-        render();
-      }
-    });
-
-    // Role Buttons
-    ['p1', 'p2', 'spec'].forEach(key => {
-      const btn = document.getElementById(`btn-role-${key}`);
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        myRole = btn.dataset.role;
-        logHistory(`Đổi vai trò thành: <strong>${myRole}</strong>`);
-      });
-    });
-
-    // Copy Room Link
-    document.getElementById('btn-copy-room-link').addEventListener('click', () => {
-      const url = window.location.href;
-      navigator.clipboard.writeText(url).then(() => {
-        alert('Đã sao chép link phòng: ' + url);
-      });
-    });
-
-    // Reset Game
-    document.getElementById('btn-sync-reset').addEventListener('click', () => {
-      if (confirm('Bạn có chắc muốn đặt lại ván cờ mới cho cả phòng?')) {
-        currentBoard = createInitialBoard();
-        currentTurn = PLAYERS.PLAYER_1;
-        selectedPos = null;
-        validMoves = [];
-        lastMove = null;
-        isGameOver = false;
-        document.getElementById('victory-modal').classList.remove('visible');
-        render();
-
-        syncEngine.broadcastState({
-          board: currentBoard,
-          turn: currentTurn,
-          lastMove: null
-        });
-        logHistory('🔄 Đã khởi tạo lại ván cờ mới!');
-      }
-    });
-
-    // Turn Timer (30s)
-    let timerRemaining = 30;
-    let timerInterval = null;
-    const timerTextEl = document.getElementById('pf-timer-text');
-    const timerBadgeEl = document.getElementById('pf-turn-timer');
-
-    function startTurnTimer() {
-      if (timerInterval) clearInterval(timerInterval);
-      timerRemaining = 30;
-      updateTimerUI();
-
-      timerInterval = setInterval(() => {
-        if (isGameOver) {
-          clearInterval(timerInterval);
-          return;
-        }
-        timerRemaining--;
-        updateTimerUI();
-
-        if (timerRemaining <= 0) {
-          clearInterval(timerInterval);
-          logHistory('⏱️ Hết thời gian 30s! Tự động đổi lượt thi đấu.');
-          currentTurn = currentTurn === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_2 : PLAYERS.PLAYER_1;
-          selectedPos = null;
-          validMoves = [];
-          render();
-          startTurnTimer();
-        }
-      }, 1000);
-    }
-
-    function updateTimerUI() {
-      if (!timerTextEl) return;
-      timerTextEl.textContent = `${timerRemaining}s`;
-      if (timerRemaining <= 5) timerBadgeEl?.classList.add('warning');
-      else timerBadgeEl?.classList.remove('warning');
-    }
-
-    // Floating Reaction
-    function triggerFloatingReaction(emoji) {
-      const el = document.createElement('div');
-      el.className = 'floating-reaction';
-      el.textContent = emoji;
-      const rect = boardEl.getBoundingClientRect();
-      el.style.left = `${rect.left + rect.width / 2 + (Math.random() * 140 - 70)}px`;
-      el.style.top = `${rect.top + rect.height / 2 + (Math.random() * 90 - 45)}px`;
-      document.body.appendChild(el);
-      setTimeout(() => el.remove(), 1600);
-    }
-
-    // Reaction Buttons
-    document.querySelectorAll('.btn-reaction').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const emoji = btn.dataset.emoji;
-        triggerFloatingReaction(emoji);
-        logHistory(`Bạn đã gửi biểu cảm: ${emoji}`);
-        syncEngine.broadcastState({ reaction: emoji });
-      });
-    });
-
-    // Ping RTT monitor
-    const pfPingEl = document.getElementById('pf-ping-badge');
-    setInterval(() => {
-      if (!pfPingEl) return;
-      const base = 24;
-      const jitter = Math.floor(Math.random() * 12 - 6);
-      pfPingEl.textContent = `📶 Ping: ${Math.max(4, base + jitter)}ms`;
-    }, 4000);
-
-    // Initial Render
-    render();
-    startTurnTimer();
-    logHistory('✓ Giao diện playfun.html đã sẵn sàng.');
-  </script>
+  <script type="module" src="js/playfunApp.js"></script>
 </body>
 </html>

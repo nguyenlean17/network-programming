@@ -8,7 +8,7 @@ import {
   PLAYERS,
   BOARD_SIZE,
   COLUMNS,
-  GOAL_CELLS,
+  PLAYER_GOALS,
   BEATS,
   COMBAT_RESULT,
   WIN_REASONS
@@ -172,72 +172,17 @@ export function countPlayerPieces(board) {
  * Checks win conditions after a move
  * Returns { hasWinner: boolean, winner: string|null, reason: string|null, details: string|null }
  */
-export function checkWinCondition(board, lastMove = null, goalMode = 'ANY') {
-  // Check 1: Goal reached (A1 or I9)
-  if (lastMove && lastMove.to) {
-    const isGoal = GOAL_CELLS.includes(lastMove.to);
-    if (isGoal) {
-      // In OPPOSITE mode: P1 wins at A1, P2 wins at I9
-      if (goalMode === 'OPPOSITE') {
-        if (lastMove.player === PLAYERS.PLAYER_1 && lastMove.to === 'A1') {
-          return {
-            hasWinner: true,
-            winner: PLAYERS.PLAYER_1,
-            reason: WIN_REASONS.GOAL_REACHED,
-            details: 'Player 1 đã đưa quân vào ô đích A1!'
-          };
-        }
-        if (lastMove.player === PLAYERS.PLAYER_2 && lastMove.to === 'I9') {
-          return {
-            hasWinner: true,
-            winner: PLAYERS.PLAYER_2,
-            reason: WIN_REASONS.GOAL_REACHED,
-            details: 'Player 2 đã đưa quân vào ô đích I9!'
-          };
-        }
-      } else {
-        // ANY mode: Entering either A1 or I9 wins immediately
-        return {
-          hasWinner: true,
-          winner: lastMove.player,
-          reason: WIN_REASONS.GOAL_REACHED,
-          details: `${lastMove.player === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2'} đã đưa quân vào ô đích ${lastMove.to}!`
-        };
-      }
-    }
+export function checkWinCondition(board, lastMove = null) {
+  const goal = PLAYER_GOALS[lastMove?.player];
+  const position = goal && coordToPos(goal);
+  if (goal && goal === lastMove?.to && board[position.y][position.x]?.player === lastMove.player) {
+    return {
+      hasWinner: true,
+      winner: lastMove.player,
+      reason: WIN_REASONS.GOAL_REACHED,
+      details: `${lastMove.player === PLAYERS.PLAYER_1 ? 'Player 1' : 'Player 2'} đã đưa quân vào ô đích ${goal} của đối phương!`
+    };
   }
-
-  // Check 2: Completely eliminated ONE type of piece of the opponent
-  const counts = countPlayerPieces(board);
-
-  // Check if Player 1 eliminated one type of Player 2
-  const p2Types = [PIECE_TYPES.ROCK, PIECE_TYPES.PAPER, PIECE_TYPES.SCISSORS];
-  for (const type of p2Types) {
-    if (counts[PLAYERS.PLAYER_2][type] === 0) {
-      const typeName = type === PIECE_TYPES.ROCK ? 'Đấm' : (type === PIECE_TYPES.PAPER ? 'Lá' : 'Kéo');
-      return {
-        hasWinner: true,
-        winner: PLAYERS.PLAYER_1,
-        reason: WIN_REASONS.ELIMINATION,
-        details: `Player 1 đã ăn sạch toàn bộ quân ${typeName} của Player 2!`
-      };
-    }
-  }
-
-  // Check if Player 2 eliminated one type of Player 1
-  const p1Types = [PIECE_TYPES.ROCK, PIECE_TYPES.PAPER, PIECE_TYPES.SCISSORS];
-  for (const type of p1Types) {
-    if (counts[PLAYERS.PLAYER_1][type] === 0) {
-      const typeName = type === PIECE_TYPES.ROCK ? 'Đấm' : (type === PIECE_TYPES.PAPER ? 'Lá' : 'Kéo');
-      return {
-        hasWinner: true,
-        winner: PLAYERS.PLAYER_2,
-        reason: WIN_REASONS.ELIMINATION,
-        details: `Player 2 đã ăn sạch toàn bộ quân ${typeName} của Player 1!`
-      };
-    }
-  }
-
   return { hasWinner: false, winner: null, reason: null, details: null };
 }
 
@@ -259,8 +204,8 @@ export function createEmptyBoard() {
 /**
  * Standard Setup (Frontlines):
  * Each player has 15 pieces (5 ✊, 5 ✋, 5 ✌️).
- * Player 2 at Rows 1-2 (Row 1 has 7, Row 2 has 8, A1 is kept free).
- * Player 1 at Rows 8-9 (Row 8 has 8, Row 9 has 7, I9 is kept free).
+ * Player 2 at Rows 1-2; I1 is kept free.
+ * Player 1 at Rows 8-9; A9 is kept free.
  */
 export function createInitialBoard(preset = 'FRONTLINE') {
   const board = createEmptyBoard();
@@ -427,7 +372,7 @@ export function generateAiDraftPlacement(armySize = 9) {
   const availableSlots = [];
   for (let y = 0; y <= 2; y++) {
     for (let x = 0; x < BOARD_SIZE; x++) {
-      if (x === 0 && y === 0) continue; // Ô A1
+      if (x === 8 && y === 0) continue; // Ô I1 của P2
       availableSlots.push({ x, y });
     }
   }

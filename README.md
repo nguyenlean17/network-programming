@@ -1,5 +1,7 @@
 # Oẳn Tù Tì v2 (OTTv2) - Board Game Chiến Thuật 9×9
-## Dự Án Web Game Oẳn Tù Tì v2: Chơi Cục Bộ (Local 2 Players) & Đa Người Chơi (Multiplayer Server / playfull.html)
+## Dự Án Web Game Oẳn Tù Tì v2: Chơi Cục Bộ & Đa Người Chơi
+
+**Bản chính để mở và nộp là [`index.html`](index.html).** Trang [`playfun.html`](playfun.html) là chế độ online có tích hợp thư viện [PlayHTML](https://playhtml.fun/docs/). Đường dẫn cũ `OTTv2/index.html` chuyển về trang chính; `/playfull.html` chuyển tới `playfun.html` khi chạy bằng server của dự án.
 
 Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ:
 1. **Chế độ 2 người chơi trên cùng một thiết bị (Local 2 Players - Phase 1)**: Lần lượt thay phiên thực hiện nước đi hoàn toàn ở client, không cần server.
@@ -7,7 +9,7 @@ Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù 
    * Máy chủ Node.js (Express + WebSocket) quản lý trạng thái trò chơi tập trung (Authoritative source of truth).
    * **Sảnh phòng trực tuyến (Live Room Lobby)**: Khi tạo một phòng mới, phòng đó **lập tức xuất hiện trong danh sách phòng**. Người chơi khác có thể **chọn phòng đó từ danh sách để vào chơi ngay mà không bắt buộc phải copy link** (vẫn có nút copy link nếu muốn chia sẻ).
    * Hỗ trợ nhiều phòng cùng lúc (Room 001, Room 002, Room 003...).
-3. **Chế độ Đồng bộ Thư viện `playfull.html` / `playfun.html` (`playhtml.fun`)**: Đồng bộ thời gian thực qua thư viện playhtml và máy chủ serverless.
+3. **Chế độ PlayHTML (`playfun.html`)**: Server WebSocket cấp vai trò P1/P2/khán giả, xác thực mọi nước đi và chuyển biểu cảm. PlayHTML chia sẻ bản sao trạng thái bàn cờ và con trỏ trong từng phòng; dữ liệu PlayHTML không có quyền ghi đè ván đấu trên server. Mỗi phòng có tối đa hai người đi quân, người đến sau chỉ xem.
 4. **Chế độ Đấu với Máy (AI Engine 3 cấp độ)**: Minimax Alpha-Beta Pruning + Bảng Chuyển Vị RAM.
 5. **Thiết kế giao diện mới (Redesign)**: Phong cách **Minimalistic (Tối giản), hoàn toàn KHÔNG SỬ DỤNG GRADIENTS**; màu sắc đơn sắc (solid colors), đường nét sắc nét (crisp 1px borders), độ tương phản cao và độ rõ ràng tối đa trên mọi kích thước màn hình.
 
@@ -24,8 +26,8 @@ Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù 
   ...
   A9 B9 C9 D9 E9 F9 G9 H9 I9
   ```
-* **Hai ô đích đặc biệt**: **`A1`** và **`I9`**.
-* Nếu người chơi đưa được bất kỳ quân nào của mình vào một trong hai ô này (`A1` hoặc `I9`) thì **người đó thắng ngay lập tức**.
+* **Hai ô đích đặc biệt**: **`A9`** và **`I1`**.
+* P1 thắng khi đưa một quân tới **`I1`**; P2 thắng khi đưa một quân tới **`A9`**.
 
 ### 1.2. Các loại quân cờ
 Mỗi người chơi có các quân cờ thuộc 3 loại:
@@ -70,12 +72,7 @@ $\rightarrow$ Kéo bị ăn, quân Đấm chiếm ô đó.
   * Lá tấn công Kéo $\rightarrow$ Bị Kéo khắc, không được đi vào.
 
 ### 1.7. Điều kiện thắng (Win Conditions)
-Có **2 cách** để giành chiến thắng:
-1. **Cách 1: Ăn hết một loại quân của đối phương**
-   * Nếu một người chơi ăn sạch hoàn toàn một loại quân bất kỳ của đối phương (ví dụ đối phương ban đầu có 5 Kéo và mất toàn bộ 5 Kéo, số Kéo về 0) $\rightarrow$ Người chơi đó thắng ngay lập tức.
-   * Không cần phải ăn hết toàn bộ quân đối phương.
-2. **Cách 2: Đưa quân vào ô đích (`A1` hoặc `I9`)**
-   * Nếu người chơi đưa bất kỳ quân nào của mình vào ô đích **`A1`** hoặc **`I9`** $\rightarrow$ Thắng ngay lập tức.
+Đưa một quân vào ô đích của đối phương: **P1 đến `I1`**, **P2 đến `A9`**. Ăn quân không tự động kết thúc ván đấu.
 
 ---
 
@@ -86,7 +83,7 @@ Dự án được phân tách rõ ràng giữa **Client UI**, **Server Authorita
 ```
 network-programming/
 ├── index.html                   # Giao diện chính: Local 2 Players, Sảnh phòng Online & AI
-├── playfun.html                 # Giao diện Bài tập 2: Thư viện playfun.html (playhtml.fun)
+├── playfun.html                 # Giao diện online dùng PlayHTML và server xác thực nước đi
 ├── rooms.html                   # Sảnh xem trực tiếp phụ trợ (Live Spectator Hub)
 ├── package.json                 # Cấu hình dự án & scripts chạy
 ├── .gitignore                   # Loại trừ node_modules và tệp tạm
@@ -101,7 +98,8 @@ network-programming/
 │   ├── constants.js             # Hằng số bàn cờ, âm thanh synthesizer, tọa độ
 │   ├── gameRules.js             # Tầng logic luật chơi (chuẩn hóa trên Client)
 │   ├── renderSync.js            # Engine kết nối WebSocket đồng bộ phòng đấu đa người chơi
-│   ├── playhtmlSync.js          # Module tích hợp thư viện playhtml.fun
+│   ├── playhtmlSync.js          # Đồng bộ bản sao ván đấu và con trỏ qua PlayHTML
+│   ├── playfunApp.js            # Bộ điều khiển trang PlayHTML
 │   └── ai.js                    # Thuật toán AI Bot 3 cấp độ (RAM Transposition Table)
 │
 ├── server/
@@ -188,7 +186,7 @@ Sau khi khởi chạy, console sẽ thông báo:
 * Để chơi **Multiplayer Server**:
   * Người chơi 1: Chọn tab `🌐 Phòng Đấu Online`, bấm `➕ Tạo phòng ngay`.
   * Người chơi 2: Mở một cửa sổ trình duyệt ẩn danh hoặc tab mới tại `http://localhost:3000`, chọn tab `🌐 Phòng Đấu Online`, bấm `⚔️ Vào chơi (P2)` trên phòng vừa tạo.
-* Để chơi **Bài tập 2 (`playfull.html`)**: Nhấn vào liên kết `⚡ playfull.html` trên thanh điều hướng hoặc truy cập `http://localhost:3000/playfun.html`.
+* Để chơi **chế độ PlayHTML**: Nhấn `⚡ PlayHTML` hoặc mở `http://localhost:3000/playfun.html`. Người đầu tiên được cấp P1 và có thể sao chép liên kết phòng. Người thứ hai mở liên kết đó để nhận P2; người tiếp theo là khán giả. Chỉ P1/P2 được đi quân hoặc tạo ván mới. Cần kết nối server để chơi; PlayHTML dùng để đồng bộ bản sao bàn cờ và con trỏ.
 
 ---
 

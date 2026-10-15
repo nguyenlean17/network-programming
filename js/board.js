@@ -88,7 +88,7 @@ export class BoardRenderer {
           cell.classList.add('cell-dark');
         }
 
-        // Special Goal cells: A1 and I9
+        // Special goal cells: A9 and I1
         if (GOAL_CELLS.includes(coord)) {
           cell.classList.add('cell-goal');
           const goalBadge = document.createElement('span');

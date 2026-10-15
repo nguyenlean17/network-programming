@@ -36,6 +36,9 @@ app.use((req, res, next) => {
 // Serve static frontend files
 app.use(express.static(rootDir));
 
+// Keep the spelling used in some assignment handouts as a compatibility URL.
+app.get('/playfull.html', (_req, res) => res.redirect('/playfun.html'));
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -85,6 +88,17 @@ function broadcastRoomsList() {
   }
 }
 
+function broadcastRoomPresence(room) {
+  roomManager.broadcast(room, {
+    type: 'PLAYER_PRESENCE',
+    roomId: room.id,
+    p1: !!room.players.P1,
+    p2: !!room.players.P2,
+    players: { p1: room.playerNames.P1, p2: room.playerNames.P2 },
+    totalConnected: room.clients.size
+  });
+}
+
 // WebSocket message dispatcher
 wss.on('connection', (ws) => {
   // Send current rooms list immediately on connect
@@ -124,6 +138,7 @@ wss.on('connection', (ws) => {
             }
           }));
 
+          broadcastRoomPresence(room);
           broadcastRoomsList();
           break;
         }
@@ -142,28 +157,19 @@ wss.on('connection', (ws) => {
             }
           }));
 
-          // Notify other clients in room
-          roomManager.broadcast(room, {
-            type: 'PLAYER_PRESENCE',
-            roomId: room.id,
-            role: assignedRole,
-            playerName: playerName || assignedRole,
-            totalConnected: room.clients.size,
-            players: {
-              p1: room.playerNames.P1,
-              p2: room.playerNames.P2
-            }
-          });
+          broadcastRoomPresence(room);
 
           broadcastRoomsList();
           break;
         }
 
         case 'LEAVE_ROOM': {
+          const previousRoom = roomManager.rooms.get(ws.roomId);
           roomManager.leaveRoom(ws);
-          ws.roomId = null;
-          ws.role = null;
           ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
+          if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
+            broadcastRoomPresence(previousRoom);
+          }
           broadcastRoomsList();
           break;
         }
@@ -174,11 +180,16 @@ wss.on('connection', (ws) => {
           if (!room) return;
 
           // Validate sender's role
-          if (ws.role !== room.gameSession.currentTurn) {
+          if (room.players[ws.role] !== ws || ws.role !== room.gameSession.currentTurn) {
             ws.send(JSON.stringify({
               type: 'MOVE_ERROR',
               message: 'Chưa tới lượt của bạn hoặc bạn là khán giả!'
             }));
+            return;
+          }
+
+          if (!room.players.P1 || !room.players.P2) {
+            ws.send(JSON.stringify({ type: 'MOVE_ERROR', message: 'Cần đủ 2 người chơi để bắt đầu.' }));
             return;
           }
 
@@ -207,6 +218,10 @@ wss.on('connection', (ws) => {
           if (!ws.roomId) return;
           const room = roomManager.rooms.get(ws.roomId);
           if (!room) return;
+          if (room.players[ws.role] !== ws) {
+            ws.send(JSON.stringify({ type: 'MOVE_ERROR', message: 'Chỉ người chơi trong phòng mới được tạo ván mới.' }));
+            return;
+          }
 
           const newState = room.gameSession.reset();
           roomManager.broadcast(room, {
@@ -242,7 +257,11 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    const previousRoom = roomManager.rooms.get(ws.roomId);
     roomManager.leaveRoom(ws);
+    if (previousRoom && roomManager.rooms.has(previousRoom.id)) {
+      broadcastRoomPresence(previousRoom);
+    }
     broadcastRoomsList();
   });
 });

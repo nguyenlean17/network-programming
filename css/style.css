@@ -1039,7 +1039,7 @@ body {
   font-weight: 600;
 }
 
-/* Special Victory Goal Cells: A1 and I9 */
+/* Special Victory Goal Cells: A9 and I1 */
 .board-cell.cell-goal {
   background-color: var(--gold-bg);
   border: 2px solid var(--gold);

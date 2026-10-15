@@ -140,9 +140,9 @@ assert.strictEqual(loseCheck.valid, false, 'Không thể đi vào ô quân Lá k
 console.log('  ✓ Kiểm tra tương tác bàn cờ thực tế hoàn toàn chính xác\n');
 
 // -------------------------------------------------------------
-// Test 6: Điều kiện thắng 1 - Ăn sạch 1 loại quân của đối phương
+// Test 6: Ăn sạch một loại quân không phải điều kiện thắng
 // -------------------------------------------------------------
-console.log('6. Kiểm tra điều kiện thắng: Tiêu diệt hoàn toàn 1 loại quân của đối phương...');
+console.log('6. Kiểm tra ăn sạch một loại quân không kết thúc ván đấu...');
 const winEliminationBoard = createEmptyBoard();
 // P1 có quân
 winEliminationBoard[0][0] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_1, id: 'p1_1' };
@@ -154,24 +154,23 @@ winEliminationBoard[8][0] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_2, 
 winEliminationBoard[8][1] = { type: PIECE_TYPES.PAPER, player: PLAYERS.PLAYER_2, id: 'p2_2' };
 
 const elimWin = checkWinCondition(winEliminationBoard);
-assert.strictEqual(elimWin.hasWinner, true, 'Trò chơi phải kết thúc');
-assert.strictEqual(elimWin.winner, PLAYERS.PLAYER_1, 'P1 phải giành chiến thắng');
-assert.strictEqual(elimWin.reason, WIN_REASONS.ELIMINATION);
-assert.ok(elimWin.details.includes('Kéo'), 'Chi tiết phải ghi rõ ăn sạch quân Kéo');
-console.log('  ✓ Phát hiện điều kiện thắng diệt chủng 1 loại quân chuẩn xác\n');
+assert.strictEqual(elimWin.hasWinner, false, 'Chỉ vào ô đích đối phương mới thắng');
+console.log('  ✓ Ăn quân không tự động kết thúc ván đấu\n');
 
 // -------------------------------------------------------------
-// Test 7: Điều kiện thắng 2 - Chiếm cứ điểm ô đích A1 / I9
+// Test 7: Chỉ ô đích của đối phương mới thắng
 // -------------------------------------------------------------
-console.log('7. Kiểm tra điều kiện thắng: Đột kích cứ điểm A1 hoặc I9...');
+console.log('7. Kiểm tra P1 tới I1 và P2 tới A9...');
 const winGoalBoard = createEmptyBoard();
-winGoalBoard[8][8] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_1, id: 'p1_hero' };
+winGoalBoard[0][8] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_1, id: 'p1_hero' };
 
-// P1 vừa đi vào I9
-const goalWin = checkWinCondition(winGoalBoard, { from: 'H8', to: 'I9', player: PLAYERS.PLAYER_1 });
+const goalWin = checkWinCondition(winGoalBoard, { from: 'H1', to: 'I1', player: PLAYERS.PLAYER_1 });
 assert.strictEqual(goalWin.hasWinner, true, 'Trò chơi phải kết thúc khi vào ô đích');
-assert.strictEqual(goalWin.winner, PLAYERS.PLAYER_1, 'P1 thắng khi vào I9');
+assert.strictEqual(goalWin.winner, PLAYERS.PLAYER_1, 'P1 thắng khi vào I1');
 assert.strictEqual(goalWin.reason, WIN_REASONS.GOAL_REACHED);
+assert.strictEqual(checkWinCondition(winGoalBoard, { from: 'H1', to: 'I1', player: PLAYERS.PLAYER_2 }).hasWinner, false, 'P2 không thắng ở ô đích phe mình');
+winGoalBoard[8][0] = { type: PIECE_TYPES.PAPER, player: PLAYERS.PLAYER_2, id: 'p2_hero' };
+assert.strictEqual(checkWinCondition(winGoalBoard, { from: 'B9', to: 'A9', player: PLAYERS.PLAYER_2 }).winner, PLAYERS.PLAYER_2, 'P2 thắng khi vào A9');
 console.log('  ✓ Phát hiện điều kiện thắng chiếm ô đích chuẩn xác\n');
 
 // -------------------------------------------------------------
@@ -217,17 +216,17 @@ console.log(`  ✓ Đã lưu ${stats.cachedStates} thế cờ vào RAM (~${stats
 // -------------------------------------------------------------
 // Test 10: AI Engine - Nhận biết nước đi dứt điểm ván cờ (Instant Win Detection)
 // -------------------------------------------------------------
-console.log('10. Kiểm tra AI phát hiện nước đi chiến thắng tức thì (Đột kích cứ điểm hoặc ăn quân cuối)...');
+console.log('10. Kiểm tra AI phát hiện nước đi chiến thắng tức thì ở A9...');
 const instantWinBoard = createEmptyBoard();
-// P2 có quân tại H8, chỉ cần đi vào I9 là thắng ngay!
-instantWinBoard[7][7] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_2, id: 'p2_winner' };
+// P2 có quân tại B8, chỉ cần đi vào A9 là thắng ngay!
+instantWinBoard[7][1] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_2, id: 'p2_winner' };
 // P1 có quân ở xa
 instantWinBoard[0][0] = { type: PIECE_TYPES.ROCK, player: PLAYERS.PLAYER_1, id: 'p1_dummy' };
 
 const aiSniper = new OttAi('hard');
 const winMove = aiSniper.getBestMove(instantWinBoard, PLAYERS.PLAYER_2, 'OPPOSITE');
-assert.strictEqual(winMove.to, 'I9', 'AI phải chọn ngay nước đi vào cứ điểm I9 để thắng trận');
-console.log('  ✓ AI phát hiện và thực hiện ngay nước đi chiến thắng vào cứ điểm I9\n');
+assert.strictEqual(winMove.to, 'A9', 'AI phải chọn ngay nước đi vào cứ điểm A9 để thắng trận');
+console.log('  ✓ AI phát hiện và thực hiện ngay nước đi chiến thắng vào cứ điểm A9\n');
 
 // -------------------------------------------------------------
 // Test 11: Chế độ Tự Chọn & Dàn Trận (Custom Draft & Pre-game Placement)
@@ -280,8 +279,8 @@ for (const piece of aiDraft) {
   assert.ok(piece.y >= 0 && piece.y <= 2, `Tọa độ y (${piece.y}) phải nằm trên nửa sân AI (0..2)`);
   assert.ok(piece.x >= 0 && piece.x < 9, `Tọa độ x (${piece.x}) phải nằm trong bàn cờ (0..8)`);
   
-  // Không được đặt đè lên ô cứ điểm A1 (0, 0)
-  assert.ok(!(piece.x === 0 && piece.y === 0), 'Không được đặt quân chặn ô cứ điểm A1');
+  // Không được đặt đè lên ô cứ điểm I1 (8, 0)
+  assert.ok(!(piece.x === 8 && piece.y === 0), 'Không được đặt quân chặn ô cứ điểm I1');
 
   // Đảm bảo không trùng tọa độ
   const coordKey = `${piece.x},${piece.y}`;
@@ -296,7 +295,7 @@ for (const piece of aiDraft) {
 assert.strictEqual(aiRock, 3, 'AI phải dàn trận 3 quân Đấm');
 assert.strictEqual(aiPaper, 3, 'AI phải dàn trận 3 quân Lá');
 assert.strictEqual(aiScissors, 3, 'AI phải dàn trận 3 quân Kéo');
-console.log('  ✓ Đội hình AI sinh ngẫu nhiên đủ 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân không trùng lặp và không chặn A1\n');
+console.log('  ✓ Đội hình AI sinh ngẫu nhiên đủ 9 quân (3 Đấm, 3 Lá, 3 Kéo) trên nửa sân không trùng lặp và không chặn I1\n');
 
 console.log('================================================================');
 console.log('🎉 TẤT CẢ 12/12 BÀI TEST ĐỀU VƯỢT QUA XUẤT SẮC (100% PASS)!');

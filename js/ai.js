@@ -15,7 +15,7 @@
 
 import {
   BOARD_SIZE,
-  GOAL_CELLS,
+  PLAYER_GOALS,
   PLAYERS,
   PIECE_TYPES,
   BEATS
@@ -210,7 +210,7 @@ export class OttAi {
 
     for (const move of candidateMoves) {
       let score = 0;
-      if (GOAL_CELLS.includes(move.to)) score += 5000;
+      if (move.to === PLAYER_GOALS[aiPlayer]) score += 5000;
       if (move.isCapture) score += 100;
       score += Math.random() * 20;
 
@@ -231,25 +231,7 @@ export class OttAi {
 
     // 1. Kiểm tra nước đi thắng ngay lập tức trong 1 lượt (Ưu tiên tuyệt đối)
     for (const move of candidateMoves) {
-      // Thắng bằng ô đích A1 hoặc I9
-      if (GOAL_CELLS.includes(move.to)) {
-        if (goalMode === 'OPPOSITE') {
-          if ((aiPlayer === PLAYERS.PLAYER_1 && move.to === 'A1') ||
-              (aiPlayer === PLAYERS.PLAYER_2 && move.to === 'I9')) {
-            return move;
-          }
-        } else {
-          return move;
-        }
-      }
-
-      // Thắng bằng ăn sạch 1 loại quân
-      if (move.isCapture && move.capturedPiece) {
-        const counts = countPlayerPieces(board);
-        if (counts[opponent][move.capturedPiece.type] === 1) {
-          return move; // Ăn quân này đối phương sẽ về 0 -> Thắng ngay!
-        }
-      }
+      if (move.to === PLAYER_GOALS[aiPlayer]) return move;
     }
 
     // 2. Sắp xếp nước đi (Move Ordering) để tăng tối đa hiệu suất cắt tỉa Alpha-Beta
@@ -323,9 +305,12 @@ export class OttAi {
     }
 
     // 2. Điều kiện dừng: Đạt độ sâu hoặc ván cờ kết thúc
-    const win = checkWinCondition(board, null, goalMode);
-    if (win.hasWinner) {
-      const score = win.winner === aiPlayer ? (100000 + depth * 100) : (-100000 - depth * 100);
+    const p1Goal = coordToPos(PLAYER_GOALS[PLAYERS.PLAYER_1]);
+    const p2Goal = coordToPos(PLAYER_GOALS[PLAYERS.PLAYER_2]);
+    const winner = board[p1Goal.y][p1Goal.x]?.player === PLAYERS.PLAYER_1 ? PLAYERS.PLAYER_1 :
+      board[p2Goal.y][p2Goal.x]?.player === PLAYERS.PLAYER_2 ? PLAYERS.PLAYER_2 : null;
+    if (winner) {
+      const score = winner === aiPlayer ? (100000 + depth * 100) : (-100000 - depth * 100);
       return score;
     }
 
@@ -393,8 +378,8 @@ export class OttAi {
       let scoreA = 0;
       let scoreB = 0;
 
-      if (GOAL_CELLS.includes(a.to)) scoreA += 1000;
-      if (GOAL_CELLS.includes(b.to)) scoreB += 1000;
+      if (a.to === PLAYER_GOALS[player]) scoreA += 1000;
+      if (b.to === PLAYER_GOALS[player]) scoreB += 1000;
 
       if (a.isCapture) scoreA += 500;
       if (b.isCapture) scoreB += 500;
@@ -415,7 +400,7 @@ export class OttAi {
     const oppTotal = counts[opponent].total;
     score += (myTotal - oppTotal) * 100;
 
-    // 2. Điểm kiểm tra chủng loại (Tuyệt chủng 1 loại là thua/thắng)
+    // 2. Giữ quân và ưu tiên bắt quân đối phương.
     const types = [PIECE_TYPES.ROCK, PIECE_TYPES.PAPER, PIECE_TYPES.SCISSORS];
     for (const t of types) {
       const oppCount = counts[opponent][t];
@@ -430,16 +415,14 @@ export class OttAi {
       else if (myCount === 2) score -= 250;
     }
 
-    // 3. Khoảng cách tới ô đích A1 / I9
+    // 3. Khoảng cách tới ô đích của từng người chơi.
     for (let y = 0; y < BOARD_SIZE; y++) {
       for (let x = 0; x < BOARD_SIZE; x++) {
         const piece = board[y][x];
         if (!piece) continue;
 
         // Xác định mục tiêu
-        const targetGoal = (aiPlayer === PLAYERS.PLAYER_2 && goalMode === 'OPPOSITE') ? { x: 8, y: 8 } :
-                           (aiPlayer === PLAYERS.PLAYER_1 && goalMode === 'OPPOSITE') ? { x: 0, y: 0 } :
-                           (y < 4 ? { x: 8, y: 8 } : { x: 0, y: 0 });
+        const targetGoal = coordToPos(PLAYER_GOALS[piece.player]);
 
         const dist = Math.hypot(x - targetGoal.x, y - targetGoal.y);
         const proximityScore = Math.max(0, (12 - dist) * 12);
