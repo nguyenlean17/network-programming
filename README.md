@@ -9,6 +9,8 @@ Tham khảo hướng hình ảnh: [Mushroom Chess Set — Vivian Lee](https://sv
 
 **Bản công khai:** [Chơi OTTv2 trên Internet](https://ottv2-game-2hxh.onrender.com/playfun.html). Mỗi người chơi mở liên kết phòng được chia sẻ và bấm **Sẵn sàng** trước khi bắt đầu.
 
+**Nâng cấp thi đấu bot:** Phần nền tảng hiện ở giai đoạn phát triển. Đã có [kiểm kê và kế hoạch](docs/bot-platform-plan.md), [Bot API 1.0](docs/bot-api-v1.md), hai bot Python mẫu và bộ điều phối trận dùng chung luật server. Trang công khai hiện **chưa nhận bot tải lên, chưa tổ chức giải** vì chưa có kho dữ liệu bền vững và worker Docker đã kiểm thử. `npm test` có bài kiểm thử Python mẫu và cần Python trong môi trường phát triển.
+
 Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ:
 1. **Chế độ 2 người chơi trên cùng một thiết bị (Local 2 Players - Phase 1)**: Lần lượt thay phiên thực hiện nước đi hoàn toàn ở client, không cần server.
 2. **Chế độ Phòng Đấu Trực Tuyến & Danh sách phòng (Authoritative Multiplayer Server - Phase 2)**:

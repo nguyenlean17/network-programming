@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/server.js",
     "server": "node server/server.js",
-    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js"
+    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js && node tests/bot-protocol.test.js && node tests/bot-match.test.js && node tests/bot-replay.test.js && node tests/bot-samples.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",
