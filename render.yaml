@@ -1,3 +1,4 @@
+version: "1"
 services:
   - type: web
     name: ottv2-game
@@ -5,8 +6,9 @@ services:
     plan: free
     region: singapore
     buildCommand: npm ci
-    startCommand: node server/server.js
+    startCommand: npm start
     healthCheckPath: /api/health
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
         value: 24
@@ -24,3 +26,4 @@ databases:
     region: singapore
     postgresMajorVersion: "18"
     databaseName: ottv2_db
+    user: ottv2_db_user
