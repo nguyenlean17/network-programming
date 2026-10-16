@@ -3,7 +3,7 @@ import { ServerGameSession } from '../game.js';
 import { botRequest, parseBotResponse } from './protocol.js';
 import { validateMove } from '../../shared/gameRules.js';
 
-const COMMAND = 'ulimit -t 2 -v 131072 -f 16 -n 64; exec timeout -k 1s 2s python3 -I -B /tmp/main.py < /tmp/request.json';
+const COMMAND = 'umask 077; ulimit -t 2 -v 131072 -u 16 -f 16 -n 64; exec timeout -k 1s 2s python3 -I -B /tmp/main.py < /tmp/request.json';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const markRunnerError = error => {
   const failure = error instanceof Error ? error : new Error(String(error));

@@ -28,6 +28,8 @@ assert.ok(calls.created.every(({ options }) => options.networkPolicy.default ===
 assert.ok(calls.created.every(({ options }) => options.timeoutSeconds <= 1800));
 assert.notEqual(files.get('sandbox-1:/tmp/main.py').toString(), files.get('sandbox-2:/tmp/main.py').toString());
 assert.ok(calls.executed.every(({ command }) => !command.includes('RENDER_API_KEY')));
+assert.ok(calls.executed.every(({ command }) => /ulimit[^;]*-t 2[^;]*-v 131072[^;]*-u 16[^;]*-f 16[^;]*-n 64/.test(command)),
+  'bot command must enforce CPU-time, virtual-memory, process-count, file-size and descriptor limits');
 assert.deepEqual(calls.terminated.sort(), ['sandbox-1', 'sandbox-2']);
 
 const validationFiles = new Map();

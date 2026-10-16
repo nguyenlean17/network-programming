@@ -11,8 +11,16 @@ services:
       - key: NODE_VERSION
         value: 24
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: ottv2-db
+          property: connectionString
       - key: AUTH_SECRET
         generateValue: true
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
+databases:
+  - name: ottv2-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "18"
+    databaseName: ottv2_db

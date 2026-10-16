@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS bots (
   owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 48),
   description text NOT NULL DEFAULT '' CHECK (char_length(description) <= 500),
+  is_public_sample boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS bots_owner_created_idx ON bots (owner_id, created_at DESC);

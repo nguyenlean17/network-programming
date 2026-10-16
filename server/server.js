@@ -12,6 +12,7 @@ import { WebSocketServer } from 'ws';
 import pg from 'pg';
 import { RoomManager } from './room.js';
 import { migrateBotPlatform } from './bots/migrate.js';
+import { seedSampleBots } from './bots/seedSamples.js';
 import { createBotPlatformRouter } from './bots/platformRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -431,6 +432,7 @@ async function startServer() {
     const preparePlatform = async () => {
       try {
         await migrateBotPlatform(platformPool);
+        await seedSampleBots(platformPool);
         const bootstrapAdminEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
         if (bootstrapAdminEmail) {
           await platformPool.query("UPDATE users SET role = 'ADMIN' WHERE lower(email) = $1", [bootstrapAdminEmail]);

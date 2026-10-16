@@ -4,8 +4,9 @@ import { hashPassword, signAccessToken, verifyAccessToken, verifyPassword } from
 import { calculateStandings } from './standings.js';
 import { createRoundRobinSchedule } from './schedule.js';
 import { replayFrame } from './replay.js';
+import { extractMainPythonFromZip, MAX_ARCHIVE_BYTES, MAX_SOURCE_BYTES } from './sourceArchive.js';
 
-const VERSION_UPLOAD_LIMIT = 64 * 1024;
+const VERSION_UPLOAD_LIMIT = MAX_ARCHIVE_BYTES;
 const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const authAttempts = new Map();
 const cleanText = (value, max) => typeof value === 'string'
@@ -88,6 +89,28 @@ export function createBotPlatformRouter({ pool, authSecret }) {
 
   router.get('/auth/me', requireUser, (req, res) => res.json({ user: req.user }));
 
+  router.get('/admin/users', requireAdmin, async (_req, res, next) => {
+    try {
+      const result = await pool.query(`SELECT id, email, display_name, role, created_at
+        FROM users ORDER BY created_at DESC LIMIT 500`);
+      res.json({ users: result.rows });
+    } catch (error) { next(error); }
+  });
+
+  router.patch('/admin/users/:userId/role', requireAdmin, async (req, res, next) => {
+    const role = req.body?.role;
+    if (!['USER', 'ADMIN'].includes(role)) return res.status(400).json({ error: 'Role must be USER or ADMIN' });
+    if (req.params.userId === req.user.id && role !== 'ADMIN') return res.status(409).json({ error: 'You cannot remove your own administrator role' });
+    try {
+      const result = await pool.query('UPDATE users SET role = $2 WHERE id = $1 RETURNING id, email, display_name, role', [req.params.userId, role]);
+      if (!result.rowCount) return res.status(404).json({ error: 'User not found' });
+      await pool.query(`INSERT INTO audit_logs (id, actor_id, action, subject_type, subject_id, details_json)
+        VALUES ($1, $2, 'USER_ROLE_CHANGED', 'USER', $3, $4::jsonb)`,
+      [randomUUID(), req.user.id, req.params.userId, JSON.stringify({ role })]);
+      res.json({ user: result.rows[0] });
+    } catch (error) { next(error); }
+  });
+
   router.get('/bots', requireUser, async (req, res, next) => {
     try {
       const result = await pool.query(`SELECT b.id, b.name, b.description, b.created_at,
@@ -112,10 +135,33 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     } catch (error) { next(error); }
   });
 
+  router.patch('/bots/:botId', requireUser, async (req, res, next) => {
+    const name = cleanText(req.body?.name, 48);
+    const description = cleanText(req.body?.description, 500);
+    if (!name) return res.status(400).json({ error: 'Bot name is required' });
+    try {
+      const result = await pool.query(`UPDATE bots SET name = $3, description = $4
+        WHERE id = $1 AND owner_id = $2 RETURNING id, name, description`, [req.params.botId, req.user.id, name, description]);
+      if (!result.rowCount) return res.status(404).json({ error: 'Bot not found' });
+      res.json({ bot: result.rows[0] });
+    } catch (error) { next(error); }
+  });
+
+  router.delete('/bots/:botId', requireUser, async (req, res, next) => {
+    try {
+      const result = await pool.query('DELETE FROM bots WHERE id = $1 AND owner_id = $2 RETURNING id', [req.params.botId, req.user.id]);
+      if (!result.rowCount) return res.status(404).json({ error: 'Bot not found' });
+      res.status(204).end();
+    } catch (error) {
+      if (error.code === '23503') return res.status(409).json({ error: 'This bot has match or tournament history and cannot be deleted' });
+      next(error);
+    }
+  });
+
   router.get('/practice/bots', requireUser, async (req, res, next) => {
     try {
       const result = await pool.query(`SELECT v.id AS bot_version_id, v.version, b.id AS bot_id,
-        b.name AS bot_name, u.display_name AS owner_name, (b.owner_id = $1) AS is_mine
+        b.name AS bot_name, u.display_name AS owner_name, (b.owner_id = $1) AS is_mine, b.is_public_sample AS is_sample
         FROM bot_versions v JOIN bots b ON b.id = v.bot_id JOIN users u ON u.id = b.owner_id
         WHERE v.validation_status = 'READY' ORDER BY (b.owner_id = $1) DESC, b.name, v.version DESC`, [req.user.id]);
       res.json({ bots: result.rows });
@@ -124,13 +170,16 @@ export function createBotPlatformRouter({ pool, authSecret }) {
 
   router.post('/practice/matches', requireUser, async (req, res, next) => {
     const { ownBotVersionId, opponentBotVersionId } = req.body || {};
+    const count = req.body?.count ?? 1;
     if (typeof ownBotVersionId !== 'string' || typeof opponentBotVersionId !== 'string' || ownBotVersionId === opponentBotVersionId) {
       return res.status(400).json({ error: 'Choose two different ready bot versions' });
     }
+    if (!Number.isInteger(count) || count < 1 || count > 3) return res.status(400).json({ error: 'Practice series count must be between 1 and 3' });
     let client;
     try {
       client = await pool.connect();
       await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`practice:${req.user.id}`]);
       const versions = await client.query(`SELECT v.id, b.owner_id FROM bot_versions v JOIN bots b ON b.id = v.bot_id
         WHERE v.id = ANY($1::uuid[]) AND v.validation_status = 'READY' FOR SHARE OF v`,
       [[ownBotVersionId, opponentBotVersionId]]);
@@ -142,19 +191,25 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       }
       const active = await client.query(`SELECT count(*)::int AS count FROM matches
         WHERE created_by = $1 AND kind = 'PRACTICE' AND status IN ('QUEUED', 'RUNNING')`, [req.user.id]);
-      if (active.rows[0].count >= 3) {
+      if (active.rows[0].count + count > 3) {
         await client.query('ROLLBACK');
         return res.status(429).json({ error: 'You can have up to three practice matches queued or running at once' });
       }
-      const matchId = randomUUID();
+      const matchIds = [];
       const rules = { apiVersion: '1.0', maxPlies: 300, decisionTimeoutMs: 2000 };
-      await client.query(`INSERT INTO matches
-        (id, created_by, kind, p1_version_id, p2_version_id, rules_json)
-        VALUES ($1, $2, 'PRACTICE', $3, $4, $5::jsonb)`,
-      [matchId, req.user.id, ownBotVersionId, opponentBotVersionId, JSON.stringify(rules)]);
-      await client.query('INSERT INTO runner_jobs (id, match_id) VALUES ($1, $2)', [randomUUID(), matchId]);
+      for (let index = 0; index < count; index++) {
+        const matchId = randomUUID();
+        matchIds.push(matchId);
+        const p1VersionId = index % 2 === 0 ? ownBotVersionId : opponentBotVersionId;
+        const p2VersionId = index % 2 === 0 ? opponentBotVersionId : ownBotVersionId;
+        await client.query(`INSERT INTO matches
+          (id, created_by, kind, p1_version_id, p2_version_id, rules_json)
+          VALUES ($1, $2, 'PRACTICE', $3, $4, $5::jsonb)`,
+        [matchId, req.user.id, p1VersionId, p2VersionId, JSON.stringify(rules)]);
+        await client.query('INSERT INTO runner_jobs (id, match_id) VALUES ($1, $2)', [randomUUID(), matchId]);
+      }
       await client.query('COMMIT');
-      res.status(202).json({ matchId, status: 'QUEUED' });
+      res.status(202).json({ matchId: matchIds[0], matchIds, status: 'QUEUED' });
     } catch (error) {
       await client?.query('ROLLBACK').catch(() => {});
       next(error);
@@ -164,6 +219,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
   router.get('/practice/matches', requireUser, async (req, res, next) => {
     try {
       const result = await pool.query(`SELECT m.id, m.status, m.result_json, m.error_message, m.created_at,
+        (m.initial_board_json IS NOT NULL) AS replay_available,
         m.completed_at, b1.name AS p1_bot_name, v1.version AS p1_version,
         b2.name AS p2_bot_name, v2.version AS p2_version
         FROM matches m JOIN bot_versions v1 ON v1.id = m.p1_version_id JOIN bots b1 ON b1.id = v1.bot_id
@@ -174,14 +230,19 @@ export function createBotPlatformRouter({ pool, authSecret }) {
   });
 
   router.post('/bots/:botId/versions', requireUser,
-    express.raw({ type: ['application/octet-stream', 'text/x-python'], limit: VERSION_UPLOAD_LIMIT }),
+    express.raw({ type: ['application/octet-stream', 'text/x-python', 'application/zip', 'application/x-zip-compressed'], limit: VERSION_UPLOAD_LIMIT }),
     async (req, res, next) => {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Upload a non-empty Python source file' });
-      const filename = req.get('x-bot-filename') || '';
-      if (filename.length > 128 || !/^[\w.-]+\.py$/i.test(filename)) return res.status(415).json({ error: 'Only a single .py source file is accepted currently' });
-      const code = req.body.toString('utf8');
-      if (Buffer.from(code, 'utf8').compare(req.body) !== 0 || code.includes('\u0000')) return res.status(400).json({ error: 'Source must be valid UTF-8 text' });
-      const sha256 = createHash('sha256').update(req.body).digest('hex');
+      const uploadName = req.get('x-bot-filename') || '';
+      if (uploadName.length > 128 || !/^[\w.-]+\.(?:py|zip)$/i.test(uploadName)) return res.status(415).json({ error: 'Upload a .py file or ZIP containing only root-level main.py' });
+      if (/\.py$/i.test(uploadName) && req.body.length > MAX_SOURCE_BYTES) return res.status(413).json({ error: 'Python source exceeds the 64 KiB limit' });
+      let source;
+      try { source = /\.zip$/i.test(uploadName) ? extractMainPythonFromZip(req.body) : req.body; }
+      catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
+      const code = source.toString('utf8');
+      if (source.length > MAX_SOURCE_BYTES || Buffer.from(code, 'utf8').compare(source) !== 0 || code.includes('\u0000')) return res.status(400).json({ error: 'Python source must be valid UTF-8 text up to 64 KiB' });
+      const filename = /\.zip$/i.test(uploadName) ? 'main.py' : uploadName;
+      const sha256 = createHash('sha256').update(source).digest('hex');
       let client;
       try {
         client = await pool.connect();
@@ -196,7 +257,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
           (id, bot_id, version, api_version, filename, sha256, source, validation_status)
           VALUES ($1, $2, $3, '1.0', $4, $5, $6, 'QUARANTINED')
           RETURNING id, version, api_version, sha256, validation_status, created_at`,
-        [id, req.params.botId, Number(version.rows[0].next), filename, sha256, req.body]);
+        [id, req.params.botId, Number(version.rows[0].next), filename, sha256, source]);
         await client.query('INSERT INTO bot_validation_jobs (id, bot_version_id) VALUES ($1, $2)', [randomUUID(), id]);
         await client.query('COMMIT');
         res.status(202).json({ version: inserted.rows[0], message: 'Uploaded to quarantine. It cannot be selected until isolated validation is available.' });
@@ -246,6 +307,42 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     } catch (error) { next(error); }
   });
 
+  router.patch('/tournaments/:tournamentId', requireAdmin, async (req, res, next) => {
+    const name = cleanText(req.body?.name, 100);
+    const hasDeadline = Object.hasOwn(req.body || {}, 'submissionDeadline');
+    const deadline = hasDeadline && req.body.submissionDeadline ? new Date(req.body.submissionDeadline) : null;
+    if (!name) return res.status(400).json({ error: 'Tournament name is required' });
+    if (hasDeadline && deadline && (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= Date.now())) {
+      return res.status(400).json({ error: 'Submission deadline must be a future date or empty' });
+    }
+    try {
+      const result = await pool.query(`UPDATE tournaments SET name = $2,
+        submission_deadline = CASE WHEN $3::boolean THEN $4::timestamptz ELSE submission_deadline END
+        WHERE id = $1 AND status IN ('DRAFT', 'OPEN')
+        RETURNING id, name, status, submission_deadline`,
+      [req.params.tournamentId, name, hasDeadline, deadline]);
+      if (!result.rowCount) return res.status(409).json({ error: 'Only draft or open tournaments can be edited' });
+      await pool.query(`INSERT INTO audit_logs (id, actor_id, action, subject_type, subject_id, details_json)
+        VALUES ($1, $2, 'TOURNAMENT_UPDATED', 'TOURNAMENT', $3, $4::jsonb)`,
+      [randomUUID(), req.user.id, req.params.tournamentId, JSON.stringify({ name, submissionDeadline: deadline })]);
+      res.json({ tournament: result.rows[0] });
+    } catch (error) { next(error); }
+  });
+
+  router.post('/tournaments/:tournamentId/cancel', requireAdmin, async (req, res, next) => {
+    try {
+      const result = await pool.query(`UPDATE tournaments t SET status = 'CANCELLED', completed_at = now()
+        WHERE t.id = $1 AND t.status IN ('DRAFT', 'OPEN', 'LOCKED')
+          AND NOT EXISTS (SELECT 1 FROM matches m WHERE m.tournament_id = t.id)
+        RETURNING id, status`, [req.params.tournamentId]);
+      if (!result.rowCount) return res.status(409).json({ error: 'Only a pre-start tournament without scheduled matches can be cancelled' });
+      await pool.query(`INSERT INTO audit_logs (id, actor_id, action, subject_type, subject_id, details_json)
+        VALUES ($1, $2, 'TOURNAMENT_CANCELLED', 'TOURNAMENT', $3, '{}'::jsonb)`,
+      [randomUUID(), req.user.id, req.params.tournamentId]);
+      res.json({ tournament: result.rows[0] });
+    } catch (error) { next(error); }
+  });
+
   router.post('/tournaments/:tournamentId/open', requireAdmin, async (req, res, next) => {
     try {
       const result = await pool.query(`UPDATE tournaments SET status = 'OPEN'
@@ -284,6 +381,41 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
       if (error.code === '23505') return res.status(409).json({ error: 'You already registered for this tournament' });
+      next(error);
+    } finally { client?.release(); }
+  });
+
+  router.get('/tournaments/:tournamentId/participants', requireAdmin, async (req, res, next) => {
+    try {
+      const tournament = await pool.query('SELECT id FROM tournaments WHERE id = $1', [req.params.tournamentId]);
+      if (!tournament.rowCount) return res.status(404).json({ error: 'Tournament not found' });
+      const result = await pool.query(`SELECT p.user_id, u.display_name AS owner_name, u.email,
+        p.bot_version_id, b.name AS bot_name, v.version, p.registered_at, p.locked_at
+        FROM tournament_participants p JOIN users u ON u.id = p.user_id
+        JOIN bot_versions v ON v.id = p.bot_version_id JOIN bots b ON b.id = v.bot_id
+        WHERE p.tournament_id = $1 ORDER BY p.registered_at`, [req.params.tournamentId]);
+      res.json({ participants: result.rows });
+    } catch (error) { next(error); }
+  });
+
+  router.delete('/tournaments/:tournamentId/participants/:userId', requireAdmin, async (req, res, next) => {
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+      const tournament = await client.query('SELECT status FROM tournaments WHERE id = $1 FOR UPDATE', [req.params.tournamentId]);
+      if (!tournament.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Tournament not found' }); }
+      if (tournament.rows[0].status !== 'OPEN') { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Participants can only be removed while registration is open' }); }
+      const removed = await client.query(`DELETE FROM tournament_participants
+        WHERE tournament_id = $1 AND user_id = $2 RETURNING bot_version_id`, [req.params.tournamentId, req.params.userId]);
+      if (!removed.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Participant not found' }); }
+      await client.query(`INSERT INTO audit_logs (id, actor_id, action, subject_type, subject_id, details_json)
+        VALUES ($1, $2, 'TOURNAMENT_PARTICIPANT_REMOVED', 'TOURNAMENT', $3, $4::jsonb)`,
+      [randomUUID(), req.user.id, req.params.tournamentId, JSON.stringify({ userId: req.params.userId, botVersionId: removed.rows[0].bot_version_id })]);
+      await client.query('COMMIT');
+      res.status(204).end();
+    } catch (error) {
+      await client?.query('ROLLBACK').catch(() => {});
       next(error);
     } finally { client?.release(); }
   });
@@ -381,7 +513,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     try {
       const tournament = await pool.query('SELECT id, scoring_json FROM tournaments WHERE id = $1', [req.params.tournamentId]);
       if (!tournament.rowCount) return res.status(404).json({ error: 'Tournament not found' });
-      const entrants = await pool.query(`SELECT p.bot_version_id, b.name AS bot_name, u.display_name AS owner_name
+      const entrants = await pool.query(`SELECT p.bot_version_id, v.version, b.name AS bot_name, u.display_name AS owner_name
         FROM tournament_participants p JOIN bot_versions v ON v.id = p.bot_version_id
         JOIN bots b ON b.id = v.bot_id JOIN users u ON u.id = p.user_id
         WHERE p.tournament_id = $1`, [req.params.tournamentId]);
@@ -389,7 +521,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
         FROM matches WHERE tournament_id = $1 AND status = 'COMPLETED'`, [req.params.tournamentId]);
       const matches = games.rows.map(row => ({ status: 'COMPLETED', p1VersionId: row.p1_version_id,
         p2VersionId: row.p2_version_id, result: row.result_json }));
-      const participants = entrants.rows.map(row => ({ botVersionId: row.bot_version_id,
+      const participants = entrants.rows.map(row => ({ botVersionId: row.bot_version_id, version: row.version,
         botName: row.bot_name, ownerName: row.owner_name }));
       res.json({ leaderboard: calculateStandings(participants, matches, tournament.rows[0].scoring_json),
         scoring: tournament.rows[0].scoring_json });
@@ -415,7 +547,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
 
   router.get('/matches/:matchId/replay', async (req, res, next) => {
     try {
-      const game = await pool.query(`SELECT m.id, m.status, m.result_json, m.initial_board_json, m.final_board_json,
+      const game = await pool.query(`SELECT m.id, m.kind, m.status, m.result_json, m.error_message, m.initial_board_json, m.final_board_json,
         b1.name AS p1_bot_name, u1.display_name AS p1_owner_name,
         b2.name AS p2_bot_name, u2.display_name AS p2_owner_name
         FROM matches m
@@ -429,7 +561,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
         finalBoard: row.final_board_json, moves: movesResult.rows.map(move => move.event_json), result: row.result_json };
       if (!record.initialBoard) return res.status(409).json({ error: 'This match does not have a saved replay yet' });
       const requestedPly = req.query.ply === undefined ? record.moves.length : Number(req.query.ply);
-      res.json({ matchId: row.id, status: row.status, result: row.result_json,
+      res.json({ matchId: row.id, matchKind: row.kind, status: row.status, result: row.result_json, errorMessage: row.error_message,
         players: { p1: { botName: row.p1_bot_name, ownerName: row.p1_owner_name },
           p2: { botName: row.p2_bot_name, ownerName: row.p2_owner_name } },
         totalPlies: record.moves.length, frame: replayFrame(record, requestedPly) });

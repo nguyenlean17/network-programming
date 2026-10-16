@@ -71,7 +71,20 @@ function renderBots(bots) {
     addText(heading, 'span', `${bot.versions.length} phiên bản`, 'pill');
     card.append(heading);
     if (bot.description) addText(card, 'p', bot.description, 'card-description');
-    if (!bot.versions.length) addText(card, 'p', 'Chưa có phiên bản. Tải lên tệp .py (tối đa 64 KiB).', 'card-meta');
+    if (!bot.versions.length) addText(card, 'p', 'Tải lên .py (tối đa 64 KiB) hoặc ZIP chỉ chứa main.py ở thư mục gốc (tối đa 128 KiB).', 'card-meta');
+    const edit = document.createElement('form'); edit.className = 'bot-edit-row'; edit.dataset.botId = bot.id;
+    const nameInput = document.createElement('input'); nameInput.name = 'name'; nameInput.maxLength = 48; nameInput.required = true; nameInput.value = bot.name; nameInput.setAttribute('aria-label', 'Tên bot');
+    const descriptionInput = document.createElement('input'); descriptionInput.name = 'description'; descriptionInput.maxLength = 500; descriptionInput.value = bot.description || ''; descriptionInput.placeholder = 'Mô tả chiến thuật (không bắt buộc)'; descriptionInput.setAttribute('aria-label', 'Mô tả bot');
+    const save = document.createElement('button'); save.type = 'submit'; save.className = 'button'; save.textContent = 'Lưu thông tin';
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button danger'; remove.textContent = 'Xóa bot';
+    remove.addEventListener('click', async () => {
+      if (!confirm(`Xóa bot “${bot.name}”? Bot đã tham gia trận hoặc giải đấu sẽ không thể xóa.`)) return;
+      remove.disabled = true;
+      try { await api(`/bots/${encodeURIComponent(bot.id)}`, { method: 'DELETE' }); await refreshAccount(); showNotice('Đã xóa bot.'); }
+      catch (error) { showNotice(error.message, 'error'); }
+      finally { remove.disabled = false; }
+    });
+    edit.append(nameInput, descriptionInput, save, remove); card.append(edit);
     const versions = document.createElement('div');
     versions.className = 'version-list';
     for (const version of bot.versions) {
@@ -90,7 +103,7 @@ function renderBots(bots) {
     form.className = 'upload-row';
     form.dataset.botId = bot.id;
     const file = document.createElement('input');
-    file.type = 'file'; file.accept = '.py,text/x-python'; file.required = true;
+    file.type = 'file'; file.accept = '.py,.zip,text/x-python,application/zip'; file.required = true;
     file.setAttribute('aria-label', `Chọn tệp Python cho bot ${bot.name}`);
     const submit = document.createElement('button');
     submit.className = 'button'; submit.type = 'submit'; submit.textContent = 'Tải phiên bản';
@@ -119,7 +132,25 @@ function renderTournaments(tournaments) {
     button.addEventListener('click', async () => {
       try {
         const result = await api(`/tournaments/${encodeURIComponent(tournament.id)}/leaderboard`);
-        showNotice(result.leaderboard.length ? result.leaderboard.map((row, index) => `${index + 1}. ${row.botName} — ${row.points} điểm`).join(' · ') : 'Giải chưa có kết quả được lưu.', 'info');
+        let board = card.querySelector('.leaderboard-container');
+        if (!board) { board = document.createElement('div'); board.className = 'leaderboard-container'; card.append(board); }
+        board.replaceChildren();
+        if (!result.leaderboard.length) { addText(board, 'p', 'Giải chưa có người đăng ký.', 'card-meta'); return; }
+        const table = document.createElement('table'); table.className = 'leaderboard-table';
+        const labels = ['Hạng', 'Chủ bot', 'Bot', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Tỷ lệ thắng', 'Điểm'];
+        const head = document.createElement('thead'); const headerRow = document.createElement('tr');
+        for (const label of labels) addText(headerRow, 'th', label);
+        head.append(headerRow); table.append(head);
+        const body = document.createElement('tbody');
+        for (const entry of result.leaderboard) {
+          const row = document.createElement('tr');
+          const cells = [entry.rank, entry.ownerName || 'Ẩn danh', `${entry.botName}${entry.version ? ` v${entry.version}` : ''}`,
+            entry.played, entry.wins, entry.draws, entry.losses,
+            entry.winRate === null ? '—' : `${(entry.winRate * 100).toFixed(1)}%`, entry.points];
+          for (const value of cells) addText(row, 'td', String(value));
+          body.append(row);
+        }
+        table.append(body); board.append(table);
       } catch (error) { showNotice(error.message, 'error'); }
     });
     const matches = document.createElement('button');
@@ -146,7 +177,51 @@ function renderTournaments(tournaments) {
     const actions = document.createElement('div');
     actions.className = 'tournament-actions';
     actions.append(button, matches);
-    if (currentUser?.role === 'ADMIN') {
+    if (list.id === 'tournament-list' && currentUser?.role === 'ADMIN') {
+      const participantButton = document.createElement('button'); participantButton.className = 'button'; participantButton.type = 'button'; participantButton.textContent = 'Người đăng ký';
+      participantButton.addEventListener('click', async () => {
+        try {
+          const result = await api(`/tournaments/${encodeURIComponent(tournament.id)}/participants`);
+          let participantList = card.querySelector('.participant-list');
+          if (!participantList) { participantList = document.createElement('div'); participantList.className = 'participant-list match-list'; card.append(participantList); }
+          participantList.replaceChildren();
+          if (!result.participants.length) { addText(participantList, 'p', 'Chưa có người đăng ký.', 'card-meta'); return; }
+          for (const participant of result.participants) {
+            const row = document.createElement('div'); row.className = 'match-row';
+            addText(row, 'span', `${participant.owner_name} · ${participant.email} · ${participant.bot_name} v${participant.version}`);
+            if (tournament.status === 'OPEN') {
+              const removeParticipant = document.createElement('button'); removeParticipant.className = 'button danger'; removeParticipant.type = 'button'; removeParticipant.textContent = 'Gỡ';
+              removeParticipant.addEventListener('click', async () => {
+                removeParticipant.disabled = true;
+                try { await api(`/tournaments/${encodeURIComponent(tournament.id)}/participants/${encodeURIComponent(participant.user_id)}`, { method: 'DELETE' }); participantButton.click(); showNotice('Đã gỡ người đăng ký khỏi giải.'); }
+                catch (error) { showNotice(error.message, 'error'); }
+                finally { removeParticipant.disabled = false; }
+              });
+              row.append(removeParticipant);
+            }
+            participantList.append(row);
+          }
+        } catch (error) { showNotice(error.message, 'error'); }
+      });
+      actions.append(participantButton);
+      if (['DRAFT', 'OPEN'].includes(tournament.status)) {
+        const edit = document.createElement('form'); edit.className = 'tournament-edit-form';
+        const name = document.createElement('input'); name.name = 'name'; name.maxLength = 100; name.required = true; name.value = tournament.name; name.setAttribute('aria-label', 'Tên giải');
+        const deadline = document.createElement('input'); deadline.name = 'submissionDeadline'; deadline.type = 'datetime-local'; deadline.setAttribute('aria-label', 'Hạn đăng ký');
+        if (tournament.submission_deadline) deadline.value = new Date(new Date(tournament.submission_deadline).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        const saveEdit = document.createElement('button'); saveEdit.type = 'submit'; saveEdit.className = 'button'; saveEdit.textContent = 'Sửa giải';
+        edit.append(name, deadline, saveEdit); edit.addEventListener('submit', async event => {
+          event.preventDefault(); saveEdit.disabled = true;
+          try {
+            const values = Object.fromEntries(new FormData(edit));
+            values.submissionDeadline = values.submissionDeadline ? new Date(values.submissionDeadline).toISOString() : null;
+            await api(`/tournaments/${encodeURIComponent(tournament.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+            await refreshAccount(); showNotice('Đã cập nhật giải đấu.');
+          } catch (error) { showNotice(error.message, 'error'); }
+          finally { saveEdit.disabled = false; }
+        });
+        actions.append(edit);
+      }
       const transitions = { DRAFT: ['open', 'Mở đăng ký'], OPEN: ['lock', 'Khóa đăng ký'], LOCKED: ['start', 'Bắt đầu giải'], RUNNING: ['pause', 'Tạm dừng'], PAUSED: ['resume', 'Tiếp tục'] };
       const transition = transitions[tournament.status];
       if (transition) {
@@ -162,6 +237,17 @@ function renderTournaments(tournaments) {
           finally { control.disabled = false; }
         });
         actions.append(control);
+      }
+      if (['DRAFT', 'OPEN', 'LOCKED'].includes(tournament.status)) {
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button danger'; cancel.textContent = 'Hủy giải';
+        cancel.addEventListener('click', async () => {
+          if (!confirm(`Hủy giải “${tournament.name}”? Thao tác này không thể hoàn tác.`)) return;
+          cancel.disabled = true;
+          try { await api(`/tournaments/${encodeURIComponent(tournament.id)}/cancel`, { method: 'POST' }); await refreshAccount(); showNotice('Đã hủy giải.'); }
+          catch (error) { showNotice(error.message, 'error'); }
+          finally { cancel.disabled = false; }
+        });
+        actions.append(cancel);
       }
     }
     if (currentUser && tournament.status === 'OPEN') {
@@ -218,7 +304,7 @@ function renderPracticeBots(bots) {
   if (selectedOwn) own.value = selectedOwn.bot_version_id;
   for (const bot of versions.filter(item => item.bot_version_id !== own.value)) {
     const option = document.createElement('option'); option.value = bot.bot_version_id;
-    option.textContent = `${bot.bot_name} v${bot.version} · ${bot.is_mine ? 'bot của bạn' : bot.owner_name}`;
+    option.textContent = `${bot.bot_name} v${bot.version} · ${bot.is_mine ? 'bot của bạn' : bot.is_sample ? 'bot mẫu' : bot.owner_name}`;
     opponent.append(option);
   }
   const selectedOpponent = versions.find(bot => bot.bot_version_id === priorOpponent && bot.bot_version_id !== own.value);
@@ -236,8 +322,9 @@ function renderPracticeMatches(matches) {
     const result = match.result_json?.winner ? ` · ${match.result_json.winner === 'P1' ? match.p1_bot_name : match.p2_bot_name} thắng` : '';
     const reason = match.result_json?.reason ? ` · ${match.result_json.reason}` : match.error_message ? ` · ${match.error_message}` : '';
     addText(row, 'span', `${match.p1_bot_name} v${match.p1_version} – ${match.p2_bot_name} v${match.p2_version} · ${match.status}${result}${reason}`);
-    if (match.status === 'COMPLETED') {
-      const replay = document.createElement('a'); replay.href = `/match.html?id=${encodeURIComponent(match.id)}`; replay.textContent = 'Xem replay'; row.append(replay);
+    if (match.replay_available && ['RUNNING', 'COMPLETED'].includes(match.status)) {
+      const replay = document.createElement('a'); replay.href = `/match.html?id=${encodeURIComponent(match.id)}`;
+      replay.textContent = match.status === 'RUNNING' ? 'Xem trực tiếp' : 'Xem replay'; row.append(replay);
     }
     list.append(row);
   }
@@ -251,7 +338,7 @@ async function refreshAccount() {
   renderTournaments(tournamentData.tournaments);
   renderPracticeBots(practiceBots.bots);
   renderPracticeMatches(practiceMatches.matches);
-  if (currentUser?.role === 'ADMIN') await refreshJobs();
+  if (currentUser?.role === 'ADMIN') await Promise.all([refreshJobs(), refreshUsers()]);
 }
 
 async function refreshJobs() {
@@ -272,6 +359,30 @@ async function refreshJobs() {
         } catch (error) { showNotice(error.message, 'error'); }
       });
       row.append(retry);
+    }
+    list.append(row);
+  }
+}
+
+async function refreshUsers() {
+  const result = await api('/admin/users');
+  const list = byId('admin-user-list'); list.replaceChildren();
+  if (!result.users.length) return addText(list, 'p', 'Chưa có tài khoản.', 'empty-state');
+  for (const user of result.users) {
+    const row = document.createElement('div'); row.className = 'match-row';
+    addText(row, 'span', `${user.display_name} · ${user.email} · ${user.role}`);
+    if (user.id !== currentUser.id) {
+      const role = document.createElement('button'); role.type = 'button'; role.className = 'button';
+      role.textContent = user.role === 'ADMIN' ? 'Hạ quyền' : 'Cấp quyền quản trị';
+      role.addEventListener('click', async () => {
+        role.disabled = true;
+        try {
+          await api(`/admin/users/${encodeURIComponent(user.id)}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: user.role === 'ADMIN' ? 'USER' : 'ADMIN' }) });
+          await refreshUsers(); showNotice('Đã cập nhật vai trò.');
+        } catch (error) { showNotice(error.message, 'error'); }
+        finally { role.disabled = false; }
+      });
+      row.append(role);
     }
     list.append(row);
   }
@@ -303,7 +414,7 @@ byId('create-bot-form').addEventListener('submit', async event => {
   const button = form.querySelector('button'); button.disabled = true;
   try {
     const result = await api('/bots', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: new FormData(form).get('name') }) });
+      body: JSON.stringify(Object.fromEntries(new FormData(form))) });
     form.reset(); await refreshAccount(); showNotice(`Đã tạo bot “${result.bot.name}”.`);
   } catch (error) { showNotice(error.message, 'error'); }
   finally { button.disabled = false; }
@@ -321,15 +432,18 @@ byId('practice-form').addEventListener('submit', async event => {
   const button = form.querySelector('button[type=submit]'); button.disabled = true;
   try {
     const created = await api('/practice/matches', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ownBotVersionId: form.elements.ownBotVersionId.value, opponentBotVersionId: form.elements.opponentBotVersionId.value }) });
+      body: JSON.stringify({ ownBotVersionId: form.elements.ownBotVersionId.value, opponentBotVersionId: form.elements.opponentBotVersionId.value,
+        count: Number(form.elements.count.value) }) });
     showNotice('Đã xếp trận luyện tập vào hàng đợi. Trạng thái sẽ tự cập nhật.', 'info');
     for (let attempt = 0; attempt < 40; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 3000));
       const [jobs, bots] = await Promise.all([api('/practice/matches'), api('/practice/bots')]);
       renderPracticeMatches(jobs.matches); renderPracticeBots(bots.bots);
-      const match = jobs.matches.find(item => item.id === created.matchId);
-      if (match && ['COMPLETED', 'FAILED'].includes(match.status)) {
-        showNotice(match.status === 'COMPLETED' ? 'Trận tập đã kết thúc. Có thể mở replay để xem lại.' : `Trận tập gặp lỗi: ${match.error_message || 'runner thất bại'}.`, match.status === 'COMPLETED' ? 'success' : 'error');
+      const batch = jobs.matches.filter(item => created.matchIds.includes(item.id));
+      if (batch.length === created.matchIds.length && batch.every(match => ['COMPLETED', 'FAILED'].includes(match.status))) {
+        const failures = batch.filter(match => match.status === 'FAILED').length;
+        showNotice(failures ? `${failures}/${batch.length} trận tập thất bại. Mở danh sách để kiểm tra từng trận.`
+          : `${batch.length} trận tập đã kết thúc. Có thể mở replay để xem lại.`, failures ? 'error' : 'success');
         break;
       }
     }
@@ -338,16 +452,29 @@ byId('practice-form').addEventListener('submit', async event => {
 });
 
 byId('bot-list').addEventListener('submit', async event => {
+  const edit = event.target.closest('.bot-edit-row');
+  if (edit) {
+    event.preventDefault();
+    const button = edit.querySelector('button[type=submit]'); button.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(edit));
+      await api(`/bots/${encodeURIComponent(edit.dataset.botId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+      await refreshAccount(); showNotice('Đã cập nhật thông tin bot.');
+    } catch (error) { showNotice(error.message, 'error'); }
+    finally { button.disabled = false; }
+    return;
+  }
   const form = event.target.closest('.upload-row');
   if (!form) return;
   event.preventDefault();
   const file = form.querySelector('input[type=file]').files[0];
   if (!file) return;
-  if (file.size > 64 * 1024) return showNotice('Tệp phải nhỏ hơn hoặc bằng 64 KiB.', 'error');
+  const isZip = /\.zip$/i.test(file.name);
+  if (file.size > (isZip ? 128 : 64) * 1024) return showNotice(isZip ? 'ZIP phải nhỏ hơn hoặc bằng 128 KiB.' : 'Tệp Python phải nhỏ hơn hoặc bằng 64 KiB.', 'error');
   const button = form.querySelector('button'); button.disabled = true;
   try {
     await api(`/bots/${encodeURIComponent(form.dataset.botId)}/versions`, { method: 'POST',
-      headers: { 'Content-Type': 'text/x-python', 'X-Bot-Filename': file.name }, body: file });
+      headers: { 'Content-Type': isZip ? 'application/zip' : 'text/x-python', 'X-Bot-Filename': file.name }, body: file });
     await refreshAccount(); showNotice('Đã lưu phiên bản ở trạng thái cách ly. Hệ thống chưa chạy mã bot này.');
   } catch (error) { showNotice(error.message, 'error'); }
   finally { button.disabled = false; }

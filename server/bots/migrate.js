@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 const migrations = [
   { id: '001_bot_platform', path: new URL('../migrations/001_bot_platform.sql', import.meta.url) },
-  { id: '002_practice_arena', path: new URL('../migrations/002_practice_arena.sql', import.meta.url) }
+  { id: '002_practice_arena', path: new URL('../migrations/002_practice_arena.sql', import.meta.url) },
+  { id: '003_public_sample_bots', path: new URL('../migrations/003_public_sample_bots.sql', import.meta.url) }
 ];
 
 export async function migrateBotPlatform(pool) {

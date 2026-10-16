@@ -7,7 +7,7 @@
     "start": "node server/server.js",
     "server": "node server/server.js",
     "bot-worker": "node server/bots/worker.js",
-    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js && node tests/bot-auth.test.js && node tests/bot-platform-api.test.js && node tests/bot-protocol.test.js && node tests/bot-match.test.js && node tests/bot-render-sandbox.test.js && node tests/bot-replay.test.js && node tests/bot-schedule.test.js && node tests/bot-standings.test.js && node tests/bot-samples.test.js"
+    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js && node tests/bot-auth.test.js && node tests/bot-platform-api.test.js && node tests/bot-source-archive.test.js && node tests/bot-protocol.test.js && node tests/bot-match.test.js && node tests/bot-render-sandbox.test.js && node tests/bot-replay.test.js && node tests/bot-schedule.test.js && node tests/bot-standings.test.js && node tests/bot-sample-seed.test.js && node tests/bot-samples.test.js"
   },
   "dependencies": {
     "@renderinc/sdk": "^1.2.0",

@@ -58,6 +58,8 @@
           <form id="create-bot-form" class="inline-form">
             <label class="sr-only" for="bot-name">Tên bot</label>
             <input id="bot-name" name="name" maxlength="48" required placeholder="Đặt tên cho bot mới">
+          <label class="sr-only" for="bot-description">Mô tả bot</label>
+          <input id="bot-description" name="description" maxlength="500" placeholder="Mô tả chiến thuật (không bắt buộc)">
             <button class="button primary" type="submit">＋ Tạo bot</button>
           </form>
           <div id="bot-list" class="card-list"><p class="empty-state">Đang tải danh sách bot…</p></div>
@@ -75,6 +77,7 @@
         <form id="practice-form" class="admin-form">
           <label>Bot của mình<select name="ownBotVersionId" required></select></label>
           <label>Bot đối thủ<select name="opponentBotVersionId" required></select></label>
+          <label>Số trận liên tiếp<select name="count"><option value="1">1 trận</option><option value="3">3 trận, đổi bên P1/P2</option></select></label>
           <button class="button primary" type="submit">Bắt đầu trận tập</button>
         </form>
         <div class="section-heading"><div><span class="eyebrow">LỊCH SỬ GẦN ĐÂY</span><h2>Trận luyện tập</h2></div></div>
@@ -91,6 +94,8 @@
         </form>
         <div class="section-heading"><div><span class="eyebrow">TÁC VỤ NỀN</span><h2>Hàng đợi</h2></div></div>
         <div id="admin-job-list" class="card-list"><p class="empty-state">Đang tải tác vụ…</p></div>
+        <div class="section-heading"><div><span class="eyebrow">TÀI KHOẢN</span><h2>Quản lý vai trò</h2></div></div>
+        <div id="admin-user-list" class="card-list"><p class="empty-state">Đang tải tài khoản…</p></div>
       </section>
     </section>
     <footer>Luật chơi và kết quả do máy chủ OTTv2 xác nhận. <a href="/">Trở lại bàn cờ</a></footer>

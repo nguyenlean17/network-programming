@@ -14,6 +14,7 @@ export function calculateStandings(participants, matches, scoring = DEFAULT_SCOR
     rows.set(participant.botVersionId, {
       botVersionId: participant.botVersionId,
       botName: participant.botName ?? participant.botVersionId,
+      version: participant.version ?? null,
       ownerName: participant.ownerName ?? null,
       points: 0, played: 0, wins: 0, draws: 0, losses: 0
     });

@@ -5,7 +5,7 @@ import { botRequest, parseBotResponse } from './protocol.js';
 
 // The runner is injected so web routes never execute uploaded code in their own process.
 // Production callers must provide an isolated runner. This module has no upload endpoint.
-export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID() }) {
+export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID(), onStart, onMove }) {
   if (typeof runner !== 'function') throw new TypeError('An isolated runner is required');
   if (!Number.isSafeInteger(maxPlies) || maxPlies < 1 || maxPlies > 10000) throw new RangeError('Invalid maxPlies');
 
@@ -16,6 +16,9 @@ export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID
   let result = null;
 
   try {
+  if (onStart && await onStart({ matchId, initialBoard: structuredClone(initialBoard) }) === false) {
+    throw new Error('Match job lease is no longer active');
+  }
   for (let ply = 0; ply < maxPlies; ply++) {
     const player = game.currentTurn;
     const request = botRequest(game, player, ply, memories[player]);
@@ -53,7 +56,11 @@ export async function runBotMatch({ runner, maxPlies = 300, matchId = randomUUID
       break;
     }
     memories[player] = response.memory;
-    moves.push({ ply: ply + 1, ...structuredClone(applied.lastMove) });
+    const event = { ply: ply + 1, ...structuredClone(applied.lastMove) };
+    moves.push(event);
+    if (onMove && await onMove({ matchId, move: structuredClone(event), board: structuredClone(game.board) }) === false) {
+      throw new Error('Match job lease is no longer active');
+    }
     if (applied.winnerInfo) {
       result = { winner: applied.winnerInfo.winner, reason: applied.winnerInfo.reason, faultPlayer: null };
       break;

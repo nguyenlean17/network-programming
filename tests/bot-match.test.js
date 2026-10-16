@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { runBotMatch } from '../server/bots/match.js';
 
 const firstLegal = async (_player, request) => JSON.stringify({ apiVersion: '1.0', move: request.legalMoves[0] });
+const progress = [];
+const observedMatch = await runBotMatch({ runner: firstLegal, maxPlies: 2,
+  onStart: ({ initialBoard }) => progress.push({ type: 'start', pieces: initialBoard.flat().filter(Boolean).length }),
+  onMove: ({ move, board }) => progress.push({ type: 'move', ply: move.ply, pieces: board.flat().filter(Boolean).length }) });
+assert.equal(observedMatch.moves.length, 2);
+assert.deepEqual(progress.map(item => item.type), ['start', 'move', 'move']);
+assert.deepEqual(progress.map(item => item.ply), [undefined, 1, 2]);
+
 const draw = await runBotMatch({ runner: firstLegal, maxPlies: 4 });
 assert.equal(draw.moves.length, 4);
 assert.equal(draw.result.reason, 'MOVE_LIMIT');

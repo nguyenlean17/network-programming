@@ -72,6 +72,43 @@ function renewLease(jobId, attempt) {
     WHERE id = $1 AND status = 'RUNNING' AND attempts = $3`, [jobId, leaseMs, attempt]);
 }
 
+async function withActiveAttempt(job, update) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const active = await client.query('SELECT status, attempts FROM runner_jobs WHERE id = $1 FOR UPDATE', [job.id]);
+    if (!active.rowCount || active.rows[0].status !== 'RUNNING' || active.rows[0].attempts !== job.attempts) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await update(client);
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally { client.release(); }
+}
+
+function startMatchProgress(job, initialBoard) {
+  return withActiveAttempt(job, async client => {
+    await client.query('DELETE FROM match_moves WHERE match_id = $1', [job.match_id]);
+    await client.query(`UPDATE matches SET status = 'RUNNING', started_at = COALESCE(started_at, now()),
+      initial_board_json = $2::jsonb, final_board_json = $2::jsonb, result_json = NULL,
+      error_message = NULL WHERE id = $1`, [job.match_id, JSON.stringify(initialBoard)]);
+  });
+}
+
+function persistMatchProgress(job, move, board) {
+  return withActiveAttempt(job, async client => {
+    await client.query(`INSERT INTO match_moves (match_id, ply, player, from_cell, to_cell, event_json)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [job.match_id, move.ply, move.player, move.from, move.to, JSON.stringify(move)]);
+    await client.query('UPDATE matches SET final_board_json = $2::jsonb WHERE id = $1',
+      [job.match_id, JSON.stringify(board)]);
+  });
+}
+
 async function deferJob(job, error) {
   const client = await pool.connect();
   try {
@@ -105,11 +142,6 @@ async function saveMatch(job, record) {
       await client.query('COMMIT');
       return;
     }
-    for (const move of record.moves) {
-      await client.query(`INSERT INTO match_moves (match_id, ply, player, from_cell, to_cell, event_json)
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
-      [job.match_id, move.ply, move.player, move.from, move.to, JSON.stringify(move)]);
-    }
     await client.query(`UPDATE matches SET status = 'COMPLETED', result_json = $2::jsonb,
       initial_board_json = $3::jsonb, final_board_json = $4::jsonb, completed_at = now(), error_message = NULL
       WHERE id = $1`, [job.match_id, JSON.stringify(record.result), JSON.stringify(record.initialBoard), JSON.stringify(record.finalBoard)]);
@@ -130,10 +162,9 @@ async function saveMatch(job, record) {
 async function executeJob(job) {
   const heartbeat = setInterval(() => renewLease(job.id, job.attempts).catch(error => console.error('Could not renew runner lease:', error.message)), 30000);
   try {
-    await pool.query("UPDATE matches SET status = 'RUNNING', started_at = COALESCE(started_at, now()) WHERE id = $1", [job.match_id]);
-    const match = await pool.query(`SELECT id, p1_version_id, p2_version_id, rules_json, status
-      FROM matches WHERE id = $1 AND kind = 'TOURNAMENT'`, [job.match_id]);
-    if (!match.rowCount) throw new Error('Tournament match record is missing');
+    const match = await pool.query(`SELECT id, p1_version_id, p2_version_id, rules_json, kind
+      FROM matches WHERE id = $1 AND kind IN ('TOURNAMENT', 'PRACTICE')`, [job.match_id]);
+    if (!match.rowCount) throw new Error('Bot match record is missing');
     const row = match.rows[0];
     const versions = await pool.query(`SELECT id, source, validation_status FROM bot_versions
       WHERE id = ANY($1::uuid[])`, [[row.p1_version_id, row.p2_version_id]]);
@@ -144,7 +175,9 @@ async function executeJob(job) {
       throw new Error('Match references a bot version that is not validated');
     }
     const runner = createRenderSandboxRunner({ sandboxes, sources: { P1: p1.source, P2: p2.source } });
-    const record = await runBotMatch({ runner, maxPlies: row.rules_json.maxPlies, matchId: row.id });
+    const record = await runBotMatch({ runner, maxPlies: row.rules_json.maxPlies, matchId: row.id,
+      onStart: ({ initialBoard }) => startMatchProgress(job, initialBoard),
+      onMove: ({ move, board }) => persistMatchProgress(job, move, board) });
     await saveMatch(job, record);
   } catch (error) {
     console.error(`Runner job ${job.id} failed:`, error.message);
