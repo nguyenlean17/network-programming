@@ -1,0 +1,25 @@
+# Separate, opt-in Blueprint. This creates a PAID worker; it is not included in
+# render.yaml. Confirm sandbox access and the Render quote before applying.
+version: "1"
+services:
+  - type: worker
+    name: ottv2-bot-worker
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci
+    startCommand: npm run bot-worker
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_URL
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_WORKSPACE_ID
+        sync: false
+      - key: BOT_WORKER_POLL_MS
+        value: "1500"
+      - key: BOT_WORKER_ROLE
+        value: all

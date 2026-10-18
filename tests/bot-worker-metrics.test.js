@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { createWorkerMetricsSampler } from '../server/bots/workerMetrics.js';
+import { jobFilters } from '../server/bots/adminMonitor.js';
+let elapsed = 1000, cpu = { user: 1000, system: 2000 };
+const sample = createWorkerMetricsSampler({ now: () => elapsed, cpuUsage: () => ({ ...cpu }),
+  memoryUsage: () => ({ rss: 1048576 }), uptime: () => 123.9 });
+assert.deepEqual(sample(), { cpuPercent: null, rssBytes: 1048576, uptimeSeconds: 123 });
+elapsed += 1000; cpu.user += 800000; cpu.system += 100000;
+assert.equal(sample().cpuPercent, 90);
+elapsed += 1000; cpu.user += 2000000;
+assert.equal(sample().cpuPercent, 200, 'usage across cores must not be capped at 100%');
+assert.equal(sample().cpuPercent, null, 'zero elapsed interval is unknown, not 0%');
+elapsed += 1000; assert.equal(sample().cpuPercent, 0, 'a genuinely idle interval can be zero');
+assert.deepEqual(jobFilters({}), { status: null, type: null, reference: null });
+assert.throws(() => jobFilters({ status: 'DROP TABLE' }), { status: 400 });
+assert.throws(() => jobFilters({ type: 'anything' }), { status: 400 });
+assert.throws(() => jobFilters({ reference: "' OR 1=1" }), { status: 400 });
+assert.throws(() => jobFilters({ reference: ['a','b'] }), { status: 400 });
+assert.equal(jobFilters({ status: 'FAILED', type: 'MATCH' }).status, 'FAILED');
+console.log('✓ Worker process CPU/RAM sampling, first-sample unknown state and validated admin filters');

@@ -1,5 +1,7 @@
 # OTTv2 Bot API 1.0
 
+Hướng dẫn trên website: `/bot-guide.html` (không cần đăng nhập). Bộ khởi đầu gồm `/bot-kit/main.py` và `/bot-kit/request.json`; request được tạo từ bàn cờ thực tế của game engine, không ghi vào dữ liệu giải đấu. Chỉnh hàm `choose_move(state)` trong `main.py` để trả `(move, memory)`.
+
 Bot Python đọc **một** JSON từ stdin và ghi **một** JSON vào stdout cho mỗi lượt. Runner tạo tiến trình cách ly mới cho mỗi lượt; bot muốn nhớ dữ liệu qua lượt dùng trường `memory` (JSON, tối đa 1 KiB). Không ghi thông tin gỡ lỗi ra stdout; dùng stderr. Trạng thái bàn cờ do server gửi là bản sao; sửa bản sao không thay đổi trận.
 
 ## Request
@@ -35,5 +37,7 @@ Bot lỗi, timeout hoặc trả nước không hợp lệ xử thua. Điểm gi�
 ## Chạy bot mẫu cục bộ
 
 `examples/bots/first_legal.py` và `examples/bots/goal_seeker.py` là ví dụ hợp lệ. Với request JSON đầy đủ lưu trong `request.json`, chạy `python examples/bots/first_legal.py < request.json` trên máy của chính bạn. **Không dùng lệnh này cho file bot từ người lạ.** Hệ thống công khai chỉ được nhận file sau khi worker sandbox hoạt động.
+
+Với bộ khởi đầu tải từ website, Windows PowerShell dùng `Get-Content -Raw -Encoding UTF8 .\request.json | python .\main.py`. CMD/macOS/Linux dùng `python main.py < request.json` (hoặc `python3` nếu cần). Bot chỉ dùng thư viện chuẩn Python. Chạy một request cục bộ chỉ kiểm tra một quyết định; cần đấu thử trên server để kiểm tra hành vi qua nhiều lượt và giới hạn tài nguyên thực tế.
 
 Phiên bản `apiVersion` sẽ được gắn vào từng bot version và từng match. Nếu thay đổi schema không tương thích, phát hành phiên bản lớn mới và giữ bộ chuyển đổi hoặc từ chối rõ ràng bot cũ.

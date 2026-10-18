@@ -14,6 +14,9 @@ import { RoomManager } from './room.js';
 import { migrateBotPlatform } from './bots/migrate.js';
 import { seedSampleBots } from './bots/seedSamples.js';
 import { createBotPlatformRouter } from './bots/platformRouter.js';
+import { watchPoolErrors } from './bots/database.js';
+import { readBotServiceStatus } from './bots/workerReadiness.js';
+import { createBotLearningRouter } from './bots/learningRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +68,7 @@ const hasBotPlatformConfig = Boolean(process.env.DATABASE_URL) && Buffer.byteLen
 const platformPool = hasBotPlatformConfig
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 8, connectionTimeoutMillis: 5000 })
   : null;
+watchPoolErrors(platformPool, 'Web server');
 let botPlatformReady = false;
 let migrationRetry = null;
 if (platformPool) app.use('/api/platform', (req, res, next) => {
@@ -86,24 +90,26 @@ app.use((req, res, next) => {
 
 // Publish only browser assets. Server code, tests and deployment files stay private.
 app.get('/', (_req, res) => res.sendFile(path.join(rootDir, 'index.html')));
-for (const page of ['index.html', 'playfun.html', 'rooms.html', 'bots.html', 'match.html']) {
+for (const page of ['index.html', 'playfun.html', 'rooms.html', 'bots.html', 'match.html', 'qualifiers.html', 'bot-guide.html', 'challenges.html', 'admin.html']) {
   app.get(`/${page}`, (_req, res) => res.sendFile(path.join(rootDir, page)));
 }
 for (const directory of ['css', 'js', 'shared']) {
   app.use(`/${directory}`, express.static(path.join(rootDir, directory), { index: false }));
 }
 app.get('/OTTv2/index.html', (_req, res) => res.redirect('/'));
+app.use('/bot-kit', createBotLearningRouter());
 
 // Keep the spelling used in some assignment handouts as a compatibility URL.
 app.get('/playfull.html', (_req, res) => res.redirect('/playfun.html'));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  const botStatus = await readBotServiceStatus(platformPool, botPlatformReady);
   res.json({
     status: 'ok',
     game: 'OTTv2',
     activeRooms: roomManager.rooms.size,
-    botPlatform: botPlatformReady ? 'ready' : 'unavailable',
+    ...botStatus,
     timestamp: new Date().toISOString()
   });
 });

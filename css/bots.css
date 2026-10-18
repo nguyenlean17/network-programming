@@ -10,3 +10,7 @@
 .tournament-edit-form{display:flex;gap:7px;flex-wrap:wrap;width:100%}.tournament-edit-form input{min-width:150px;min-height:38px;padding:7px 10px;border:1px solid #dedbcc;border-radius:10px;background:white;color:var(--ink);font:inherit;font-size:12px}.tournament-edit-form input:first-child{flex:1}
 
 #admin-user-list .match-row{align-items:center}
+.version-row{flex-wrap:wrap}.validation-message{flex-basis:100%;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);line-height:1.5;font-weight:400}
+#qualifier-benchmarks label{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--green-soft)}
+#qualifier-benchmarks input[type=checkbox]{width:20px;min-height:20px;height:20px;flex:none;accent-color:var(--green)}
+#qualifier-admin{margin:20px 0}.button:disabled{opacity:.55;cursor:default;transform:none}

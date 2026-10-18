@@ -23,6 +23,15 @@
       <div><span class="eyebrow">TRẬN ĐẤU ĐÃ LƯU</span><h1>Phát lại ván bot</h1><p id="player-summary" class="card-meta"></p><p id="replay-status" role="status">Đang tải dữ liệu trận…</p></div>
       <div class="welcome-sticker" aria-hidden="true">🎬</div>
     </section>
+    <section id="result-share" class="panel result-share" hidden>
+      <span class="eyebrow" id="share-title"></span><h2 id="share-outcome"></h2>
+      <p id="share-bots"></p><p id="share-detail" class="card-meta"></p>
+      <div class="tournament-actions"><button id="copy-result" type="button" class="button primary">Sao chép kết quả & liên kết</button><button id="download-result" type="button" class="button">↓ Tải thẻ kết quả</button></div>
+      <p class="form-hint">Replay có thể xem công khai, gồm tên bot và tên hiển thị của người chơi. Chia sẻ không gửi mã nguồn bot.</p>
+      <p id="share-feedback" role="status" class="form-hint"></p>
+      <textarea id="share-text" rows="5" readonly aria-label="Nội dung kết quả để sao chép" hidden></textarea>
+      <p><a href="/challenges.html">Bạn cũng có thể viết bot đầu tiên →</a></p>
+    </section>
     <section class="panel replay-panel">
       <div class="board-wrapper replay-board-wrap"><div id="board-container" class="board-grid" aria-label="Bàn cờ OTTv2 replay"></div></div>
       <div class="replay-toolbar">

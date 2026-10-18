@@ -4,6 +4,9 @@ let accessToken = sessionStorage.getItem(tokenKey);
 let authMode = 'login';
 let currentUser = null;
 let myBots = [];
+let validationPollTimer = null;
+let validationPollGeneration = 0;
+let practiceBusy = false;
 
 const byId = id => document.getElementById(id);
 const authPanel = byId('auth-panel');
@@ -57,8 +60,66 @@ function showAccount(user) {
   byId('admin-panel').hidden = user.role !== 'ADMIN';
 }
 
+function validationPending(version) {
+  return ['QUARANTINED', 'VALIDATING'].includes(version.status) && version.validationJobStatus !== 'FAILED';
+}
+
+function renderVersions(container, versions) {
+  container.replaceChildren();
+  for (const version of versions) {
+    const row = document.createElement('div');
+    row.className = 'version-row';
+    addText(row, 'span', `v${version.version} · ${version.apiVersion}`);
+    const failed = version.validationJobStatus === 'FAILED';
+    const label = version.status === 'READY' ? 'Đã kiểm tra' : version.status === 'REJECTED' ? 'Cần sửa'
+      : failed ? 'Kiểm tra bị gián đoạn' : version.validationJobStatus === 'RUNNING' || version.status === 'VALIDATING'
+        ? 'Đang kiểm tra' : 'Đang chờ kiểm tra';
+    addText(row, 'span', label, 'state-pill');
+    if (failed) addText(row, 'p', 'Hệ thống chưa kiểm tra được bot. Cần quản trị viên cho chạy lại; đây chưa phải kết luận mã bot bị lỗi.', 'validation-message');
+    if (version.message) addText(row, 'p', version.message, 'validation-message');
+    else if (version.status === 'REJECTED') addText(row, 'p', 'Bot chưa vượt qua kiểm tra. Chưa có thông báo lỗi chi tiết.', 'validation-message');
+    container.append(row);
+  }
+}
+
+function stopValidationPolling() {
+  clearTimeout(validationPollTimer);
+  validationPollTimer = null;
+  validationPollGeneration++;
+}
+
+function scheduleValidationRefresh(waitMs = 3000) {
+  stopValidationPolling();
+  if (!currentUser || !myBots.some(bot => bot.versions.some(validationPending))) return;
+  const generation = validationPollGeneration;
+  validationPollTimer = setTimeout(async () => {
+    let nextWait = 3000;
+    try {
+      const result = await api('/bots');
+      if (generation !== validationPollGeneration || !currentUser) return;
+      const priorReady = new Set(myBots.flatMap(bot => bot.versions.filter(v => v.status === 'READY').map(v => v.id)));
+      const becameReady = result.bots.some(bot => bot.versions.some(v => v.status === 'READY' && !priorReady.has(v.id)));
+      const choices = becameReady ? await api('/practice/bots') : null;
+      if (generation !== validationPollGeneration || !currentUser) return;
+      myBots = result.bots;
+      const byBot = new Map(myBots.map(bot => [bot.id, bot]));
+      for (const container of byId('bot-list').querySelectorAll('.version-list')) {
+        const bot = byBot.get(container.dataset.botId);
+        if (bot) renderVersions(container, bot.versions);
+      }
+      // Refresh playable choices when validation succeeds, without rebuilding edit/upload forms.
+      if (choices) renderPracticeBots(choices.bots);
+    } catch {
+      nextWait = Math.min(waitMs * 2, 30000);
+    } finally {
+      if (generation === validationPollGeneration) scheduleValidationRefresh(nextWait);
+    }
+  }, waitMs);
+}
+
 function renderBots(bots) {
   myBots = bots;
+  scheduleValidationRefresh();
   const list = byId('bot-list');
   list.replaceChildren();
   if (!bots.length) return addText(list, 'p', 'Bạn chưa tạo bot nào. Bắt đầu với một tệp Python nhỏ nhé!', 'empty-state');
@@ -87,17 +148,9 @@ function renderBots(bots) {
     edit.append(nameInput, descriptionInput, save, remove); card.append(edit);
     const versions = document.createElement('div');
     versions.className = 'version-list';
-    for (const version of bot.versions) {
-      const row = document.createElement('div');
-      row.className = 'version-row';
-      const identity = document.createElement('span');
-      identity.textContent = `v${version.version} · ${version.apiVersion}`;
-      const status = document.createElement('span');
-      status.className = 'state-pill';
-      status.textContent = version.status === 'READY' ? 'Đã kiểm tra' : version.status === 'REJECTED' ? 'Cần sửa' : 'Đang cách ly';
-      row.append(identity, status);
-      versions.append(row);
-    }
+    versions.dataset.botId = bot.id;
+    versions.setAttribute('aria-live', 'polite');
+    renderVersions(versions, bot.versions);
     card.append(versions);
     const form = document.createElement('form');
     form.className = 'upload-row';
@@ -309,7 +362,7 @@ function renderPracticeBots(bots) {
   }
   const selectedOpponent = versions.find(bot => bot.bot_version_id === priorOpponent && bot.bot_version_id !== own.value);
   if (selectedOpponent) opponent.value = selectedOpponent.bot_version_id;
-  form.querySelector('button[type=submit]').disabled = ownBots.length === 0 || versions.length < 2;
+  form.querySelector('button[type=submit]').disabled = practiceBusy || ownBots.length === 0 || versions.length < 2;
   if (!ownBots.length) addText(byId('practice-match-list'), 'p', 'Cần có bot của bạn đã qua kiểm tra và ít nhất một bot đối thủ sẵn sàng.', 'empty-state');
 }
 
@@ -341,8 +394,20 @@ async function refreshAccount() {
   if (currentUser?.role === 'ADMIN') await Promise.all([refreshJobs(), refreshUsers()]);
 }
 
-async function refreshJobs() {
-  const result = await api('/admin/jobs');
+function appendPager(list, result, refresh) {
+  if (!result.hasMore && result.page <= 1) return;
+  const controls = document.createElement('div'); controls.className = 'tournament-actions';
+  for (const [label, page, disabled] of [['← Trước', result.page - 1, result.page <= 1], ['Sau →', result.page + 1, !result.hasMore]]) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'button';
+    button.textContent = label; button.disabled = disabled;
+    button.addEventListener('click', async () => { button.disabled = true; try { await refresh(page); } catch (error) { showNotice(error.message, 'error'); button.disabled = disabled; } });
+    controls.append(button);
+  }
+  addText(controls, 'span', `Trang ${result.page}`); list.append(controls);
+}
+
+async function refreshJobs(page = 1) {
+  const result = await api(`/admin/jobs?page=${page}&limit=50`);
   const list = byId('admin-job-list');
   list.replaceChildren();
   if (!result.jobs.length) return addText(list, 'p', 'Chưa có công việc nền.', 'empty-state');
@@ -355,17 +420,18 @@ async function refreshJobs() {
         retry.disabled = true;
         try {
           await api(`/admin/jobs/${encodeURIComponent(job.id)}/retry`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobType: job.job_type }) });
-          await refreshJobs(); showNotice('Đã đưa công việc vào hàng đợi thử lại.');
+          await refreshAccount(); showNotice('Đã đưa công việc vào hàng đợi thử lại.');
         } catch (error) { showNotice(error.message, 'error'); }
       });
       row.append(retry);
     }
     list.append(row);
   }
+  appendPager(list, result, refreshJobs);
 }
 
-async function refreshUsers() {
-  const result = await api('/admin/users');
+async function refreshUsers(page = 1) {
+  const result = await api(`/admin/users?page=${page}&limit=50`);
   const list = byId('admin-user-list'); list.replaceChildren();
   if (!result.users.length) return addText(list, 'p', 'Chưa có tài khoản.', 'empty-state');
   for (const user of result.users) {
@@ -378,7 +444,7 @@ async function refreshUsers() {
         role.disabled = true;
         try {
           await api(`/admin/users/${encodeURIComponent(user.id)}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: user.role === 'ADMIN' ? 'USER' : 'ADMIN' }) });
-          await refreshUsers(); showNotice('Đã cập nhật vai trò.');
+          await refreshUsers(page); showNotice('Đã cập nhật vai trò.');
         } catch (error) { showNotice(error.message, 'error'); }
         finally { role.disabled = false; }
       });
@@ -386,6 +452,7 @@ async function refreshUsers() {
     }
     list.append(row);
   }
+  appendPager(list, result, refreshUsers);
 }
 
 document.querySelectorAll('.auth-tab').forEach(tab => tab.addEventListener('click', () => setAuthMode(tab.dataset.authMode)));
@@ -428,6 +495,8 @@ byId('practice-form').elements.ownBotVersionId.addEventListener('change', async 
 
 byId('practice-form').addEventListener('submit', async event => {
   event.preventDefault();
+  if (practiceBusy) return;
+  practiceBusy = true;
   const form = event.currentTarget;
   const button = form.querySelector('button[type=submit]'); button.disabled = true;
   try {
@@ -448,7 +517,7 @@ byId('practice-form').addEventListener('submit', async event => {
       }
     }
   } catch (error) { showNotice(error.message, 'error'); }
-  finally { button.disabled = false; }
+  finally { practiceBusy = false; button.disabled = false; }
 });
 
 byId('bot-list').addEventListener('submit', async event => {
@@ -475,7 +544,7 @@ byId('bot-list').addEventListener('submit', async event => {
   try {
     await api(`/bots/${encodeURIComponent(form.dataset.botId)}/versions`, { method: 'POST',
       headers: { 'Content-Type': isZip ? 'application/zip' : 'text/x-python', 'X-Bot-Filename': file.name }, body: file });
-    await refreshAccount(); showNotice('Đã lưu phiên bản ở trạng thái cách ly. Hệ thống chưa chạy mã bot này.');
+    await refreshAccount(); showNotice('Đã nhận phiên bản và xếp hàng kiểm tra. Trạng thái và thông báo lỗi sẽ tự cập nhật.', 'info');
   } catch (error) { showNotice(error.message, 'error'); }
   finally { button.disabled = false; }
 });
@@ -495,6 +564,7 @@ byId('create-tournament-form').addEventListener('submit', async event => {
 });
 
 byId('logout-button').addEventListener('click', () => {
+  stopValidationPolling();
   sessionStorage.removeItem(tokenKey); accessToken = null; currentUser = null;
   accountPanel.hidden = true; authPanel.hidden = false; byId('logout-button').hidden = true;
   showNotice('Bạn đã đăng xuất.');

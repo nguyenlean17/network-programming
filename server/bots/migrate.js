@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 const migrations = [
   { id: '001_bot_platform', path: new URL('../migrations/001_bot_platform.sql', import.meta.url) },
   { id: '002_practice_arena', path: new URL('../migrations/002_practice_arena.sql', import.meta.url) },
-  { id: '003_public_sample_bots', path: new URL('../migrations/003_public_sample_bots.sql', import.meta.url) }
+  { id: '003_public_sample_bots', path: new URL('../migrations/003_public_sample_bots.sql', import.meta.url) },
+  { id: '004_worker_heartbeats', path: new URL('../migrations/004_worker_heartbeats.sql', import.meta.url) },
+  { id: '005_qualifiers', path: new URL('../migrations/005_qualifiers.sql', import.meta.url) },
+  { id: '006_worker_metrics', path: new URL('../migrations/006_worker_metrics.sql', import.meta.url) }
 ];
 
 export async function migrateBotPlatform(pool) {

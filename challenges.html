@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hành trình bot đầu tiên — OTTv2</title>
+  <meta name="description" content="Biết Python cơ bản là có thể bắt đầu: viết bot, vượt thử thách và chia sẻ trận thắng đầu tiên trên OTTv2.">
+  <link rel="stylesheet" href="css/bots.css"><link rel="stylesheet" href="css/challenges.css">
+</head>
+<body>
+  <header class="hub-header"><a class="back-link" href="/bots.html">← Góc bot</a><div class="brand-mark" aria-hidden="true">🌱</div><div class="brand-text"><strong>Hành trình của bạn</strong><span>Từng nước nhỏ, thêm một bước tiến.</span></div></header>
+  <main class="hub-main journey-main">
+    <section class="welcome-card"><div><span class="eyebrow">BẮT ĐẦU VỚI PYTHON CƠ BẢN</span><h1>Bot đầu tiên, chiến thắng đầu tiên 🌷</h1><p>Không cần học Machine Learning. Bắt đầu với mã mẫu chạy được ngay, viết chiến thuật của bạn rồi thử sức với hai đối thủ nhập môn.</p><div class="tournament-actions"><a class="button primary" href="/bot-guide.html">Viết bot đầu tiên</a><a class="button" href="/bot-kit/main.py" download="main.py">↓ Tải mã mẫu</a></div></div></section>
+    <div id="journey-notice" class="notice" role="status" hidden></div>
+    <section class="panel"><h2>Bốn cột mốc của bạn</h2><p id="journey-account">Đăng nhập tại <a href="/bots.html">Góc bot</a> để ghi nhận tiến độ từ các trận của bạn.</p><div id="journey-milestones" class="milestone-grid">
+      <article class="milestone"><span aria-hidden="true">🌱</span><h3>Gieo mầm</h3><p>Tải lên phiên bản Python đầu tiên.</p></article>
+      <article class="milestone"><span aria-hidden="true">🛠️</span><h3>Sẵn sàng ra sân</h3><p>Có phiên bản vượt qua kiểm tra.</p></article>
+      <article class="milestone"><span aria-hidden="true">🎮</span><h3>Trận đầu tiên</h3><p>Hoàn tất trận tập với bot của người khác hoặc bot mẫu.</p></article>
+      <article class="milestone"><span aria-hidden="true">⭐</span><h3>Chiến thắng đầu tiên</h3><p>Thắng một trận tập với đối thủ.</p></article>
+    </div><p class="form-hint">Đây là cột mốc luyện tập, không phải giải thưởng hay điểm vòng loại. Trận chờ, trận lỗi hệ thống và tự đấu hai bot của mình không được tính thành tích thi đấu.</p></section>
+    <section class="panel"><h2>Hai cửa ải để luyện chiến thuật</h2><p>Chọn một phiên bản của bạn và chơi một cặp trận đổi bên. Thắng cả P1 và P2 bằng <strong>cùng một phiên bản</strong> trước cùng phiên bản đối thủ để vượt cửa ải; có thể hoàn thành qua nhiều lần thử.</p><p class="form-hint">Tiến độ dưới đây tính với phiên bản bot mẫu đang hiển thị. Nếu bot mẫu được cập nhật, phiên bản mới là một thử thách mới; replay cũ vẫn được giữ.</p><div id="challenge-list" class="card-list"><p class="empty-state">Đang tải thử thách…</p></div>
+      <div class="tournament-actions"><button id="refresh-journey" class="button" type="button">Cập nhật tiến độ</button><a href="/bots.html#practice-form">Xem các trận ở Sân tập →</a></div>
+    </section>
+    <section class="panel"><h2>Mang chiến thuật của bạn vào vòng loại 🏁</h2><p>Khi đã tự tin, chọn phiên bản đã kiểm tra để dự thi. Vòng loại lấy điểm bài tốt nhất, không cộng dồn các lần nộp. Các thử thách luyện tập ở đây không ảnh hưởng BXH.</p><a href="/qualifiers.html">Xem đợt vòng loại đang mở →</a></section>
+  </main>
+  <script type="module" src="js/challengeHub.js"></script>
+</body>
+</html>

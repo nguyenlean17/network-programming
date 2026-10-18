@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vòng loại — OTTv2</title>
+  <link rel="stylesheet" href="css/bots.css">
+</head>
+<body>
+  <header class="hub-header"><a class="back-link" href="/bots.html">← Góc bot</a><div class="brand-mark">🌱</div><div class="brand-text"><strong>Vòng loại</strong><span>Mỗi bài nộp, một cơ hội tiến bộ.</span></div></header>
+  <main class="hub-main">
+    <section class="welcome-card"><div><span class="eyebrow">OTTv2 · VÒNG LOẠI</span><h1>Chinh phục bộ bot chuẩn 🌷</h1><p>Mỗi phiên bản đấu cùng bộ đối thủ, đổi bên công bằng. Thắng 3, hòa 1, thua 0 điểm. Bảng xếp hạng lấy bài tốt nhất của mỗi tài khoản, không cộng dồn qua các lần nộp. Bằng điểm được đồng hạng.</p><p>Mỗi tài khoản có một bài đang chấm và tối đa 5 bài trong 24 giờ. Bot hết nước đi hoặc đủ 300 lượt: hòa; bot lỗi, quá thời gian hoặc đi sai: thua.</p></div></section>
+    <div id="qualifier-notice" class="notice" role="status" hidden></div>
+    <p id="qualifier-account" class="card-meta">Đang kiểm tra tài khoản…</p>
+    <p><a href="/bots.html">Đăng nhập, tạo bot và tải phiên bản Python tại Góc bot</a></p>
+    <p><a href="/bot-guide.html">Hướng dẫn viết bot Python và tải mã mẫu →</a></p>
+    <section id="qualifier-admin" class="panel" hidden>
+      <h2>Tạo vòng loại</h2>
+      <form id="qualifier-create" class="form-grid">
+        <label>Tên vòng loại<input name="name" required maxlength="100"></label>
+        <label>Hạn nhận bài<input name="submissionDeadline" type="datetime-local" required></label>
+        <label>Số cặp trận đổi bên với mỗi bot chuẩn<select name="roundsPerOpponent"><option value="1">1 cặp (2 trận)</option><option value="2">2 cặp (4 trận)</option><option value="3">3 cặp (6 trận)</option></select></label>
+        <label>Tối đa bài mỗi tài khoản trong đợt<input name="maxSubmissions" type="number" min="1" max="100" value="20" required></label>
+        <fieldset><legend>Chọn 1–8 phiên bản bot chuẩn đã kiểm tra</legend><div id="qualifier-benchmarks" class="card-list"></div></fieldset>
+        <p class="form-hint">Bộ bot chuẩn, số trận và thể lệ được cố định khi tạo. Muốn thay đổi, hãy tạo đợt mới. Tạo bot chuẩn mạnh hơn trong Góc bot trước khi mở giải chính thức.</p>
+        <button class="button primary" type="submit">Tạo bản nháp</button>
+      </form>
+    </section>
+    <section class="panel"><h2>Các đợt vòng loại</h2><div id="qualifier-list" class="card-list"></div></section>
+  </main>
+  <script type="module" src="js/qualifierHub.js"></script>
+</body>
+</html>

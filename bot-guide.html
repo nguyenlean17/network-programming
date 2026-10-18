@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hướng dẫn viết bot Python OTTv2: tải mã mẫu, đọc Bot API, chạy thử và nộp bài vòng loại.">
+  <title>Viết bot đầu tiên — OTTv2</title>
+  <link rel="stylesheet" href="css/bots.css">
+  <link rel="stylesheet" href="css/bot-guide.css">
+</head>
+<body>
+  <header class="hub-header"><a class="back-link" href="/bots.html">← Góc bot</a><div class="brand-mark" aria-hidden="true">🌱</div><div class="brand-text"><strong>Viết bot đầu tiên</strong><span>Từ một nước đi đến chiến thuật của bạn.</span></div></header>
+  <main class="hub-main guide-main">
+    <section class="welcome-card"><div><span class="eyebrow">PYTHON · BOT API 1.0</span><h1>Cho bot của bạn bước lên bàn cờ 🌷</h1><p>Bạn viết thuật toán chọn nước đi bằng Python. Mỗi lượt, hệ thống gửi trạng thái bàn cờ cho chương trình; chương trình trả lại một nước đi bằng JSON. Không cần API key hay tự kết nối mạng.</p><div class="tournament-actions"><a class="button primary" href="/bot-kit/main.py" download="main.py">↓ Tải mã khởi đầu</a><a class="button" href="#quick-start">Bắt đầu trong 4 bước</a></div></div></section>
+    <nav class="guide-nav" aria-label="Nội dung hướng dẫn"><a href="#quick-start">Bắt đầu</a><a href="#api">Dữ liệu API</a><a href="#rules">Luật & giới hạn</a><a href="#errors">Sửa lỗi thường gặp</a><a href="/challenges.html">Hành trình & thử thách →</a></nav>
+    <section id="quick-start" class="panel"><h2>1. Chuẩn bị và chạy thử</h2>
+      <ol class="guide-steps">
+        <li><strong>Chuẩn bị Python 3.</strong> Kiểm tra bằng <code>python --version</code> trong cửa sổ lệnh. Bot chỉ dùng thư viện chuẩn Python; không có bước cài thêm gói khi chấm.</li>
+        <li><strong>Tải hai file vào cùng thư mục:</strong> <a href="/bot-kit/main.py" download="main.py">main.py</a> và <a href="/bot-kit/request.json" download="request.json">request.json</a>. File JSON là bàn cờ khởi đầu mẫu đủ 9×9, được tạo từ luật game thật; không phải kết quả thi đấu.</li>
+        <li><strong>Sửa hàm <code>choose_move(state)</code> trong main.py.</strong> Trả về cặp <code>(move, memory)</code>. Mã khởi đầu chọn nước hợp lệ đầu tiên; hãy thay bằng chiến thuật của bạn.</li>
+        <li><strong>Chạy thử trên máy của bạn.</strong> Chỉ chạy mã do bạn viết hoặc mẫu tin cậy. Cách này kiểm tra một lượt, chưa thay thế trận đấu thử và kiểm tra giới hạn trên server.</li>
+      </ol>
+      <h3>Windows PowerShell</h3><pre><code>Get-Content -Raw -Encoding UTF8 .\request.json | python .\main.py</code></pre>
+      <h3>Windows CMD / macOS / Linux</h3><pre><code>python main.py &lt; request.json</code></pre><p class="form-hint">Trên macOS/Linux, dùng <code>python3</code> nếu máy không có lệnh <code>python</code>.</p>
+      <p>Kết quả phải là một JSON chứa <code>apiVersion</code>, <code>move</code> và có thể thêm <code>memory</code>. Tọa độ trả về phải thuộc danh sách <code>legalMoves</code> của request đang thử.</p>
+      <details><summary>Xem mã khởi đầu</summary><pre><code id="starter-source">Đang tải mã mẫu…</code></pre></details>
+      <div class="tournament-actions"><a href="/bot-kit/first_legal.py" download>↓ Mẫu chọn nước đầu tiên</a><a href="/bot-kit/goal_seeker.py" download>↓ Mẫu ưu tiên ô đích và ăn quân</a></div>
+    </section>
+    <section id="api" class="panel"><h2>2. Bot nhận gì và trả gì?</h2><p>Chương trình đọc <strong>một JSON từ stdin</strong> và in <strong>một JSON ra stdout</strong>. Hệ thống khởi chạy chương trình mới mỗi lượt; biến Python sẽ không được giữ lại.</p>
+      <div class="leaderboard-container"><table class="guide-table"><thead><tr><th>Trường đầu vào</th><th>Ý nghĩa</th></tr></thead><tbody>
+        <tr><td><code>apiVersion</code></td><td>Phiên bản giao thức: <code>"1.0"</code>.</td></tr>
+        <tr><td><code>player</code></td><td>Bên bạn điều khiển: <code>"P1"</code> hoặc <code>"P2"</code>. Không viết thuật toán chỉ dành cho P1.</td></tr>
+        <tr><td><code>turn</code></td><td>Số thứ tự nước đi trong trận, bắt đầu từ 1.</td></tr>
+        <tr><td><code>board</code></td><td>Mảng 9 hàng × 9 cột. <code>board[y][x]</code>; A1 là <code>board[0][0]</code>, I9 là <code>board[8][8]</code>. Ô trống là <code>null</code> (Python: <code>None</code>); quân cờ có <code>player</code> và <code>type</code>.</td></tr>
+        <tr><td><code>goals</code></td><td>Ô đích để thắng: P1 → I1, P2 → A9. Đọc bằng <code>state["goals"][state["player"]]</code>.</td></tr>
+        <tr><td><code>legalMoves</code></td><td>Danh sách nước hợp lệ dạng <code>{"from": "A8", "to": "A7"}</code>. Đây là ví dụ định dạng; chọn nước có trong request thực tế.</td></tr>
+        <tr><td><code>memory</code></td><td>Dữ liệu JSON bot gửi ở lượt trước của chính mình, ban đầu <code>null</code>. Tối đa 1 KiB.</td></tr>
+      </tbody></table></div>
+      <p>Loại quân: <code>ROCK</code> = Đấm, <code>PAPER</code> = Lá, <code>SCISSORS</code> = Kéo. Hệ thống xử lý hòa trước khi gọi bot nếu không còn nước hợp lệ.</p>
+      <h3>Phần đọc và trả dữ liệu</h3><pre><code>state = json.load(sys.stdin)
+move, memory = choose_move(state)
+json.dump({
+    "apiVersion": "1.0",
+    "move": move,
+    "memory": memory
+}, sys.stdout)</code></pre>
+      <p>Muốn ghi nhớ chiến thuật, đọc <code>state["memory"]</code> và trả dữ liệu mới ở <code>memory</code>. Không dựa vào file hay biến toàn cục để nhớ qua lượt. Sửa <code>board</code> trong Python chỉ sửa bản sao, không thay đổi bàn cờ thật.</p>
+      <details><summary>Xem request mẫu đầy đủ</summary><pre><code id="request-source">Đang tải dữ liệu mẫu…</code></pre></details>
+      <p><a href="/bot-kit/bot-api-v1.md" download>↓ Tải tài liệu Bot API 1.0 (.md)</a></p>
+    </section>
+    <section id="rules" class="panel"><h2>3. Luật và giới hạn khi chấm</h2>
+      <ul><li>Bàn 9×9, mỗi quân đi một ô theo 8 hướng. Đấm ăn Kéo, Kéo ăn Lá, Lá ăn Đấm; cùng loại chặn nhau, không ăn quân cùng phe. Đến ô đích của đối phương thì thắng.</li>
+        <li>Thắng 3, hòa 1, thua 0. Hết nước hợp lệ hoặc đủ tổng cộng 300 nước đi mà chưa có bên thắng: hòa. Mỗi lần một bên đi tính một nước.</li>
+        <li>Bot lỗi, trả JSON sai, đi sai hoặc hết thời gian: thua. Lỗi hạ tầng được xử lý riêng, không tự tính thành thua.</li>
+        <li>Giới hạn tiến trình Python: 2 giây mỗi quyết định; bộ điều phối chờ khoảng 2,5 giây. Bộ nhớ tiến trình 128 MiB; tắt mạng. Không đặt thuật toán sát giới hạn thời gian.</li>
+        <li>File Python UTF-8 tối đa 64 KiB. ZIP tối đa 128 KiB, chỉ chứa một <code>main.py</code> ngay ở gốc, không kèm thư mục hoặc thư viện.</li>
+        <li>Toàn bộ stdout tối đa 4 KiB; <code>memory</code> tối đa 1 KiB. Ghi chẩn đoán bằng <code>print("...", file=sys.stderr)</code>, không in thêm vào stdout.</li></ul>
+      <p>Trong vòng loại, mọi bài cùng đợt đấu với các phiên bản bot chuẩn cố định, đổi bên P1/P2. BXH lấy bài đã chấm đủ trận có điểm cao nhất của mỗi tài khoản; bằng điểm được đồng hạng.</p>
+    </section>
+    <section class="panel"><h2>4. Tải lên và dự thi</h2><ol class="guide-steps"><li>Vào <a href="/bots.html">Góc bot</a>, đăng nhập, tạo tên bot rồi tải <code>main.py</code> lên.</li><li>Chờ kiểm tra hoàn tất. Phiên bản chưa qua kiểm tra chưa thể dùng để thi đấu. Nếu báo lỗi, sửa mã và tải phiên bản mới.</li><li>Chọn phiên bản đã sẵn sàng trong Sân tập để đấu với bot mẫu, rồi xem kết quả và replay.</li><li>Vào <a href="/qualifiers.html">Vòng loại</a>, chọn đợt đang nhận bài và nộp phiên bản đã kiểm tra. Chỉ khi đủ trận, điểm mới xuất hiện trên BXH.</li></ol><p class="form-hint">Nếu bài nằm chờ quá lâu, liên hệ ban tổ chức kiểm tra dịch vụ chấm. Không tải lại cùng mã để cố kích hoạt hàng đợi.</p></section>
+    <section id="errors" class="panel"><h2>Khi bot chưa chạy được</h2><dl class="guide-errors"><dt>JSON lỗi / MALFORMED_OUTPUT</dt><dd>Chỉ in một JSON, dùng <code>json.dump</code>; kiểm tra phiên bản <code>"1.0"</code> và hai trường <code>move.from</code>, <code>move.to</code>.</dd><dt>Nước đi sai / INVALID_MOVE</dt><dd>Chọn từ <code>legalMoves</code> của lượt hiện tại; kiểm tra tọa độ, bên P1/P2 và hướng của ô đích.</dd><dt>Quá thời gian / BOT_TIMEOUT</dt><dd>Giới hạn độ sâu tìm kiếm, kiểm soát thời gian và luôn chuẩn bị một nước hợp lệ dự phòng.</dd><dt>Chương trình lỗi / BOT_CRASH</dt><dd>Kiểm tra lỗi cú pháp, truy cập ô trống, thư viện ngoài và việc dùng <code>memory</code> khi giá trị đang là <code>None</code>.</dd></dl></section>
+  </main>
+  <script type="module" src="js/botGuide.js"></script>
+</body>
+</html>

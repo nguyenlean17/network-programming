@@ -11,6 +11,16 @@ Tham khảo hướng hình ảnh: [Mushroom Chess Set — Vivian Lee](https://sv
 
 **Nâng cấp thi đấu bot:** Xem [trang bot](bots.html), [Bot API 1.0](docs/bot-api-v1.md) và [kế hoạch triển khai](docs/bot-platform-plan.md). `render.yaml` nối dịch vụ web với PostgreSQL `ottv2-db` bằng `DATABASE_URL` nội bộ và yêu cầu Render tạo `AUTH_SECRET`; migration tự chạy khi server khởi động. Gói PostgreSQL miễn phí chỉ phù hợp thử nghiệm: dữ liệu hết hạn sau 30 ngày nếu không nâng cấp. `BOOTSTRAP_ADMIN_EMAIL` có thể gán quyền quản trị cho tài khoản đã đăng ký. Tệp `.py` tối đa 64 KiB hoặc ZIP đơn `main.py` tối đa 128 KiB được lưu `QUARANTINED` và cần worker Render Sandbox riêng để kiểm tra rồi mới được sử dụng trong trận. Worker cần `DATABASE_URL`, `RENDER_API_KEY`, `RENDER_WORKSPACE_ID` và quyền truy cập Render Sandboxes; chưa được cấu hình trong web service.
 
+**Dịch vụ chạy bot:** Cấu hình riêng và điều kiện triển khai nằm trong [hướng dẫn worker](docs/bot-worker-deployment.md). Workspace hiện chưa có quyền Render Sandboxes; cấu hình worker chưa được áp dụng. Health check mới phân biệt `botStorage` và `botRunner`, chỉ báo `botPlatform: ready` khi có worker đã qua kiểm tra khởi động và gửi tín hiệu hoạt động gần đây.
+
+**Vòng loại đông sinh viên:** [Trang vòng loại](qualifiers.html) chấm mỗi phiên bản với bộ bot chuẩn cố định, đổi bên P1/P2 và lấy điểm bài tốt nhất của mỗi tài khoản (thắng/hòa/thua: 3/1/0). Có giới hạn nộp bài, phân trang BXH và phân vai worker. Xem [thể lệ, giới hạn và hướng dẫn vận hành](docs/qualification.md). Chưa có kết quả kiểm thử chịu tải thực tế cho 4.000–5.000 người dùng.
+
+**Dành cho sinh viên:** Mở [hướng dẫn viết bot](bot-guide.html) trên website, tải `main.py` và `request.json`, sửa hàm chọn nước rồi chạy thử theo hướng dẫn. Trang này có tài liệu Bot API, ví dụ đầy đủ, giới hạn thực thi và cách nộp bài; dùng được ngay cả khi cơ sở dữ liệu hoặc worker chưa sẵn sàng.
+
+**Hành trình nhập môn:** [Thử thách bot](challenges.html) có bốn cột mốc từ dữ liệu thật và hai đối thủ mẫu để luyện cặp trận đổi bên. Replay của trận hoàn tất có thẻ kết quả để tải hoặc sao chép kèm liên kết. Xem [phạm vi và quy tắc ghi nhận thành tích](docs/student-engagement.md).
+
+**Theo dõi vận hành:** [Trang quản trị](admin.html) hiển thị hàng đợi, tín hiệu worker và CPU/RAM tiến trình worker; hỗ trợ lọc tác vụ lỗi, tìm theo mã, chạy lại và tra cứu nhật ký. API yêu cầu ADMIN. Xem [hướng dẫn theo dõi](docs/admin-monitoring.md).
+
 Trang web trò chơi chiến thuật bàn cờ 9×9 biến thể từ Oẳn tù tì (Rock - Paper - Scissors) dành cho **2 người chơi**, hỗ trợ:
 1. **Chế độ 2 người chơi trên cùng một thiết bị (Local 2 Players - Phase 1)**: Lần lượt thay phiên thực hiện nước đi hoàn toàn ở client, không cần server.
 2. **Chế độ Phòng Đấu Trực Tuyến & Danh sách phòng (Authoritative Multiplayer Server - Phase 2)**:

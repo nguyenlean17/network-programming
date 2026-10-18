@@ -67,6 +67,10 @@ try {
   assert.equal((await fetch(`http://127.0.0.1:${port}/server/server.js`)).status, 404, 'server code must not be public');
   assert.equal((await fetch(`http://127.0.0.1:${port}/render.yaml`)).status, 404, 'deployment config must not be public');
   assert.equal((await fetch(`http://127.0.0.1:${port}/playfun.html`)).status, 200, 'online game must be public');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/bot-guide.html`)).status, 200, 'student guide must be public');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/challenges.html`)).status, 200, 'beginner journey must be public');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/admin.html`)).status, 200, 'admin shell is public, its APIs enforce authorization');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/bot-kit/main.py`)).status, 200, 'starter download must be available');
   assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/rooms`)).json()).rooms.length, 0,
     'the lobby must not contain a fake default room');
 

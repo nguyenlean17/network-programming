@@ -5,6 +5,11 @@ import { calculateStandings } from './standings.js';
 import { createRoundRobinSchedule } from './schedule.js';
 import { replayFrame } from './replay.js';
 import { extractMainPythonFromZip, MAX_ARCHIVE_BYTES, MAX_SOURCE_BYTES } from './sourceArchive.js';
+import { isDatabaseUnavailable, rollbackQuietly } from './database.js';
+import { installQualifierRoutes } from './qualifierRoutes.js';
+import { pagination, pageResult } from './pagination.js';
+import { installChallengeRoutes } from './challenges.js';
+import { installAdminMonitorRoutes, jobFilters, ADMIN_JOBS_SQL } from './adminMonitor.js';
 
 const VERSION_UPLOAD_LIMIT = MAX_ARCHIVE_BYTES;
 const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
@@ -32,7 +37,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     next();
   };
 
-  router.post('/auth/register', accountAttemptLimiter, async (req, res) => {
+  router.post('/auth/register', accountAttemptLimiter, async (req, res, next) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const displayName = cleanText(req.body?.displayName, 48);
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
@@ -40,7 +45,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     let passwordHash;
     try { passwordHash = await hashPassword(req.body?.password); }
     catch (error) { return res.status(400).json({ error: error.message }); }
-    const user = { id: randomUUID(), email, displayName };
+    const user = { id: randomUUID(), email, displayName, role: 'USER' };
     try {
       await pool.query('INSERT INTO users (id, email, display_name, password_hash) VALUES ($1, $2, $3, $4)',
         [user.id, user.email, user.displayName, passwordHash]);
@@ -48,6 +53,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       res.status(201).json({ user, accessToken: signAccessToken(user, authSecret) });
     } catch (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'An account with that email already exists' });
+      if (isDatabaseUnavailable(error)) return next(error);
       console.error('Account registration failed:', error.message);
       res.status(500).json({ error: 'Account could not be created' });
     }
@@ -56,13 +62,13 @@ export function createBotPlatformRouter({ pool, authSecret }) {
   router.post('/auth/login', accountAttemptLimiter, async (req, res, next) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     try {
-      const result = await pool.query('SELECT id, email, display_name, password_hash FROM users WHERE lower(email) = $1', [email]);
+      const result = await pool.query('SELECT id, email, display_name, password_hash, role FROM users WHERE lower(email) = $1', [email]);
       const row = result.rows[0];
       if (!row || !(await verifyPassword(req.body?.password, row.password_hash))) {
         return res.status(401).json({ error: 'Email or password is incorrect' });
       }
       authAttempts.delete(email);
-      const user = { id: row.id, email: row.email, displayName: row.display_name };
+      const user = { id: row.id, email: row.email, displayName: row.display_name, role: row.role };
       res.json({ user, accessToken: signAccessToken(user, authSecret) });
     } catch (error) {
       next(error);
@@ -89,11 +95,12 @@ export function createBotPlatformRouter({ pool, authSecret }) {
 
   router.get('/auth/me', requireUser, (req, res) => res.json({ user: req.user }));
 
-  router.get('/admin/users', requireAdmin, async (_req, res, next) => {
+  router.get('/admin/users', requireAdmin, async (req, res, next) => {
     try {
+      const paging = pagination(req.query);
       const result = await pool.query(`SELECT id, email, display_name, role, created_at
-        FROM users ORDER BY created_at DESC LIMIT 500`);
-      res.json({ users: result.rows });
+        FROM users ORDER BY created_at DESC, id LIMIT $1 OFFSET $2`, [paging.limit + 1, paging.offset]);
+      res.json(pageResult(result.rows, paging, 'users'));
     } catch (error) { next(error); }
   });
 
@@ -116,7 +123,9 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       const result = await pool.query(`SELECT b.id, b.name, b.description, b.created_at,
         COALESCE(json_agg(json_build_object('id', v.id, 'version', v.version, 'apiVersion', v.api_version,
           'sha256', v.sha256, 'status', v.validation_status, 'message', v.validation_message,
-          'createdAt', v.created_at)) FILTER (WHERE v.id IS NOT NULL), '[]'::json) AS versions
+          'createdAt', v.created_at,
+          'validationJobStatus', (SELECT j.status FROM bot_validation_jobs j WHERE j.bot_version_id = v.id)))
+          FILTER (WHERE v.id IS NOT NULL), '[]'::json) AS versions
         FROM bots b LEFT JOIN bot_versions v ON v.bot_id = b.id WHERE b.owner_id = $1
         GROUP BY b.id ORDER BY b.created_at DESC`, [req.user.id]);
       res.json({ bots: result.rows });
@@ -211,7 +220,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       await client.query('COMMIT');
       res.status(202).json({ matchId: matchIds[0], matchIds, status: 'QUEUED' });
     } catch (error) {
-      await client?.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       next(error);
     } finally { client?.release(); }
   });
@@ -247,6 +256,16 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       try {
         client = await pool.connect();
         await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`bot-upload:${req.user.id}`]);
+        const quota = await client.query(`SELECT count(*)::int AS total,
+          count(*) FILTER (WHERE v.created_at > now() - interval '24 hours')::int AS daily,
+          count(*) FILTER (WHERE j.status IN ('QUEUED','RUNNING'))::int AS pending
+          FROM bot_versions v JOIN bots b ON b.id = v.bot_id
+          LEFT JOIN bot_validation_jobs j ON j.bot_version_id = v.id WHERE b.owner_id = $1`, [req.user.id]);
+        if (quota.rows[0].total >= 100 || quota.rows[0].daily >= 20 || quota.rows[0].pending >= 3) {
+          await client.query('ROLLBACK');
+          return res.status(429).json({ error: 'Giới hạn mỗi tài khoản: 100 phiên bản lưu trữ, 20 phiên bản trong 24 giờ, tối đa 3 phiên bản chờ kiểm tra.' });
+        }
         const bot = await client.query('SELECT id FROM bots WHERE id = $1 AND owner_id = $2 FOR UPDATE', [req.params.botId, req.user.id]);
         if (!bot.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Bot not found' }); }
         const duplicate = await client.query('SELECT id, version FROM bot_versions WHERE bot_id = $1 AND sha256 = $2', [req.params.botId, sha256]);
@@ -262,7 +281,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
         await client.query('COMMIT');
         res.status(202).json({ version: inserted.rows[0], message: 'Uploaded to quarantine. It cannot be selected until isolated validation is available.' });
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
+        await rollbackQuietly(client);
         next(error);
       } finally { client?.release(); }
     });
@@ -300,7 +319,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
         [randomUUID(), req.user.id, id, JSON.stringify({ format, scoring })]);
         await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
+        await rollbackQuietly(client);
         throw error;
       } finally { client.release(); }
       res.status(201).json({ tournament: result.rows[0] });
@@ -374,12 +393,14 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       const version = await client.query(`SELECT v.id FROM bot_versions v JOIN bots b ON b.id = v.bot_id
         WHERE v.id = $1 AND b.owner_id = $2 AND v.validation_status = 'READY'`, [versionId, req.user.id]);
       if (!version.rowCount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Select one of your bot versions that passed isolated validation' }); }
+      const registered = await client.query('SELECT count(*)::int AS count FROM tournament_participants WHERE tournament_id = $1', [tournamentId]);
+      if (registered.rows[0].count >= 64) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Giải vòng tròn giới hạn 64 người. Với nhiều sinh viên, hãy dùng vòng loại đấu bot chuẩn.' }); }
       await client.query(`INSERT INTO tournament_participants (tournament_id, user_id, bot_version_id)
         VALUES ($1, $2, $3)`, [tournamentId, req.user.id, versionId]);
       await client.query('COMMIT');
       res.status(201).json({ tournamentId, botVersionId: versionId });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       if (error.code === '23505') return res.status(409).json({ error: 'You already registered for this tournament' });
       next(error);
     } finally { client?.release(); }
@@ -415,7 +436,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       await client.query('COMMIT');
       res.status(204).end();
     } catch (error) {
-      await client?.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       next(error);
     } finally { client?.release(); }
   });
@@ -438,7 +459,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       await client.query('COMMIT');
       res.json({ status: 'LOCKED', participantCount: count.rows[0].count });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       next(error);
     } finally { client?.release(); }
   });
@@ -459,6 +480,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
         WHERE p.tournament_id = $1 AND p.locked_at IS NOT NULL AND v.validation_status = 'READY'
         ORDER BY p.registered_at, p.bot_version_id`, [tournament.id]);
       if (entrants.rowCount < 2) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'At least two isolated-validated bot versions are required' }); }
+      if (entrants.rowCount > 64) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Giải vòng tròn vượt 64 người; cần chia bảng hoặc dùng vòng loại.' }); }
       const schedule = createRoundRobinSchedule(entrants.rows.map(row => row.bot_version_id));
       for (const pairing of schedule) {
         const matchId = randomUUID();
@@ -476,7 +498,7 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       await client.query('COMMIT');
       res.status(202).json({ tournamentId: tournament.id, scheduledMatches: schedule.length });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       next(error);
     } finally { client?.release(); }
   });
@@ -568,23 +590,21 @@ export function createBotPlatformRouter({ pool, authSecret }) {
     } catch (error) { next(error); }
   });
 
-  router.get('/admin/jobs', requireAdmin, async (_req, res, next) => {
+  router.get('/admin/jobs', requireAdmin, async (req, res, next) => {
     try {
-      const result = await pool.query(`SELECT j.id, j.match_id, j.status, j.attempts, j.lease_until, j.created_at, j.updated_at,
-        m.tournament_id, 'MATCH' AS job_type FROM runner_jobs j JOIN matches m ON m.id = j.match_id
-        UNION ALL
-        SELECT v.id, NULL::uuid AS match_id, v.status, v.attempts, v.lease_until, v.created_at, v.updated_at,
-        NULL::uuid AS tournament_id, 'VALIDATION' AS job_type FROM bot_validation_jobs v
-        ORDER BY created_at DESC LIMIT 200`);
-      res.json({ jobs: result.rows });
+      const paging = pagination(req.query);
+      const filters = jobFilters(req.query);
+      const result = await pool.query(ADMIN_JOBS_SQL, [paging.limit + 1, paging.offset, filters.status, filters.type, filters.reference]);
+      res.json(pageResult(result.rows, paging, 'jobs'));
     } catch (error) { next(error); }
   });
 
   router.post('/admin/jobs/:jobId/retry', requireAdmin, async (req, res, next) => {
     const { jobType } = req.body || {};
     if (!['MATCH', 'VALIDATION'].includes(jobType)) return res.status(400).json({ error: 'jobType must be MATCH or VALIDATION' });
-    const client = await pool.connect();
+    let client;
     try {
+      client = await pool.connect();
       await client.query('BEGIN');
       if (jobType === 'MATCH') {
         const match = await client.query(`UPDATE runner_jobs j SET status = 'QUEUED', attempts = 0, lease_until = NULL, updated_at = now()
@@ -607,14 +627,23 @@ export function createBotPlatformRouter({ pool, authSecret }) {
       await client.query('COMMIT');
       res.status(202).json({ queued: true });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      await rollbackQuietly(client);
       next(error);
-    } finally { client.release(); }
+    } finally { client?.release(); }
   });
 
+  installQualifierRoutes(router, { pool, requireUser, requireAdmin });
+  installChallengeRoutes(router, { pool, requireUser });
+  installAdminMonitorRoutes(router, { pool, requireAdmin });
+
   router.use((error, _req, res, _next) => {
+    if ([400,404,409,429].includes(error?.status)) return res.status(error.status).json({ error: error.message });
     if (error?.type === 'entity.too.large') return res.status(413).json({ error: 'Python file must be 64 KiB or smaller' });
     console.error('Bot platform request failed:', error?.message || error);
+    if (isDatabaseUnavailable(error)) {
+      res.set('Retry-After', '5');
+      return res.status(503).json({ error: 'Database is temporarily unavailable. Please try again shortly.' });
+    }
     res.status(500).json({ error: 'Request could not be completed' });
   });
   return router;

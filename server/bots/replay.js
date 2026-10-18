@@ -1,4 +1,5 @@
 import { ServerGameSession } from '../game.js';
+import { isDeepStrictEqual } from 'node:util';
 
 /** Rebuild a recorded frame through the same authoritative engine as live play. */
 export function replayFrame(record, ply = record?.moves?.length) {
@@ -6,7 +7,8 @@ export function replayFrame(record, ply = record?.moves?.length) {
     throw new Error('Invalid replay position');
   }
   const game = new ServerGameSession(record.matchId || 'replay');
-  if (JSON.stringify(game.board) !== JSON.stringify(record.initialBoard)) throw new Error('Replay starting board differs from game rules');
+  // PostgreSQL jsonb may reorder object keys; compare board contents instead.
+  if (!isDeepStrictEqual(game.board, record.initialBoard)) throw new Error('Replay starting board differs from game rules');
   for (let index = 0; index < ply; index++) {
     const saved = record.moves[index];
     if (saved.ply !== index + 1 || saved.player !== game.currentTurn) throw new Error('Replay turn order is invalid');

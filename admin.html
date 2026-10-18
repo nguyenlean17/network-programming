@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Theo dõi giải đấu — OTTv2</title><link rel="stylesheet" href="css/bots.css"><link rel="stylesheet" href="css/admin.css"></head>
+<body>
+  <header class="hub-header"><a class="back-link" href="/bots.html">← Góc bot</a><div class="brand-mark" aria-hidden="true">📋</div><div class="brand-text"><strong>Theo dõi vận hành</strong><span>Dành cho ban tổ chức.</span></div></header>
+  <main class="hub-main admin-main">
+    <div id="monitor-notice" class="notice" role="status">Đang kiểm tra quyền truy cập…</div>
+    <section id="monitor-login" class="panel" hidden><h1>Cần tài khoản quản trị</h1><p>Đăng nhập tại Góc bot rồi mở lại trang này.</p><a href="/bots.html">Đến trang đăng nhập →</a></section>
+    <div id="monitor-content" hidden>
+      <section class="panel"><div class="section-heading"><h1>Tình trạng chấm bài</h1><button id="refresh-overview" class="button" type="button">Cập nhật số liệu</button></div><p id="monitor-time" class="card-meta"></p><p id="worker-coverage" role="status"></p><div id="queue-overview" class="card-list"></div></section>
+      <section class="panel"><h2>Worker và tài nguyên</h2><p class="form-hint">Số đo CPU/RAM thuộc tiến trình Node của worker, không phải sandbox Python hoặc toàn bộ máy chủ. CPU 100% tương đương một lõi; dấu “—” là chưa có số đo. Worker gửi cập nhật khoảng 30 giây/lần, quá 90 giây không có tín hiệu sẽ được đánh dấu mất kết nối.</p><div id="worker-list" class="card-list"></div></section>
+      <section class="panel"><h2>Tra cứu tác vụ</h2><form id="job-filters" class="monitor-filters">
+        <label>Trạng thái<select name="status"><option value="FAILED">Thất bại</option><option value="QUEUED">Chờ xử lý</option><option value="RUNNING">Đang chạy</option><option value="SUCCEEDED">Hoàn tất xử lý</option><option value="">Tất cả</option></select></label>
+        <label>Loại<select name="type"><option value="">Tất cả</option><option value="MATCH">Trận đấu</option><option value="VALIDATION">Kiểm tra mã</option></select></label>
+        <label>Mã tra cứu<input name="reference" maxlength="36" placeholder="Mã trận, bài nộp, vòng loại hoặc tác vụ"></label><button class="button primary" type="submit">Tìm tác vụ</button>
+      </form><p class="form-hint">Nhập UUID đầy đủ của tác vụ, trận, giải, vòng loại, bài nộp hoặc phiên bản bot. Chỉ tác vụ thất bại mới có thể đưa vào hàng đợi chạy lại.</p><div id="monitor-jobs" class="card-list"></div></section>
+      <section class="panel"><h2>Nhật ký quản trị</h2><form id="audit-filters" class="monitor-filters"><label>Mã đối tượng<input name="reference" maxlength="36" placeholder="UUID trận, giải, bài hoặc tài khoản"></label><button class="button" type="submit">Tra cứu nhật ký</button></form><p class="form-hint">Các thao tác đã được hệ thống ghi nhận, như tạo/chốt giải, đổi quyền và yêu cầu chạy lại. Đây không phải nhật ký đầy đủ của mọi yêu cầu truy cập.</p><div id="monitor-audit" class="card-list"></div></section>
+    </div>
+  </main><script type="module" src="js/adminMonitor.js"></script>
+</body></html>

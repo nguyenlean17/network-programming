@@ -19,7 +19,7 @@ const pool = {
     }
     if (sql.includes('FROM users WHERE lower(email)')) {
       return { rowCount: account?.email === params[0] ? 1 : 0,
-        rows: account?.email === params[0] ? [{ id: account.id, email: account.email, display_name: account.displayName, password_hash: account.passwordHash }] : [] };
+        rows: account?.email === params[0] ? [{ id: account.id, email: account.email, display_name: account.displayName, password_hash: account.passwordHash, role: account.role }] : [] };
     }
     if (sql.includes('FROM users WHERE id = $1')) return { rowCount: account?.id === params[0] ? 1 : 0,
       rows: account ? [{ id: account.id, email: account.email, display_name: account.displayName, role: account.role }] : [] };
@@ -50,7 +50,7 @@ const pool = {
       tournamentStatus = 'CANCELLED'; return { rowCount: 1, rows: [{ id: params[0], status: tournamentStatus }] };
     }
     if (sql.includes('INSERT INTO audit_logs')) return { rowCount: 1, rows: [] };
-    if (sql.includes('FROM users ORDER BY created_at DESC LIMIT 500')) return { rowCount: 2, rows: [
+    if (sql.includes('FROM users ORDER BY created_at DESC, id LIMIT')) return { rowCount: 2, rows: [
       { id: account.id, email: account.email, display_name: account.displayName, role: account.role },
       { id: 'user-2', email: 'other@example.test', display_name: 'Other', role: 'USER' }] };
     if (sql.startsWith('UPDATE users SET role')) return { rowCount: params[0] === 'user-2' ? 1 : 0,
@@ -64,6 +64,7 @@ const pool = {
       async query(sql, params = []) {
         if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rowCount: 0, rows: [] };
         if (sql.includes('pg_advisory_xact_lock')) return { rowCount: 1, rows: [] };
+        if (sql.includes('AS total') && sql.includes('AS daily')) return { rowCount: 1, rows: [{ total: 0, daily: 0, pending: 0 }] };
         if (sql.includes('FROM bot_versions v JOIN bots b') && sql.includes('FOR SHARE OF v')) {
           const rows = [];
           if (params[0].includes(version?.id) && version?.validation_status === 'READY') rows.push({ id: version.id, owner_id: bot.ownerId });
@@ -105,6 +106,7 @@ try {
   assert.equal(registered.status, 201);
   const { user, accessToken } = await registered.json();
   assert.equal(user.email, 'player@example.test');
+  assert.equal(user.role, 'USER');
   assert.equal((await fetch(`${base}/bots`)).status, 401);
   const headers = { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' };
   assert.equal((await fetch(`${base}/auth/me`, { headers })).status, 200);
@@ -151,6 +153,12 @@ try {
     body: JSON.stringify({ name: 'Season', submissionDeadline: null }) });
   assert.equal(deniedTournamentEdit.status, 403, 'tournament administration is role protected');
   account.role = 'ADMIN';
+  const adminLogin = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: user.email, password: 'correct horse battery staple' }) });
+  assert.equal(adminLogin.status, 200);
+  const adminSession = await adminLogin.json();
+  assert.equal(adminSession.user.role, 'ADMIN', 'admin controls must be available immediately after login');
+  assert.equal(adminSession.user.password_hash, undefined, 'login must not expose the stored password hash');
   const tournamentEdit = await fetch(`${base}/tournaments/t1`, { method: 'PATCH', headers,
     body: JSON.stringify({ name: 'Season', submissionDeadline: null }) });
   assert.equal(tournamentEdit.status, 200);

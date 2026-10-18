@@ -31,7 +31,7 @@ function trustedSample(player, request) {
 }
 
 const match = await runBotMatch({ runner: trustedSample, maxPlies: 12 });
-assert.ok(match.moves.length > 0);
+assert.ok(match.moves.length > 0, JSON.stringify(match.result));
 assert.equal(match.moves.length, 12);
 assert.equal(match.result.reason, 'MOVE_LIMIT');
 console.log('✓ Two trusted Python examples completed a local match');

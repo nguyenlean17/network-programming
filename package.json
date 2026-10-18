@@ -7,7 +7,7 @@
     "start": "node server/server.js",
     "server": "node server/server.js",
     "bot-worker": "node server/bots/worker.js",
-    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js && node tests/bot-auth.test.js && node tests/bot-platform-api.test.js && node tests/bot-source-archive.test.js && node tests/bot-protocol.test.js && node tests/bot-match.test.js && node tests/bot-render-sandbox.test.js && node tests/bot-replay.test.js && node tests/bot-schedule.test.js && node tests/bot-standings.test.js && node tests/bot-sample-seed.test.js && node tests/bot-samples.test.js"
+    "test": "node tests/rules.test.js && node tests/multiplayer.test.js && node tests/renderSync.test.js && node tests/server.integration.test.js && node tests/server.timer.test.js && node tests/bot-auth.test.js && node tests/bot-platform-api.test.js && node tests/bot-database-failure.test.js && node tests/bot-hub.test.js && node tests/bot-source-archive.test.js && node tests/bot-protocol.test.js && node tests/bot-match.test.js && node tests/bot-render-sandbox.test.js && node tests/bot-worker-readiness.test.js && node tests/bot-replay.test.js && node tests/bot-schedule.test.js && node tests/bot-tournament-completion.test.js && node tests/bot-standings.test.js && node tests/bot-sample-seed.test.js && node tests/bot-samples.test.js && node tests/bot-job-picker.test.js && node tests/bot-qualifier-hub.test.js && node tests/bot-qualifiers.integration.test.js && node tests/bot-learning.test.js && node tests/bot-challenge-hub.test.js && node tests/bot-match-share.test.js && node tests/bot-worker-metrics.test.js && node tests/bot-admin-monitor-ui.test.js"
   },
   "dependencies": {
     "@renderinc/sdk": "^1.2.0",
@@ -24,5 +24,8 @@
     "vercel"
   ],
   "author": "nguyenlean17",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10"
+  }
 }

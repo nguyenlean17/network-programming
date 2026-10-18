@@ -1,4 +1,7 @@
 import { BoardRenderer } from './board.js';
+import { setupResultSharing } from './matchShare.js';
+
+const updateSharing = setupResultSharing({ document, navigator, location, URL, Blob, setTimeout });
 
 const params = new URLSearchParams(location.search);
 const matchId = params.get('id');
@@ -43,6 +46,7 @@ function describeResult(state = matchStatus, error = matchError) {
 }
 
 function updateMatchState(data) {
+  updateSharing(data);
   matchStatus = data.status;
   matchResult = data.result;
   matchError = data.errorMessage;
@@ -96,7 +100,7 @@ else {
       renderer.render(data.frame.board, data.frame.currentTurn, data.frame.lastMove);
       counter.textContent = `0 / ${totalPlies}`;
       document.getElementById('player-summary').textContent =
-        `${data.matchKind === 'PRACTICE' ? 'Trận luyện tập' : 'Trận giải'} · 🌸 P1 ${data.players.p1.botName} · ${data.players.p1.ownerName}  |  🌿 P2 ${data.players.p2.botName} · ${data.players.p2.ownerName}`;
+        `${data.matchKind === 'PRACTICE' ? 'Trận luyện tập' : data.matchKind === 'QUALIFICATION' ? 'Trận vòng loại' : 'Trận giải'} · 🌸 P1 ${data.players.p1.botName} · ${data.players.p1.ownerName}  |  🌿 P2 ${data.players.p2.botName} · ${data.players.p2.ownerName}`;
       description.textContent = totalPlies ? 'Bàn cờ ở trạng thái ban đầu.' : 'Trận không có nước đi đã lưu.';
       if (data.status === 'RUNNING' || data.status === 'QUEUED') {
         liveRefresh = setInterval(async () => {

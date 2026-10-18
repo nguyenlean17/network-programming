@@ -2,6 +2,12 @@ import pg from 'pg';
 import { Render } from '@renderinc/sdk';
 import { runBotMatch } from './match.js';
 import { createRenderSandboxRunner, validatePythonBot } from './renderSandboxRunner.js';
+import { completeTournament } from './completeTournament.js';
+import { watchPoolErrors } from './database.js';
+import { migrateBotPlatform } from './migrate.js';
+import { verifyWorkerSandbox, startWorkerHeartbeat } from './workerReadiness.js';
+import { completeQualificationSubmission } from './qualification.js';
+import { createJobPicker } from './jobPicker.js';
 
 const { Pool } = pg;
 const pollMs = Number(process.env.BOT_WORKER_POLL_MS) > 0 ? Number(process.env.BOT_WORKER_POLL_MS) : 1500;
@@ -13,6 +19,7 @@ if (!process.env.DATABASE_URL || !process.env.RENDER_API_KEY || !process.env.REN
 }
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 5000 });
+watchPoolErrors(pool, 'Bot worker');
 const render = new Render({ token: process.env.RENDER_API_KEY, ownerId: process.env.RENDER_WORKSPACE_ID });
 const sandboxes = render.experimental.sandboxes;
 let stopping = false;
@@ -37,7 +44,7 @@ async function claimJob() {
       WHERE (status = 'QUEUED' OR (status = 'RUNNING' AND lease_until < now())) AND attempts < $1
         AND EXISTS (SELECT 1 FROM matches m LEFT JOIN tournaments t ON t.id = m.tournament_id
           WHERE m.id = runner_jobs.match_id AND
-            (m.kind = 'PRACTICE' OR (m.kind = 'TOURNAMENT' AND t.status = 'RUNNING')))
+            (m.kind IN ('PRACTICE','QUALIFICATION') OR (m.kind = 'TOURNAMENT' AND t.status = 'RUNNING')))
       ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
     )
     UPDATE runner_jobs j SET status = 'RUNNING', attempts = j.attempts + 1,
@@ -146,12 +153,8 @@ async function saveMatch(job, record) {
       initial_board_json = $3::jsonb, final_board_json = $4::jsonb, completed_at = now(), error_message = NULL
       WHERE id = $1`, [job.match_id, JSON.stringify(record.result), JSON.stringify(record.initialBoard), JSON.stringify(record.finalBoard)]);
     await client.query("UPDATE runner_jobs SET status = 'SUCCEEDED', lease_until = NULL, updated_at = now() WHERE id = $1", [job.id]);
-    const finishedTournament = await client.query(`UPDATE tournaments SET status = 'COMPLETED', completed_at = now()
-      WHERE id = (SELECT tournament_id FROM matches WHERE id = $1) AND status = 'RUNNING'
-        AND NOT EXISTS (SELECT 1 FROM matches WHERE tournament_id = (SELECT tournament_id FROM matches WHERE id = $1)
-          AND status <> 'COMPLETED') RETURNING id`, [job.match_id]);
-    if (finishedTournament.rowCount) await client.query(`INSERT INTO audit_logs (id, actor_id, action, subject_type, subject_id, details_json)
-      VALUES (gen_random_uuid(), NULL, 'TOURNAMENT_AUTO_COMPLETED', 'TOURNAMENT', $1, '{}'::jsonb)`, [finishedTournament.rows[0].id]);
+    await completeTournament(client, job.match_id);
+    await completeQualificationSubmission(client, job.match_id);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -163,7 +166,7 @@ async function executeJob(job) {
   const heartbeat = setInterval(() => renewLease(job.id, job.attempts).catch(error => console.error('Could not renew runner lease:', error.message)), 30000);
   try {
     const match = await pool.query(`SELECT id, p1_version_id, p2_version_id, rules_json, kind
-      FROM matches WHERE id = $1 AND kind IN ('TOURNAMENT', 'PRACTICE')`, [job.match_id]);
+      FROM matches WHERE id = $1 AND kind IN ('TOURNAMENT', 'PRACTICE', 'QUALIFICATION')`, [job.match_id]);
     if (!match.rowCount) throw new Error('Bot match record is missing');
     const row = match.rows[0];
     const versions = await pool.query(`SELECT id, source, validation_status FROM bot_versions
@@ -224,22 +227,28 @@ async function executeValidation(job) {
 }
 
 async function main() {
-  console.log('OTTv2 isolated bot worker started');
-  while (!stopping) {
-    try {
-      const validation = await claimValidationJob();
-      if (validation) await executeValidation(validation);
-      else {
-        const job = await claimJob();
-        if (job) await executeJob(job);
+  let stopHeartbeat;
+  try {
+    const pickJob = createJobPicker({ claimValidation: claimValidationJob, claimMatch: claimJob, role: process.env.BOT_WORKER_ROLE || 'all' });
+    await migrateBotPlatform(pool);
+    await verifyWorkerSandbox(sandboxes);
+    stopHeartbeat = await startWorkerHeartbeat(pool, process.env.BOT_WORKER_ROLE || 'all');
+    console.log('OTTv2 isolated bot worker started');
+    while (!stopping) {
+      try {
+        const next = await pickJob();
+        if (next?.type === 'validation') await executeValidation(next.job);
+        else if (next) await executeJob(next.job);
         else await new Promise(resolve => setTimeout(resolve, pollMs));
+      } catch (error) {
+        console.error('Worker loop error:', error.message);
+        await new Promise(resolve => setTimeout(resolve, Math.min(pollMs * 5, 10000)));
       }
-    } catch (error) {
-      console.error('Worker loop error:', error.message);
-      await new Promise(resolve => setTimeout(resolve, Math.min(pollMs * 5, 10000)));
     }
+  } finally {
+    if (stopHeartbeat) await stopHeartbeat().catch(() => {});
+    await pool.end();
   }
-  await pool.end();
 }
 
 process.once('SIGTERM', () => { stopping = true; });
